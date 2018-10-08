@@ -1,0 +1,9 @@
+[package]
+name = "game"
+version = "0.1.0"
+authors = ["Expenses <expenses@airmail.cc>"]
+
+[dependencies]
+glium = "*"
+obj = {version = "*", features = ["genmesh"]}
+genmesh = "*"
