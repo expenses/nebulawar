@@ -7,3 +7,8 @@ authors = ["Expenses <expenses@airmail.cc>"]
 glium = "*"
 obj = {version = "*", features = ["genmesh"]}
 genmesh = "*"
+image = "*"
+line_drawing = "*"
+arrayvec = "*"
+cgmath = "*"
+#lyon = "*"
