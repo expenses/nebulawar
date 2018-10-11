@@ -168,7 +168,7 @@ fn main() {
                 },
                 glutin::WindowEvent::MouseWheel {delta, ..} => match delta {
                     MouseScrollDelta::PixelDelta(LogicalPosition {y, ..}) => camera.change_distance(y as f32 / 20.0),
-                    MouseScrollDelta::LineDelta(_, _) => unimplemented!("Line delta not implemented yet")
+                    MouseScrollDelta::LineDelta(_, y) => camera.change_distance(-y * 2.0)
                 },
                 _ => ()
             }

@@ -57,7 +57,7 @@ impl Context {
     pub fn new(events_loop: &EventsLoop) -> Self {
         let window = glutin::WindowBuilder::new();
         let context = glutin::ContextBuilder::new()
-            .with_multisampling(4)
+            .with_multisampling(16)
             .with_depth_buffer(24)
             .with_vsync(true);
         
@@ -158,6 +158,10 @@ impl Context {
         perspective_matrix(self.aspect_ratio())
     }
 
+    fn dpi(&self) -> f32 {
+        self.display.gl_window().get_hidpi_factor() as f32
+    }
+
     pub fn screen_position(&self, model: Matrix4<f32>, camera: &Camera) -> Option<(f32, f32)> {
         let modelview = camera.view_matrix() * model;
 
@@ -169,7 +173,8 @@ impl Context {
 
         if z < 1.0 {
             let (width, height) = self.screen_dimensions();
-            Some(opengl_pos_to_screen_pos(x, y, width, height))
+            let (x, y) = opengl_pos_to_screen_pos(x, y, width, height);
+            Some((x * 2.0 / self.dpi(), y * 2.0 / self.dpi()))
         } else {
             None
         }
@@ -181,7 +186,7 @@ impl Context {
         let (x, y) = self.controls.mouse;
         let (x, y) = (x as f32, y as f32);
         // Not sure why we have to do this
-        let (x, y) = (x * 2.0, y * 2.0);
+        let (x, y) = (x * self.dpi(), y * self.dpi());
 
         let (width, height) = self.screen_dimensions();
         let (x, y) = screen_pos_to_opengl_pos(x, y, width, height);
