@@ -11,10 +11,10 @@ use {
 };
 
 use camera::*;
-
 use lines::*;
 use *;
 
+use runic;
 
 #[derive(Copy, Clone)]
 pub struct Vertex {
@@ -30,7 +30,8 @@ pub struct Context {
     program: Program,
     target: Frame,
     resources: Resources,
-    lines: LineRenderer
+    lines: LineRenderer,
+    text_program: Program
 }
 
 impl Context {
@@ -55,6 +56,7 @@ impl Context {
             target: display.draw(),
             program,
             lines: LineRenderer::new(&display),
+            text_program: runic::default_program(&display).unwrap(),
             display
         }
     }
@@ -113,6 +115,10 @@ impl Context {
         };
 
         self.target.draw(&self.resources.skybox, &NoIndices(PrimitiveType::TrianglesList), &self.program, &uniforms, &params).unwrap();
+    }
+
+    pub fn render_text(&mut self, text: &str, x: f32, y: f32) {
+        self.resources.font.render(text, [x, y], 20.0, [1.0; 4], &mut self.target, &self.display, &self.text_program).unwrap();
     }
 
     pub fn render_line(&mut self, start: (f32, f32), end: (f32, f32)) {

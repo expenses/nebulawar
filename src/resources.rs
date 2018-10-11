@@ -62,7 +62,8 @@ impl Model {
 pub struct Resources {
     pub models: [Model; 2],
     pub skybox: VertexBuffer<Vertex>,
-    pub skybox_images: [SrgbTexture2d; 1]
+    pub skybox_images: [SrgbTexture2d; 1],
+    pub font: runic::CachedFont<'static>
 }
 
 impl Resources {
@@ -75,7 +76,9 @@ impl Resources {
             skybox: load_wavefront(display, &fs::read("models/skybox.obj").unwrap()),
             skybox_images: [
                 load_image(display, &fs::read("models/skybox.png").unwrap())
-            ]
+            ],
+            font: runic::CachedFont::from_bytes(include_bytes!("DS-DIGIB.TTF"), display).unwrap()
         }
     }
 }
+use runic;

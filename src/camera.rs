@@ -1,20 +1,17 @@
 use cgmath::*;
 use std::f32::consts::*;
 use util::*;
-use collision::*;
+use *;
 
 pub struct Camera {
     center: Vector3<f32>,
     longitude: f32,
     latitude: f32,
-    distance: f32
+    distance: f32,
+    focus: HashSet<usize>
 }
 
 impl Camera {
-    pub fn set_position(&mut self, position: Vector3<f32>) {
-        self.center = position;
-    }
-
     pub fn rotate_longitude(&mut self, amount: f32) {
         self.longitude += amount;
     }
@@ -31,11 +28,13 @@ impl Camera {
     pub fn move_sideways(&mut self, amount: f32) {
         self.center.x -= amount * (-self.longitude).cos();
         self.center.z -= amount * (-self.longitude).sin();
+        self.focus.clear();
     }
 
     pub fn move_forwards(&mut self, amount: f32) {
         self.center.x -= amount * self.longitude.sin();
         self.center.z -= amount * self.longitude.cos();
+        self.focus.clear();
     }
 
     fn direction(&self) -> Vector3<f32> {
@@ -56,11 +55,17 @@ impl Camera {
         )
     }
 
-    /*pub fn fire_ray(&self, x: f32, y: f32) -> Ray<f32, Point3<f32>, Vector3<f32>> {
-        let dx = (FOV * 0.5).tan() * 
+    pub fn step(&mut self, ships: &Ships) {
+        if !self.focus.is_empty() {
+            self.center = self.focus.iter().fold(Vector3::zero(), |vector, index| {
+                vector + ships[*index].position
+            }) / self.focus.len() as f32;
+        }
+    }
 
-        //Ray::new(vector_to_point(self.position()), -self.direction())
-    }*/
+    pub fn set_focus(&mut self, ships: &HashSet<usize>) {
+        self.focus.clone_from(ships)
+    }
 }
 
 impl Default for Camera {
@@ -69,7 +74,8 @@ impl Default for Camera {
             center: Vector3::new(0.0, 0.0, 0.0),
             longitude: 0.0,
             latitude: FRAC_PI_4,
-            distance: 30.0
+            distance: 30.0,
+            focus: HashSet::new()
         }
     }
 }

@@ -12,3 +12,5 @@ arrayvec = "*"
 cgmath = "*"
 lyon = "*"
 collision = "*"
+runic = {git = "https://github.com/expenses/runic"}
+derive_is_enum_variant = "*"
