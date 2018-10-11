@@ -25,31 +25,11 @@ pub struct Vertex {
 
 implement_vertex!(Vertex, position, normal, texture);
 
-#[derive(Default)]
-pub struct Controls {
-    pub mouse: (f64, f64),
-    pub left_pressed: bool,
-    pub left_drag: Option<(f64, f64)>,
-    pub right_pressed: bool,
-    pub left: bool,
-    pub right: bool,
-    pub forwards: bool,
-    pub back: bool
-}
-
-impl Controls {
-    pub fn right_dragging(&self) -> bool {
-        self.mouse != (0.0, 0.0) && self.right_pressed
-    }
-}
-
-
 pub struct Context {
     display: Display,
     program: Program,
     target: Frame,
     resources: Resources,
-    pub controls: Controls,
     lines: LineRenderer
 }
 
@@ -75,8 +55,7 @@ impl Context {
             target: display.draw(),
             program,
             lines: LineRenderer::new(&display),
-            display,
-            controls: Controls::default()
+            display
         }
     }
 
@@ -181,10 +160,9 @@ impl Context {
     }
 
     // http://webglfactory.blogspot.com/2011/05/how-to-convert-world-to-screen.html
-    pub fn ray(&self, camera: &Camera) -> collision::Ray<f32, Point3<f32>, Vector3<f32>> {
+    pub fn ray(&self, camera: &Camera, mouse: (f32, f32)) -> collision::Ray<f32, Point3<f32>, Vector3<f32>> {
         // Get mouse position
-        let (x, y) = self.controls.mouse;
-        let (x, y) = (x as f32, y as f32);
+        let (x, y) = mouse;
         // Not sure why we have to do this
         let (x, y) = (x * self.dpi(), y * self.dpi());
 

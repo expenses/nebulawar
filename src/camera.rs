@@ -11,6 +11,10 @@ pub struct Camera {
 }
 
 impl Camera {
+    pub fn set_position(&mut self, position: Vector3<f32>) {
+        self.center = position;
+    }
+
     pub fn rotate_longitude(&mut self, amount: f32) {
         self.longitude += amount;
     }
