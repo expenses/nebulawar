@@ -13,6 +13,7 @@ extern crate rand;
 
 use rand::rngs::*;
 use rand::Rng;
+use rand::distributions::*;
 
 use glium::*;
 use glutin::*;
@@ -48,25 +49,42 @@ fn average_position(selection: &HashSet<ShipID>, ships: &AutoIDMap<ShipID, Ship>
     }
 }
 
+// http://corysimon.github.io/articles/uniformdistn-on-sphere/
+fn uniform_sphere_distribution(rng: &mut ThreadRng) -> Vector3<f32> {
+    let uniform = Normal::new(0.0, 1.0);
+
+    let x = uniform.ind_sample(rng);
+    let y = uniform.ind_sample(rng);
+
+    let theta = 2.0 * std::f64::consts::PI * x;
+    // the % 1.0 here is to prevent NaN if the value is out of [-1, 1]
+    let phi = ((1.0 - 2.0 * y) % 1.0).acos();
+
+    Vector3::new(
+        (phi.sin() * theta.cos()) as f32,
+        (phi.sin() * theta.sin()) as f32,
+        phi.cos() as f32
+    )
+}
+
 pub struct System {
     pub location: (f32, f32),
-    pub stars: Vec<Quaternion<f32>>,
-    pub light: [f32; 3]
+    pub stars: Vec<Vector3<f32>>,
+    pub light: Vector3<f32>
 }
 
 impl System {
     fn new(location: (f32, f32), rng: &mut ThreadRng) -> Self {
-        let distance_from_center = location.1.hypot(location.2);
+        let distance_from_center = location.0.hypot(location.1);
 
-        use rand::Rand;
         let stars = rng.gen_range(100, 1000);
 
         let stars = (0 .. stars)
-            .map(|_| Quaternion::new(rng.gen(), rng.gen(), rng.gen(), rng.gen()))
+            .map(|_| uniform_sphere_distribution(rng))
             .collect();
 
         Self {
-            light: [50.0, 50.0, 50.0],
+            light: uniform_sphere_distribution(rng),
             stars, location
         }
     }
@@ -83,7 +101,7 @@ struct Game {
     controls: Controls,
     plane_y: f32,
     selected: HashSet<ShipID>,
-    rng: rand::rngs::ThreadRng
+    rng: ThreadRng
 }
 
 impl Game {
@@ -96,7 +114,7 @@ impl Game {
             ships: AutoIDMap::new(),
             people: AutoIDMap::new(),
 
-            system: System::new(&mut rng),
+            system: System::new((-1.0, -1.0), &mut rng),
             camera: Camera::default(),
             controls: Controls::new(),
             plane_y: 0.0,

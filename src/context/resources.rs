@@ -6,6 +6,7 @@ use context::Vertex;
 use arrayvec::*;
 use image;
 use std::fs;
+use runic;
 
 use glium::texture::*;
 
@@ -51,16 +52,49 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn new(display: &Display, model: &str, image_filename: &str) -> Self {
+    fn new(display: &Display, model: &str, image_filename: &str) -> Self {
         Self {
             vertices: load_wavefront(display, &fs::read(model).unwrap()),
-            texture: load_image(&display, &fs::read(image_filename).unwrap())
+            texture: load_image(display, &fs::read(image_filename).unwrap())
+        }
+    }
+
+    fn billboard(display: &Display, image: &str) -> Self {
+        let normal = [0.0, 0.0, 1.0];
+        
+        let top_left = Vertex {
+            position: [-0.5, 0.5, 0.0],
+            texture: [0.0; 2],
+            normal
+        };
+
+        let top_right = Vertex {
+            position: [0.5, 0.5, 0.0],
+            texture: [1.0, 0.0],
+            normal
+        };
+
+        let bottom_left = Vertex {
+            position: [-0.5, -0.5, 0.0],
+            texture: [0.0, 1.0],
+            normal
+        };
+
+        let bottom_right = Vertex {
+            position: [0.5, -0.5, 0.0],
+            texture: [1.0; 2],
+            normal
+        };
+
+        Self {
+            vertices: VertexBuffer::new(display, &[top_left, top_right, bottom_left, top_right, bottom_right, bottom_left]).unwrap(),
+            texture: load_image(display, &fs::read(image).unwrap())
         }
     }
 }
 
 pub struct Resources {
-    pub models: [Model; 2],
+    pub models: [Model; 3],
     pub skybox: VertexBuffer<Vertex>,
     pub skybox_images: [SrgbTexture2d; 1],
     pub font: runic::CachedFont<'static>
@@ -71,7 +105,8 @@ impl Resources {
         Self {
             models: [
                 Model::new(display, "models/fighter.obj", "models/fighter.png"),
-                Model::new(display, "models/tanker.obj", "models/tanker.png")
+                Model::new(display, "models/tanker.obj", "models/tanker.png"),
+                Model::billboard(display, "models/star.png")
             ],
             skybox: load_wavefront(display, &fs::read("models/skybox.obj").unwrap()),
             skybox_images: [
@@ -81,4 +116,3 @@ impl Resources {
         }
     }
 }
-use runic;

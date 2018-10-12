@@ -7,17 +7,23 @@ in vec3 v_position;
 out vec4 color;
 uniform vec3 light_direction;
 uniform sampler2D tex;
-uniform bool shadeless;
+uniform int mode;
 
 float map(float min, float max, float value) {
     return value * (max - min) + min;
 }
 
-void main() {
-    vec3 texture_color = texture(tex, v_texture).rgb;
+const int NORMAL = 1;
+const int SHADELESS = 2;
+const int STARS = 3;
 
-    if (shadeless) {
-        color = vec4(texture_color, 1.0);
+void main() {
+    vec4 texture_color = texture(tex, v_texture);
+
+    if (mode == SHADELESS) {
+        color = texture_color;
+    } else if (mode == STARS) {
+        color = vec4(1.0);
     } else {
         vec3 light_dir = normalize(light_direction);  
 
@@ -25,6 +31,6 @@ void main() {
         
         float norm_brightness = mix(0.1, 1.0, max(brightness, 0.0));
 
-        color = vec4(norm_brightness * texture_color, 1.0);
+        color = vec4(norm_brightness * texture_color.rgb, texture_color.a);
     }
 }

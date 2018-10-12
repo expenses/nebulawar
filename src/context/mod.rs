@@ -21,6 +21,12 @@ use *;
 
 use runic;
 
+pub enum Mode {
+    Normal = 1,
+    Shadeless = 2,
+    Stars = 3
+}
+
 #[derive(Copy, Clone)]
 pub struct Vertex {
     pub position: [f32; 3],
@@ -81,17 +87,17 @@ impl Context {
 
     pub fn render_system(&mut self, system: &System, camera: &Camera) {
         let uniforms = uniform!{
-            model: matrix_to_array(Matrix4::from_scale(1.0)),
+            model: matrix_to_array(Matrix4::identity()),
             view: matrix_to_array(camera.view_matrix()),
             perspective: matrix_to_array(self.perspective_matrix()),
-            light_direction: system.light,
-            shadeless: true
+            light_direction: vector_to_array(system.light),
+            mode: Mode::Stars as i32
         };
 
         let vertices: Vec<Vertex> = system.stars.iter()
-            .map(|quat| {
+            .map(|vector| {
                 context::Vertex {
-                    position: (camera.position() + quat.rotate_vector(Vector3::new(1.0, 0.0, 0.0))).into(),
+                    position: (camera.position() + vector * 1000.0).into(),
                     normal: [0.0; 3],
                     texture: [0.0; 2]
                 }
@@ -109,28 +115,39 @@ impl Context {
             },
             backface_culling: BackfaceCullingMode::CullCounterClockwise,
             polygon_mode: PolygonMode::Point,
-            point_size: Some(4.0),
+            point_size: Some(2.0 * self.dpi()),
+            blend: Blend::alpha_blending(),
             .. Default::default()
         };
 
         self.target.draw(&buffer, &indices, &self.program, &uniforms, &params).unwrap();
+
+        let offset = system.light * 1000.0;
+
+        let rotation: Matrix4<f32> = Quaternion::look_at(offset, Vector3::new(0.0, 1.0, 0.0)).invert().into();
+
+        self.render(
+            2,
+            Matrix4::from_translation(camera.position() + offset) * rotation * Matrix4::from_scale(100.0),
+            camera, system, Mode::Shadeless
+        );
     }
 
-    pub fn uniforms<'a>(&self, position: Matrix4<f32>, camera: &Camera, light: [f32; 3], texture: &'a SrgbTexture2d, shadeless: bool) -> impl Uniforms + 'a {
+    pub fn uniforms<'a>(&self, position: Matrix4<f32>, camera: &Camera, system: &System, texture: &'a SrgbTexture2d, mode: Mode) -> impl Uniforms + 'a {
         uniform!{
             model: matrix_to_array(position),
             view: matrix_to_array(camera.view_matrix()),
             perspective: matrix_to_array(self.perspective_matrix()),
-            light_direction: light,
+            light_direction: vector_to_array(system.light),
             tex: Sampler::new(texture).minify_filter(MinifySamplerFilter::Nearest).magnify_filter(MagnifySamplerFilter::Nearest),
-            shadeless: shadeless
+            mode: mode as i32
         }
     }
 
-    pub fn render(&mut self, model: usize, position: Matrix4<f32>, camera: &Camera, light: [f32; 3]) {
+    pub fn render(&mut self, model: usize, position: Matrix4<f32>, camera: &Camera, system: &System, mode: Mode) {
         let model = &self.resources.models[model];
 
-        let uniforms = self.uniforms(position, camera, light, &model.texture, false);
+        let uniforms = self.uniforms(position, camera, system, &model.texture, mode);
 
         let params = DrawParameters {
             depth: Depth {
@@ -139,16 +156,17 @@ impl Context {
                 .. Default::default()
             },
             backface_culling: BackfaceCullingMode::CullCounterClockwise,
+            blend: Blend::alpha_blending(),
             .. Default::default()
         };
 
         self.target.draw(&model.vertices, &NoIndices(PrimitiveType::TrianglesList), &self.program, &uniforms, &params).unwrap();
     }
 
-    pub fn render_skybox(&mut self, camera: &Camera, index: usize) {
+    /*pub fn render_skybox(&mut self, camera: &Camera, index: usize) {
         let skybox_position = Matrix4::from_translation(camera.position()) * Matrix4::from_scale(100.0);
 
-        let uniforms = self.uniforms(skybox_position, camera, [0.0; 3], &self.resources.skybox_images[index], true);
+        let uniforms = self.uniforms(skybox_position, camera, [0.0; 3], &self.resources.skybox_images[index], Mode::Shadeless);
 
         let params = DrawParameters {
             depth: Depth {
@@ -161,7 +179,7 @@ impl Context {
         };
 
         self.target.draw(&self.resources.skybox, &NoIndices(PrimitiveType::TrianglesList), &self.program, &uniforms, &params).unwrap();
-    }
+    }*/
 
     pub fn render_text(&mut self, text: &str, x: f32, y: f32) {
         self.resources.font.render(text, [x, y], 20.0, [1.0; 4], &mut self.target, &self.display, &self.text_program).unwrap();

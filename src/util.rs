@@ -46,6 +46,10 @@ pub fn point_to_vector(point: Point3<f32>) -> Vector3<f32> {
     Vector3::new(point.x, point.y, point.z)
 }
 
+pub fn vector_to_array(vector: Vector3<f32>) -> [f32; 3] {
+    vector.into()
+}
+
 pub trait ID: Hash + Copy + Eq + Default {
     fn increment(&mut self);
 }

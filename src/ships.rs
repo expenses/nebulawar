@@ -3,6 +3,7 @@ use arrayvec::*;
 use cgmath::*;
 use camera::*;
 use *;
+use context::*;
 
 pub enum Formation {
     Screen,
@@ -202,7 +203,7 @@ impl Ship {
     }
 
     pub fn render(&self, context: &mut context::Context, camera: &Camera, system: &System) {
-        context.render(self.tag.model(), self.position_matrix(), camera, system.light);
+        context.render(self.tag.model(), self.position_matrix(), camera, system, Mode::Normal);
     }
 
     pub fn info(&self) -> String {
