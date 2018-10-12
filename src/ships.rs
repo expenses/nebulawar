@@ -105,10 +105,10 @@ pub enum ShipType {
 }
 
 impl ShipType {
-    fn model(&self) -> usize {
+    fn model(&self) -> Model {
         match *self {
-            ShipType::Fighter => 0,
-            ShipType::Tanker => 1
+            ShipType::Fighter => Model::Fighter,
+            ShipType::Tanker => Model::Tanker
         }
     }
 

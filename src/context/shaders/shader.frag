@@ -23,7 +23,7 @@ void main() {
     if (mode == SHADELESS) {
         color = texture_color;
     } else if (mode == STARS) {
-        color = vec4(1.0);
+        color = vec4(vec3(1.0), v_texture.x);
     } else {
         vec3 light_dir = normalize(light_direction);  
 

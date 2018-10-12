@@ -51,14 +51,28 @@ fn average_position(selection: &HashSet<ShipID>, ships: &AutoIDMap<ShipID, Ship>
 
 // http://corysimon.github.io/articles/uniformdistn-on-sphere/
 fn uniform_sphere_distribution(rng: &mut ThreadRng) -> Vector3<f32> {
+    use std::f64::consts::PI;
+
     let uniform = Normal::new(0.0, 1.0);
 
     let x = uniform.ind_sample(rng);
     let y = uniform.ind_sample(rng);
 
-    let theta = 2.0 * std::f64::consts::PI * x;
-    // the % 1.0 here is to prevent NaN if the value is out of [-1, 1]
-    let phi = ((1.0 - 2.0 * y) % 1.0).acos();
+    let theta = 2.0 * PI * x;
+
+    // Ensure that the phi value is between -1 and 1 but is still random
+
+    let mut value = (1.0 - 2.0 * y);
+
+    while value > 1.0 {
+        value -= 2.0;
+    }
+
+    while value < -1.0 {
+        value += 2.0;
+    }
+
+    let phi = value.acos();
 
     Vector3::new(
         (phi.sin() * theta.cos()) as f32,
@@ -69,22 +83,25 @@ fn uniform_sphere_distribution(rng: &mut ThreadRng) -> Vector3<f32> {
 
 pub struct System {
     pub location: (f32, f32),
-    pub stars: Vec<Vector3<f32>>,
-    pub light: Vector3<f32>
+    pub stars: Vec<(Vector3<f32>, f32)>,
+    pub light: Vector3<f32>,
+    pub background_color: (f32, f32, f32)
 }
 
 impl System {
     fn new(location: (f32, f32), rng: &mut ThreadRng) -> Self {
         let distance_from_center = location.0.hypot(location.1);
 
-        let stars = rng.gen_range(100, 1000);
+        //let stars = rng.gen_range(100, 1000);
+        let stars = 10000;
 
         let stars = (0 .. stars)
-            .map(|_| uniform_sphere_distribution(rng))
+            .map(|_| (uniform_sphere_distribution(rng), rng.gen()))
             .collect();
 
         Self {
             light: uniform_sphere_distribution(rng),
+            background_color: (0.0, 0.0, rng.gen_range(0.0, 0.25)),
             stars, location
         }
     }
@@ -239,7 +256,7 @@ impl Game {
     }
 
     fn render(&mut self) {
-        self.context.clear();
+        self.context.clear(&self.system);
 
         for ship in self.ships.iter() {
             ship.render(&mut self.context, &self.camera, &self.system);

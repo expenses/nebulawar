@@ -4,6 +4,8 @@ mod resources;
 use self::resources::*;
 use self::lines::*;
 
+pub use self::resources::Model;
+
 use cgmath::*;
 
 use {
@@ -72,8 +74,9 @@ impl Context {
         }
     }
 
-    pub fn clear(&mut self) {
-        self.target.clear_color_and_depth((0.0, 0.0, 0.0, 1.0), 1.0);
+    pub fn clear(&mut self, system: &System) {
+        let (r, g, b) = system.background_color;
+        self.target.clear_color_srgb_and_depth((r, g, b, 1.0), 1.0);
     }
 
     pub fn flush_ui(&mut self) {
@@ -83,6 +86,23 @@ impl Context {
     pub fn finish(&mut self) {
         self.target.set_finish().unwrap();
         self.target = self.display.draw();
+    }
+
+    fn render_billboard(&mut self, matrix: Matrix4<f32>, image: Image, camera: &Camera, system: &System) {
+        let uniforms = self.uniforms(matrix, camera, system, &self.resources.images[image as usize], Mode::Shadeless);
+
+        let params = DrawParameters {
+            depth: Depth {
+                test: DepthTest::IfLess,
+                write: true,
+                .. Default::default()
+            },
+            backface_culling: BackfaceCullingMode::CullCounterClockwise,
+            blend: Blend::alpha_blending(),
+            .. Default::default()
+        };
+
+        self.target.draw(&billboard(&self.display), &NoIndices(PrimitiveType::TrianglesList), &self.program, &uniforms, &params).unwrap();
     }
 
     pub fn render_system(&mut self, system: &System, camera: &Camera) {
@@ -95,11 +115,11 @@ impl Context {
         };
 
         let vertices: Vec<Vertex> = system.stars.iter()
-            .map(|vector| {
+            .map(|(vector, brightness)| {
                 context::Vertex {
-                    position: (camera.position() + vector * 1000.0).into(),
+                    position: (camera.position() + vector * 1010.0).into(),
                     normal: [0.0; 3],
-                    texture: [0.0; 2]
+                    texture: [*brightness; 2]
                 }
             })
             .collect();
@@ -125,12 +145,9 @@ impl Context {
         let offset = system.light * 1000.0;
 
         let rotation: Matrix4<f32> = Quaternion::look_at(offset, Vector3::new(0.0, 1.0, 0.0)).invert().into();
+        let matrix = Matrix4::from_translation(camera.position() + offset) * rotation * Matrix4::from_scale(100.0);
 
-        self.render(
-            2,
-            Matrix4::from_translation(camera.position() + offset) * rotation * Matrix4::from_scale(100.0),
-            camera, system, Mode::Shadeless
-        );
+        self.render_billboard(matrix, Image::Star, camera, system);
     }
 
     pub fn uniforms<'a>(&self, position: Matrix4<f32>, camera: &Camera, system: &System, texture: &'a SrgbTexture2d, mode: Mode) -> impl Uniforms + 'a {
@@ -144,8 +161,8 @@ impl Context {
         }
     }
 
-    pub fn render(&mut self, model: usize, position: Matrix4<f32>, camera: &Camera, system: &System, mode: Mode) {
-        let model = &self.resources.models[model];
+    pub fn render(&mut self, model: Model, position: Matrix4<f32>, camera: &Camera, system: &System, mode: Mode) {
+        let model = &self.resources.models[model as usize];
 
         let uniforms = self.uniforms(position, camera, system, &model.texture, mode);
 
@@ -162,24 +179,6 @@ impl Context {
 
         self.target.draw(&model.vertices, &NoIndices(PrimitiveType::TrianglesList), &self.program, &uniforms, &params).unwrap();
     }
-
-    /*pub fn render_skybox(&mut self, camera: &Camera, index: usize) {
-        let skybox_position = Matrix4::from_translation(camera.position()) * Matrix4::from_scale(100.0);
-
-        let uniforms = self.uniforms(skybox_position, camera, [0.0; 3], &self.resources.skybox_images[index], Mode::Shadeless);
-
-        let params = DrawParameters {
-            depth: Depth {
-                test: DepthTest::IfLess,
-                write: true,
-                .. Default::default()
-            },
-            backface_culling: BackfaceCullingMode::CullCounterClockwise,
-            .. Default::default()
-        };
-
-        self.target.draw(&self.resources.skybox, &NoIndices(PrimitiveType::TrianglesList), &self.program, &uniforms, &params).unwrap();
-    }*/
 
     pub fn render_text(&mut self, text: &str, x: f32, y: f32) {
         self.resources.font.render(text, [x, y], 20.0, [1.0; 4], &mut self.target, &self.display, &self.text_program).unwrap();
