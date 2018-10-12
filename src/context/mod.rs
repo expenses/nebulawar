@@ -1,3 +1,9 @@
+mod lines;
+mod resources;
+
+use self::resources::*;
+use self::lines::*;
+
 use cgmath::*;
 
 use {
@@ -11,7 +17,6 @@ use {
 };
 
 use camera::*;
-use lines::*;
 use *;
 
 use runic;
@@ -62,7 +67,11 @@ impl Context {
     }
 
     pub fn clear(&mut self) {
-        self.target.clear_color_and_depth((0.0, 0.5, 0.0, 1.0), 1.0);
+        self.target.clear_color_and_depth((0.0, 0.0, 0.0, 1.0), 1.0);
+    }
+
+    pub fn flush_ui(&mut self) {
+        self.lines.flush(&mut self.target, &self.display);
     }
 
     pub fn finish(&mut self) {
@@ -70,7 +79,44 @@ impl Context {
         self.target = self.display.draw();
     }
 
-    fn uniforms<'a>(&self, position: Matrix4<f32>, camera: &Camera, light: [f32; 3], texture: &'a SrgbTexture2d, shadeless: bool) -> impl Uniforms + 'a {
+    pub fn render_system(&mut self, system: &System, camera: &Camera) {
+        let uniforms = uniform!{
+            model: matrix_to_array(Matrix4::from_scale(1.0)),
+            view: matrix_to_array(camera.view_matrix()),
+            perspective: matrix_to_array(self.perspective_matrix()),
+            light_direction: system.light,
+            shadeless: true
+        };
+
+        let vertices: Vec<Vertex> = system.stars.iter()
+            .map(|quat| {
+                context::Vertex {
+                    position: (camera.position() + quat.rotate_vector(Vector3::new(1.0, 0.0, 0.0))).into(),
+                    normal: [0.0; 3],
+                    texture: [0.0; 2]
+                }
+            })
+            .collect();
+
+        let buffer = VertexBuffer::new(&self.display, &vertices).unwrap();
+        let indices = NoIndices(PrimitiveType::Points);
+
+        let params = DrawParameters {
+            depth: Depth {
+                test: DepthTest::IfLess,
+                write: true,
+                .. Default::default()
+            },
+            backface_culling: BackfaceCullingMode::CullCounterClockwise,
+            polygon_mode: PolygonMode::Point,
+            point_size: Some(4.0),
+            .. Default::default()
+        };
+
+        self.target.draw(&buffer, &indices, &self.program, &uniforms, &params).unwrap();
+    }
+
+    pub fn uniforms<'a>(&self, position: Matrix4<f32>, camera: &Camera, light: [f32; 3], texture: &'a SrgbTexture2d, shadeless: bool) -> impl Uniforms + 'a {
         uniform!{
             model: matrix_to_array(position),
             view: matrix_to_array(camera.view_matrix()),
@@ -121,12 +167,16 @@ impl Context {
         self.resources.font.render(text, [x, y], 20.0, [1.0; 4], &mut self.target, &self.display, &self.text_program).unwrap();
     }
 
+    pub fn render_rect(&mut self, top_left: (f32, f32), bottom_right: (f32, f32)) {
+        self.lines.render_rect(top_left, bottom_right);
+    }
+
     pub fn render_line(&mut self, start: (f32, f32), end: (f32, f32)) {
-        self.lines.render_line(start, end, &mut self.target, &self.display);
+        self.lines.render_line(start, end);
     }
 
     pub fn render_circle(&mut self, x: f32, y: f32, radius: f32) {
-        self.lines.render_circle(x, y, radius, &mut self.target, &self.display);
+        self.lines.render_circle(x, y, radius);
     }
 
     fn screen_dimensions(&self) -> (f32, f32) {

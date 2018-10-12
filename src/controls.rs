@@ -104,6 +104,10 @@ impl Controls {
         self.left_state.is_clicked()
     }
 
+    pub fn right_clicked(&self) -> bool {
+        self.right_state.is_clicked()
+    }
+
     pub fn left_drag(&self) -> Option<(f32, f32)>  {
         if let MouseState::Drag(x, y) = self.left_state {
             Some((x, y))

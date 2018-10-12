@@ -4,13 +4,23 @@ version = "0.1.0"
 authors = ["Expenses <expenses@airmail.cc>"]
 
 [dependencies]
+# OpenGL
 glium = "*"
+# model/uv loading
 obj = {version = "*", features = ["genmesh"]}
 genmesh = "*"
+# image loading
 image = "*"
+# Useful wrapper around arrays
 arrayvec = "*"
+# Easier matrices stuff
 cgmath = "*"
-lyon = "*"
+# collision detection extension for cgmath
 collision = "*"
+# 2d ui rendering (circles etc)
+lyon = "*"
+# text rendering
 runic = {git = "https://github.com/expenses/runic"}
+# lazy derive
 derive_is_enum_variant = "*"
+rand = "*"

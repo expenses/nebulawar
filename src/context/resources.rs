@@ -77,7 +77,7 @@ impl Resources {
             skybox_images: [
                 load_image(display, &fs::read("models/skybox.png").unwrap())
             ],
-            font: runic::CachedFont::from_bytes(include_bytes!("DS-DIGIB.TTF"), display).unwrap()
+            font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator-Bold.ttf"), display).unwrap()
         }
     }
 }

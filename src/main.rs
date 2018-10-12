@@ -1,5 +1,4 @@
 extern crate glium;
-
 extern crate obj;
 extern crate genmesh;
 extern crate image;
@@ -10,6 +9,10 @@ extern crate collision;
 extern crate runic;
 #[macro_use]
 extern crate derive_is_enum_variant;
+extern crate rand;
+
+use rand::rngs::*;
+use rand::Rng;
 
 use glium::*;
 use glutin::*;
@@ -17,56 +20,88 @@ use glutin::dpi::*;
 use cgmath::*;
 use collision::*;
 use std::collections::*;
+use std::f32::consts::*;
 
 mod camera;
-mod lines;
-mod resources;
 mod util;
 mod context;
 mod ships;
 mod controls;
+mod people;
 
+use people::*;
 use controls::*;
 
-use resources::*;
 use camera::*;
 use util::*;
 use ships::*;
 
-pub struct World {
-    light: [f32; 3],
-    skybox: usize
+fn average_position(selection: &HashSet<ShipID>, ships: &AutoIDMap<ShipID, Ship>) -> Option<Vector3<f32>> {
+    if !selection.is_empty() {
+        let position = selection.iter().fold(Vector3::zero(), |vector, index| {
+            vector + ships[*index].position
+        }) / selection.len() as f32;
+
+        Some(position)
+    } else {
+        None
+    }
 }
 
-impl World {
-    fn new() -> Self {
+pub struct System {
+    pub location: (f32, f32),
+    pub stars: Vec<Quaternion<f32>>,
+    pub light: [f32; 3]
+}
+
+impl System {
+    fn new(location: (f32, f32), rng: &mut ThreadRng) -> Self {
+        let distance_from_center = location.1.hypot(location.2);
+
+        use rand::Rand;
+        let stars = rng.gen_range(100, 1000);
+
+        let stars = (0 .. stars)
+            .map(|_| Quaternion::new(rng.gen(), rng.gen(), rng.gen(), rng.gen()))
+            .collect();
+
         Self {
             light: [50.0, 50.0, 50.0],
-            skybox: 0
+            stars, location
         }
     }
 }
 
 struct Game {
     context: context::Context,
-    ships: Ships,
-    world: World,
+    
+    ships: AutoIDMap<ShipID, Ship>,
+    people: AutoIDMap<PersonID, Person>,
+
+    system: System,
     camera: Camera,
     controls: Controls,
     plane_y: f32,
-    selected: HashSet<usize>
+    selected: HashSet<ShipID>,
+    rng: rand::rngs::ThreadRng
 }
 
 impl Game {
     fn new(events_loop: &EventsLoop) -> Self {
+        let mut rng = rand::thread_rng();
+
         Self {
             context: context::Context::new(events_loop),
-            ships: Ships::default(),
-            world: World::new(),
+            
+            ships: AutoIDMap::new(),
+            people: AutoIDMap::new(),
+
+            system: System::new(&mut rng),
             camera: Camera::default(),
             controls: Controls::new(),
             plane_y: 0.0,
-            selected: HashSet::new()
+            selected: HashSet::new(),
+            rng
         }
     }
 
@@ -98,21 +133,30 @@ impl Game {
 
     fn handle_keypress(&mut self, key: VirtualKeyCode, pressed: bool) {
         match key {
-            VirtualKeyCode::Left => self.controls.left = pressed,
-            VirtualKeyCode::Right => self.controls.right = pressed,
-            VirtualKeyCode::Up => self.controls.forwards = pressed,
-            VirtualKeyCode::Down => self.controls.back = pressed,
+            VirtualKeyCode::Left  | VirtualKeyCode::A => self.controls.left     = pressed,
+            VirtualKeyCode::Right | VirtualKeyCode::D => self.controls.right    = pressed,
+            VirtualKeyCode::Up    | VirtualKeyCode::W => self.controls.forwards = pressed,
+            VirtualKeyCode::Down  | VirtualKeyCode::S => self.controls.back     = pressed,
             VirtualKeyCode::T if pressed => if let Some(point) = self.point_under_mouse() {
-                self.ships.push(ShipType::Fighter, point, (0.0, 0.0, 0.0));
+                self.ships.push(Ship::new(ShipType::Fighter, point, (0.0, 0.0, 0.0)));
                 self.plane_y += 0.5;
             },
+            VirtualKeyCode::C => self.camera.set_focus(&self.selected),
             _ => {}
         }
+    }
+
+    fn average_position(&self) -> Option<Vector3<f32>> {
+        average_position(&self.selected, &self.ships)
     }
 
     fn update(&mut self) {
         if self.controls.middle_clicked() {
             self.camera.set_focus(&self.selected);
+        }
+
+        if self.controls.left_clicked() {
+            self.selected.clear();
         }
 
         if let Some((mut left, mut top)) = self.controls.left_drag() {
@@ -137,10 +181,16 @@ impl Game {
             }
         }
 
-        if self.controls.left_clicked() {
-            if let Some(point) = self.point_under_mouse() {
-                for id in &self.selected {
-                    self.ships.get_mut(*id).unwrap().commands = vec![Command::MoveTo(point)];
+        if self.controls.right_clicked() {
+            if let Some(target) = self.point_under_mouse() {
+                if let Some(avg) = self.average_position() {
+                    let positions = Formation::DeltaWing.arrange(self.selected.len(), avg, target, 2.5);
+                    
+                    let ships = &mut self.ships;
+
+                    self.selected.iter()
+                        .zip(positions.iter())
+                        .for_each(|(id, position)| ships.get_mut(*id).unwrap().commands.push(Command::MoveTo(*position)));
                 }
             }
         }
@@ -148,19 +198,19 @@ impl Game {
         self.controls.update();
 
         if self.controls.left {
-            self.camera.move_sideways(-0.2);
+            self.camera.move_sideways(-0.5);
         }
 
         if self.controls.right {
-            self.camera.move_sideways(0.2);
+            self.camera.move_sideways(0.5);
         }
 
         if self.controls.forwards {
-            self.camera.move_forwards(0.2);
+            self.camera.move_forwards(0.5);
         }
 
         if self.controls.back {
-            self.camera.move_forwards(-0.2);
+            self.camera.move_forwards(-0.5);
         }
 
         for ship in self.ships.iter_mut() {
@@ -174,33 +224,35 @@ impl Game {
         self.context.clear();
 
         for ship in self.ships.iter() {
-            ship.render(&mut self.context, &self.camera, &self.world);
+            ship.render(&mut self.context, &self.camera, &self.system);
         }
 
-        self.context.render_skybox(&self.camera, self.world.skybox);
+        self.context.render_system(&self.system, &self.camera);
 
         for ship in self.ships.iter() {
             if self.selected.contains(&ship.id()) {
-                 if let Some((x, y)) = self.context.screen_position(ship.position_matrix(), &self.camera) {
-                    self.context.render_circle(x, y, 50.0);
+                if let Some((x, y)) = self.context.screen_position(ship.position_matrix(), &self.camera) {
+                    self.context.render_circle(x, y, 25.0);
+                }
+
+                if let Some(Command::MoveTo(e)) = ship.commands.first() {
+                    if let Some(e) = self.context.screen_position(Matrix4::from_translation(*e), &self.camera) {
+                        if let Some(s) = self.context.screen_position(ship.position_matrix(), &self.camera) {
+                            self.context.render_line(e, s);
+                        }
+                    } 
                 }
             }
         }
 
-        if let Some((start_x, start_y)) = self.controls.left_drag() {
-            let (end_x, end_y) = self.controls.mouse();
-            let (start_x, start_y) = (start_x as f32, start_y as f32);
-            let (end_x, end_y) = (end_x as f32, end_y as f32);
-
-            self.context.render_line((start_x, start_y), (end_x, start_y));
-            self.context.render_line((start_x, end_y), (end_x, end_y));
-
-            self.context.render_line((start_x, start_y), (start_x, end_y));
-            self.context.render_line((end_x, start_y), (end_x, end_y));
+        if let Some(top_left) = self.controls.left_drag() {
+            self.context.render_rect(top_left, self.controls.mouse());
         }
 
         self.context.render_text(&format!("Ship count: {}", self.ships.len()), 10.0, 10.0);
+        self.context.render_text(&format!("Population: {}", self.people.len()), 10.0, 40.0);
 
+        self.context.flush_ui();
         self.context.finish();
     }
 }
@@ -210,12 +262,18 @@ fn main() {
     
     let mut game = Game::new(&events_loop);
 
-    game.ships.push(ShipType::Fighter, Vector3::new(5.0, 0.0, 0.0), (0.0, 0.0, 0.0));
-    game.ships.push(ShipType::Tanker, Vector3::new(0.0, 0.0, 0.0), (0.0, 0.0, 0.0));
+    let tanker = game.ships.push(Ship::new(ShipType::Tanker, Vector3::new(0.0, 0.0, 0.0), (0.0, 0.0, 0.0)));
 
-    game.ships[0].commands.push(Command::MoveTo(Vector3::new(-100.0, -50.0, 10.0)));
-    game.selected.insert(0);
-    game.selected.insert(1);
+    for _ in 0 .. 10 {
+        game.people.push(Person::new(Occupation::Worker, tanker));
+    }
+    
+    for i in 0 .. 100 {
+        let x = (50.0 - i as f32) * 3.0;
+        let fighter = game.ships.push(Ship::new(ShipType::Fighter, Vector3::new(x, 5.0, 0.0), (0.0, 0.0, 0.0)));
+        game.people.push(Person::new(Occupation::Pilot, fighter));
+    }
+
 
     let mut closed = false;
     while !closed {

@@ -8,7 +8,7 @@ pub struct Camera {
     longitude: f32,
     latitude: f32,
     distance: f32,
-    focus: HashSet<usize>
+    focus: HashSet<ShipID>
 }
 
 impl Camera {
@@ -55,15 +55,13 @@ impl Camera {
         )
     }
 
-    pub fn step(&mut self, ships: &Ships) {
-        if !self.focus.is_empty() {
-            self.center = self.focus.iter().fold(Vector3::zero(), |vector, index| {
-                vector + ships[*index].position
-            }) / self.focus.len() as f32;
+    pub fn step(&mut self, ships: &AutoIDMap<ShipID, Ship>) {
+        if let Some(position) = average_position(&self.focus, ships) {
+            self.center = position;
         }
     }
 
-    pub fn set_focus(&mut self, ships: &HashSet<usize>) {
+    pub fn set_focus(&mut self, ships: &HashSet<ShipID>) {
         self.focus.clone_from(ships)
     }
 }

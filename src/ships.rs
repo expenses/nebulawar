@@ -1,15 +1,103 @@
-use std::collections::*;
-use std::collections::hash_map::*;
-use std::ops::*;
+use arrayvec::*;
 
 use cgmath::*;
 use camera::*;
 use *;
 
+pub enum Formation {
+    Screen,
+    DeltaWing
+}
+
+impl Formation {
+    pub fn arrange(&self, ships: usize, position: Vector3<f32>, target: Vector3<f32>, distance: f32) -> Vec<Vector3<f32>> {
+        let mut step = target - position;
+        step.y = 0.0;
+        let step = step.normalize_to(distance);
+
+        match *self {
+            Formation::Screen => {                
+                let step_sideways = Quaternion::from_angle_y(Rad(FRAC_PI_2)).rotate_vector(step);
+                let step_up = Vector3::new(0.0, distance, 0.0);
+
+                let width = (ships as f32).sqrt().ceil() as usize;
+
+                let middle_x = (width - 1) as f32 / 2.0;
+
+                let middle_y = (ships as f32 / width as f32).floor() / 2.0;
+
+                (0 .. ships)
+                    .map(|i| {
+                        let x = (i % width) as f32 - middle_x;
+                        let y = (i / width) as f32 - middle_y;
+
+                        target + step_sideways * x + step_up * y
+                    })
+                    .collect()
+            },
+            Formation::DeltaWing => {
+                let step_sideways = Quaternion::from_angle_y(Rad(FRAC_PI_2)).rotate_vector(step);
+
+                let middle_x = (ships - 1) as f32 / 2.0;
+
+                (0 .. ships)
+                    .map(|i| {
+                        let x = i as f32 - middle_x;
+
+                        let y = -(i as f32 - middle_x).abs();
+
+                        target + step * y + step_sideways * x
+                    })
+                    .collect()
+            }
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum ComponentType {
+    AX2900Drive,
+    HG900Drive,
+    HG43WarpDrive,
+    Boltor89Cannons
+}
+
+impl ComponentType {
+    fn thrust(&self) -> f32 {
+        match *self {
+            ComponentType::AX2900Drive => 1.0,
+            ComponentType::HG900Drive => 5.0,
+            _ => 0.0
+        }
+    }
+
+    fn can_warp(&self) -> bool {
+        match *self {
+            ComponentType::HG43WarpDrive => true,
+            _ => false
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Component {
+    age: u8,
+    tag: ComponentType
+}
+
+impl Component {
+    fn new(tag: ComponentType, age: u8) -> Self {
+        Self {
+            tag, age
+        }
+    }
+}
+
 pub enum Command {
     MoveTo(Vector3<f32>)
 }
 
+#[derive(Debug)]
 pub enum ShipType {
     Fighter,
     Tanker
@@ -22,19 +110,68 @@ impl ShipType {
             ShipType::Tanker => 1
         }
     }
+
+    fn crew_capacity(&self) -> usize {
+        match *self {
+            ShipType::Fighter => 1,
+            ShipType::Tanker => 10
+        }
+    }
+
+    fn default_components(&self, age: u8) -> ArrayVec<[Component; 6]> {
+        let mut vec = ArrayVec::new();
+
+        match *self {
+            ShipType::Fighter => {
+                vec.push(Component::new(ComponentType::AX2900Drive, age));
+                vec.push(Component::new(ComponentType::Boltor89Cannons, age));
+            },
+            ShipType::Tanker => {
+                vec.push(Component::new(ComponentType::HG900Drive, age));
+                vec.push(Component::new(ComponentType::HG43WarpDrive, age));
+            }
+        }
+
+        vec
+    } 
+
+    fn mass(&self) -> f32 {
+        match *self {
+            ShipType::Fighter => 2.0,
+            ShipType::Tanker => 100.0
+        }
+    }
 }
 
 pub struct Ship {
-    id: usize,
+    id: ShipID,
     tag: ShipType,
     pub position: Vector3<f32>,
     angle: Quaternion<f32>,
-    pub commands: Vec<Command>
+    pub commands: Vec<Command>,
+    components: ArrayVec<[Component; 6]>
 }
 
 impl Ship {
-    pub fn id(&self) -> usize {
+    pub fn new(tag: ShipType, position: Vector3<f32>, angle: (f32, f32, f32)) -> Self {
+        let (pitch, yaw, roll) = angle;
+
+        Self {
+            id: ShipID::default(),
+            position,
+            angle: Euler::new(Rad(pitch), Rad(yaw), Rad(roll)).into(),
+            commands: Vec::new(),
+            components: tag.default_components(0),
+            tag,
+        }
+    }
+
+    pub fn id(&self) -> ShipID {
         self.id
+    }
+
+    fn speed(&self) -> f32 {
+        self.components.iter().map(|component| component.tag.thrust()).sum::<f32>() / self.tag.mass()
     }
 
     pub fn position_matrix(&self) -> Matrix4<f32> {
@@ -47,8 +184,8 @@ impl Ship {
         if let Some(Command::MoveTo(position)) = self.commands.first() {
             let delta = position - self.position;
 
-            if 0.5 < self.position.distance(*position) {
-                let step = delta.normalize_to(0.5);
+            if self.speed() < self.position.distance(*position) {
+                let step = delta.normalize_to(self.speed());
 
                 self.position += step;
             } else {
@@ -56,72 +193,34 @@ impl Ship {
                 clear = true;
             }
 
-            let ideal = Quaternion::look_at(delta, Vector3::new(0.0, 1.0, 0.0)).invert();
-
-            self.angle = ideal;
+            self.angle = Quaternion::look_at(delta, Vector3::new(0.0, 1.0, 0.0)).invert();;
         }
 
         if clear {
-            self.commands.clear();
+            self.commands.remove(0);
         }
     }
 
-    pub fn render(&self, context: &mut context::Context, camera: &Camera, world: &World) {
-        context.render(self.tag.model(), self.position_matrix(), camera, world.light);
+    pub fn render(&self, context: &mut context::Context, camera: &Camera, system: &System) {
+        context.render(self.tag.model(), self.position_matrix(), camera, system.light);
+    }
+
+    pub fn info(&self) -> String {
+        format!("{:?} {:?} - Components: {:?}", self.tag, self.id, self.components.iter().map(|c| c.tag).collect::<Vec<_>>())
     }
 }
 
-#[derive(Default)]
-pub struct Ships {
-    inner: HashMap<usize, Ship>,
-    next_id: usize
-}
-
-impl Ships {
-    pub fn push(&mut self, tag: ShipType, position: Vector3<f32>, angle: (f32, f32, f32)) {
-        let (pitch, yaw, roll) = angle;
-
-        self.inner.insert(self.next_id, Ship {
-            id: self.next_id,
-            tag, position,
-            angle: Euler::new(Rad(pitch), Rad(yaw), Rad(roll)).into(),
-            commands: Vec::new()
-        });
-
-        self.next_id += 1;
-    }
-
-    /*fn get(&self, id: usize) -> Option<&Ship> {
-        self.inner.get(&id)
-    }*/
-
-    pub fn get_mut(&mut self, id: usize) -> Option<&mut Ship> {
-        self.inner.get_mut(&id)
-    }
-
-    pub fn iter(&self) -> Values<usize, Ship> {
-        self.inner.values()
-    }
-
-    pub fn iter_mut(&mut self) -> ValuesMut<usize, Ship> {
-        self.inner.values_mut()
-    }
-
-    pub fn len(&self) -> usize {
-        self.inner.len()
+impl IDed<ShipID> for Ship {
+    fn set_id(&mut self, id: ShipID) {
+        self.id = id;
     }
 }
 
-impl Index<usize> for Ships {
-    type Output = Ship;
+#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug, Default)]
+pub struct ShipID(u32);
 
-    fn index(&self, index: usize) -> &Ship {
-        &self.inner[&index]
-    }
-}
-
-impl IndexMut<usize> for Ships {
-    fn index_mut(&mut self, index: usize) -> &mut Ship {
-        self.get_mut(index).unwrap()
+impl ID for ShipID {
+    fn increment(&mut self) {
+        *self = ShipID(self.0 + 1)
     }
 }
