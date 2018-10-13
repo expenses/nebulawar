@@ -50,6 +50,10 @@ pub fn vector_to_array(vector: Vector3<f32>) -> [f32; 3] {
     vector.into()
 }
 
+pub fn mix(a: f32, b: f32, percentage: f32) -> f32 {
+    a + (b - a) * percentage
+}
+
 pub trait ID: Hash + Copy + Eq + Default {
     fn increment(&mut self);
 }

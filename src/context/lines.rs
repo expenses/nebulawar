@@ -6,7 +6,7 @@ use lyon::math::*;
 use lyon::lyon_tessellation::*;
 use lyon::lyon_tessellation::basic_shapes::*;
 use self::tessellation::{FillVertex, StrokeVertex};
-
+use util::*;
 use cgmath::*;
 
 use super::Vertex;
@@ -44,9 +44,11 @@ impl VertexConstructor<FillVertex, Vertex> for Constructor3d {
 
 impl VertexConstructor<StrokeVertex, Vertex> for Constructor3d {
     fn new_vertex(&mut self, vertex: StrokeVertex) -> Vertex {
-        let distance = self.start.distance(self.end);
-        let position = vertex.advancement / distance;
-        let y = self.start.y + (self.end.y - self.start.y) * position;
+        let delta = self.start - self.end;
+        // Get how far through the line is
+        let percentage = vertex.advancement / delta.x.hypot(delta.z);
+        // Get the y value
+        let y = mix(self.start.y, self.end.y, percentage);
 
         Vertex {
             position: [vertex.position.x, y, vertex.position.y],
