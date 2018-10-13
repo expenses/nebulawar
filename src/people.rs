@@ -1,6 +1,7 @@
 use ships::*;
 use util::*;
 
+#[derive(Deserialize, Serialize)]
 pub enum Occupation {
     Worker,
     Pilot,
@@ -9,6 +10,7 @@ pub enum Occupation {
     Government
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct Person {
     id: PersonID,
     occupation: Occupation,
@@ -30,7 +32,7 @@ impl IDed<PersonID> for Person {
     }
 }
 
-#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug, Default)]
+#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug, Default, Deserialize, Serialize)]
 pub struct PersonID(u32);
 
 impl ID for PersonID {

@@ -24,3 +24,6 @@ runic = {git = "https://github.com/expenses/runic"}
 # lazy derive
 derive_is_enum_variant = "*"
 rand = "*"
+serde = "*"
+serde_derive = "*"
+bincode = "*"

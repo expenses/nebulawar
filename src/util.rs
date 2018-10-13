@@ -58,7 +58,8 @@ pub trait IDed<I> {
     fn set_id(&mut self, id: I);
 }
 
-pub struct AutoIDMap<I, T> {
+#[derive(Deserialize, Serialize)]
+pub struct AutoIDMap<I: ID, T> {
     next_id: I,
     inner: HashMap<I, T>
 }

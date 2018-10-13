@@ -1,5 +1,3 @@
-use arrayvec::*;
-
 use cgmath::*;
 use camera::*;
 use *;
@@ -55,7 +53,7 @@ impl Formation {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum ComponentType {
     AX2900Drive,
     HG900Drive,
@@ -80,7 +78,7 @@ impl ComponentType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Component {
     age: u8,
     tag: ComponentType
@@ -94,11 +92,12 @@ impl Component {
     }
 }
 
+#[derive(Deserialize, Serialize)]
 pub enum Command {
     MoveTo(Vector3<f32>)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum ShipType {
     Fighter,
     Tanker
@@ -119,21 +118,17 @@ impl ShipType {
         }
     }
 
-    fn default_components(&self, age: u8) -> ArrayVec<[Component; 6]> {
-        let mut vec = ArrayVec::new();
-
+    fn default_components(&self, age: u8) -> Vec<Component> {
         match *self {
-            ShipType::Fighter => {
-                vec.push(Component::new(ComponentType::AX2900Drive, age));
-                vec.push(Component::new(ComponentType::Boltor89Cannons, age));
-            },
-            ShipType::Tanker => {
-                vec.push(Component::new(ComponentType::HG900Drive, age));
-                vec.push(Component::new(ComponentType::HG43WarpDrive, age));
-            }
+            ShipType::Fighter => vec![
+                Component::new(ComponentType::AX2900Drive, age),
+                Component::new(ComponentType::Boltor89Cannons, age)
+            ],
+            ShipType::Tanker => vec![
+                Component::new(ComponentType::HG900Drive, age),
+                Component::new(ComponentType::HG43WarpDrive, age)
+            ]
         }
-
-        vec
     } 
 
     fn mass(&self) -> f32 {
@@ -144,13 +139,14 @@ impl ShipType {
     }
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct Ship {
     id: ShipID,
     tag: ShipType,
     pub position: Vector3<f32>,
     angle: Quaternion<f32>,
     pub commands: Vec<Command>,
-    components: ArrayVec<[Component; 6]>
+    components: Vec<Component>
 }
 
 impl Ship {
@@ -217,7 +213,7 @@ impl IDed<ShipID> for Ship {
     }
 }
 
-#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug, Default)]
+#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug, Default, Deserialize, Serialize)]
 pub struct ShipID(u32);
 
 impl ID for ShipID {

@@ -10,9 +10,11 @@ extern crate runic;
 #[macro_use]
 extern crate derive_is_enum_variant;
 extern crate rand;
+#[macro_use]
+extern crate serde_derive;
+extern crate bincode;
 
-use rand::rngs::*;
-use rand::Rng;
+use rand::*;
 use rand::distributions::*;
 
 use glium::*;
@@ -62,7 +64,7 @@ fn uniform_sphere_distribution(rng: &mut ThreadRng) -> Vector3<f32> {
 
     // Ensure that the phi value is between -1 and 1 but is still random
 
-    let mut value = (1.0 - 2.0 * y);
+    let mut value = 1.0 - 2.0 * y;
 
     while value > 1.0 {
         value -= 2.0;
@@ -81,6 +83,52 @@ fn uniform_sphere_distribution(rng: &mut ThreadRng) -> Vector3<f32> {
     )
 }
 
+#[derive(Serialize, Deserialize)]
+struct State {
+    ships: AutoIDMap<ShipID, Ship>,
+    people: AutoIDMap<PersonID, Person>,
+    system: System,
+    camera: Camera,
+    selected: HashSet<ShipID>,
+}
+
+impl State {
+    fn new(rng: &mut ThreadRng) -> Self {
+        let mut state = Self {
+            ships: AutoIDMap::new(),
+            people: AutoIDMap::new(),
+            system: System::new((-1.0, -1.0), rng),
+            camera: Camera::default(),
+            selected: HashSet::new()
+        };
+
+        let tanker = state.ships.push(Ship::new(ShipType::Tanker, Vector3::new(0.0, 0.0, 0.0), (0.0, 0.0, 0.0)));
+
+        for _ in 0 .. 10 {
+            state.people.push(Person::new(Occupation::Worker, tanker));
+        }
+        
+        for i in 0 .. 100 {
+            let x = (50.0 - i as f32) * 3.0;
+            let fighter = state.ships.push(Ship::new(ShipType::Fighter, Vector3::new(x, 5.0, 0.0), (0.0, 0.0, 0.0)));
+            state.people.push(Person::new(Occupation::Pilot, fighter));
+        }
+
+        state
+    }
+
+    fn load(filename: &str) -> Self {
+        let file = ::std::fs::File::open(filename).unwrap();
+        bincode::deserialize_from(file).unwrap()
+    }
+
+    fn save(&self, filename: &str) {
+        let file = ::std::fs::File::create(filename).unwrap();
+        bincode::serialize_into(file, self).unwrap();
+    }
+}
+
+#[derive(Deserialize, Serialize)]
 pub struct System {
     pub location: (f32, f32),
     pub stars: Vec<(Vector3<f32>, f32)>,
@@ -110,14 +158,8 @@ impl System {
 struct Game {
     context: context::Context,
     
-    ships: AutoIDMap<ShipID, Ship>,
-    people: AutoIDMap<PersonID, Person>,
-
-    system: System,
-    camera: Camera,
+    state: State,
     controls: Controls,
-    plane_y: f32,
-    selected: HashSet<ShipID>,
     rng: ThreadRng
 }
 
@@ -127,15 +169,8 @@ impl Game {
 
         Self {
             context: context::Context::new(events_loop),
-            
-            ships: AutoIDMap::new(),
-            people: AutoIDMap::new(),
-
-            system: System::new((-1.0, -1.0), &mut rng),
-            camera: Camera::default(),
+            state: State::new(&mut rng),
             controls: Controls::new(),
-            plane_y: 0.0,
-            selected: HashSet::new(),
             rng
         }
     }
@@ -146,15 +181,15 @@ impl Game {
         self.controls.set_mouse(x, y);
 
         if self.controls.right_dragging() {
-            self.camera.rotate_longitude(delta_x / 200.0);
-            self.camera.rotate_latitude(delta_y / 200.0);
+            self.state.camera.rotate_longitude(delta_x / 200.0);
+            self.state.camera.rotate_latitude(delta_y / 200.0);
         }
     }
 
     fn point_under_mouse(&self) -> Option<Vector3<f32>> {
-        let ray = self.context.ray(&self.camera, self.controls.mouse());
+        let ray = self.context.ray(&self.state.camera, self.controls.mouse());
 
-        Plane::new(Vector3::new(0.0, 1.0, 0.0), self.plane_y).intersection(&ray).map(point_to_vector)
+        Plane::new(Vector3::new(0.0, 1.0, 0.0), 0.0).intersection(&ray).map(point_to_vector)
     }
 
     fn handle_mouse_button(&mut self, button: MouseButton, pressed: bool) {
@@ -173,25 +208,26 @@ impl Game {
             VirtualKeyCode::Up    | VirtualKeyCode::W => self.controls.forwards = pressed,
             VirtualKeyCode::Down  | VirtualKeyCode::S => self.controls.back     = pressed,
             VirtualKeyCode::T if pressed => if let Some(point) = self.point_under_mouse() {
-                self.ships.push(Ship::new(ShipType::Fighter, point, (0.0, 0.0, 0.0)));
-                self.plane_y += 0.5;
+                self.state.ships.push(Ship::new(ShipType::Fighter, point, (0.0, 0.0, 0.0)));
             },
-            VirtualKeyCode::C => self.camera.set_focus(&self.selected),
+            VirtualKeyCode::C => self.state.camera.set_focus(&self.state.selected),
+            VirtualKeyCode::Z if pressed => self.state.save("game.sav"),
+            VirtualKeyCode::L if pressed => self.state = State::load("game.sav"),
             _ => {}
         }
     }
 
     fn average_position(&self) -> Option<Vector3<f32>> {
-        average_position(&self.selected, &self.ships)
+        average_position(&self.state.selected, &self.state.ships)
     }
 
     fn update(&mut self) {
         if self.controls.middle_clicked() {
-            self.camera.set_focus(&self.selected);
+            self.state.camera.set_focus(&self.state.selected);
         }
 
         if self.controls.left_clicked() {
-            self.selected.clear();
+            self.state.selected.clear();
         }
 
         if let Some((mut left, mut top)) = self.controls.left_drag() {
@@ -205,12 +241,12 @@ impl Game {
                 std::mem::swap(&mut top, &mut bottom);
             }
 
-            self.selected.clear();
+            self.state.selected.clear();
 
-            for ship in self.ships.iter() {
-                if let Some((x, y)) = self.context.screen_position(ship.position_matrix(), &self.camera) {
+            for ship in self.state.ships.iter() {
+                if let Some((x, y)) = self.context.screen_position(ship.position_matrix(), &self.state.camera) {
                     if left <= x && x <= right && top <= y && y <= bottom {
-                        self.selected.insert(ship.id());
+                        self.state.selected.insert(ship.id());
                     }
                 }
             }
@@ -219,11 +255,11 @@ impl Game {
         if self.controls.right_clicked() {
             if let Some(target) = self.point_under_mouse() {
                 if let Some(avg) = self.average_position() {
-                    let positions = Formation::DeltaWing.arrange(self.selected.len(), avg, target, 2.5);
+                    let positions = Formation::DeltaWing.arrange(self.state.selected.len(), avg, target, 2.5);
                     
-                    let ships = &mut self.ships;
+                    let ships = &mut self.state.ships;
 
-                    self.selected.iter()
+                    self.state.selected.iter()
                         .zip(positions.iter())
                         .for_each(|(id, position)| ships.get_mut(*id).unwrap().commands.push(Command::MoveTo(*position)));
                 }
@@ -233,46 +269,46 @@ impl Game {
         self.controls.update();
 
         if self.controls.left {
-            self.camera.move_sideways(-0.5);
+            self.state.camera.move_sideways(-0.5);
         }
 
         if self.controls.right {
-            self.camera.move_sideways(0.5);
+            self.state.camera.move_sideways(0.5);
         }
 
         if self.controls.forwards {
-            self.camera.move_forwards(0.5);
+            self.state.camera.move_forwards(0.5);
         }
 
         if self.controls.back {
-            self.camera.move_forwards(-0.5);
+            self.state.camera.move_forwards(-0.5);
         }
 
-        for ship in self.ships.iter_mut() {
+        for ship in self.state.ships.iter_mut() {
             ship.step();
         }
 
-        self.camera.step(&self.ships);
+        self.state.camera.step(&self.state.ships);
     }
 
     fn render(&mut self) {
-        self.context.clear(&self.system);
+        self.context.clear(&self.state.system);
 
-        for ship in self.ships.iter() {
-            ship.render(&mut self.context, &self.camera, &self.system);
+        for ship in self.state.ships.iter() {
+            ship.render(&mut self.context, &self.state.camera, &self.state.system);
         }
 
-        self.context.render_system(&self.system, &self.camera);
+        self.context.render_system(&self.state.system, &self.state.camera);
 
-        for ship in self.ships.iter() {
-            if self.selected.contains(&ship.id()) {
-                if let Some((x, y)) = self.context.screen_position(ship.position_matrix(), &self.camera) {
+        for ship in self.state.ships.iter() {
+            if self.state.selected.contains(&ship.id()) {
+                if let Some((x, y)) = self.context.screen_position(ship.position_matrix(), &self.state.camera) {
                     self.context.render_circle(x, y, 25.0);
                 }
 
                 if let Some(Command::MoveTo(e)) = ship.commands.first() {
-                    if let Some(e) = self.context.screen_position(Matrix4::from_translation(*e), &self.camera) {
-                        if let Some(s) = self.context.screen_position(ship.position_matrix(), &self.camera) {
+                    if let Some(e) = self.context.screen_position(Matrix4::from_translation(*e), &self.state.camera) {
+                        if let Some(s) = self.context.screen_position(ship.position_matrix(), &self.state.camera) {
                             self.context.render_line(e, s);
                         }
                     } 
@@ -284,11 +320,15 @@ impl Game {
             self.context.render_rect(top_left, self.controls.mouse());
         }
 
-        self.context.render_text(&format!("Ship count: {}", self.ships.len()), 10.0, 10.0);
-        self.context.render_text(&format!("Population: {}", self.people.len()), 10.0, 40.0);
+        self.context.render_text(&format!("Ship count: {}", self.state.ships.len()), 10.0, 10.0);
+        self.context.render_text(&format!("Population: {}", self.state.people.len()), 10.0, 40.0);
 
         self.context.flush_ui();
         self.context.finish();
+    }
+
+    fn change_distance(&mut self, delta: f32) {
+        self.state.camera.change_distance(delta)
     }
 }
 
@@ -296,19 +336,6 @@ fn main() {
     let mut events_loop = EventsLoop::new();
     
     let mut game = Game::new(&events_loop);
-
-    let tanker = game.ships.push(Ship::new(ShipType::Tanker, Vector3::new(0.0, 0.0, 0.0), (0.0, 0.0, 0.0)));
-
-    for _ in 0 .. 10 {
-        game.people.push(Person::new(Occupation::Worker, tanker));
-    }
-    
-    for i in 0 .. 100 {
-        let x = (50.0 - i as f32) * 3.0;
-        let fighter = game.ships.push(Ship::new(ShipType::Fighter, Vector3::new(x, 5.0, 0.0), (0.0, 0.0, 0.0)));
-        game.people.push(Person::new(Occupation::Pilot, fighter));
-    }
-
 
     let mut closed = false;
     while !closed {
@@ -323,8 +350,8 @@ fn main() {
                     game.handle_keypress(key, state == ElementState::Pressed);
                 },
                 glutin::WindowEvent::MouseWheel {delta, ..} => match delta {
-                    MouseScrollDelta::PixelDelta(LogicalPosition {y, ..}) => game.camera.change_distance(y as f32 / 20.0),
-                    MouseScrollDelta::LineDelta(_, y) => game.camera.change_distance(-y * 2.0)
+                    MouseScrollDelta::PixelDelta(LogicalPosition {y, ..}) => game.change_distance(y as f32 / 20.0),
+                    MouseScrollDelta::LineDelta(_, y) => game.change_distance(-y * 2.0)
                 },
                 _ => ()
             }
