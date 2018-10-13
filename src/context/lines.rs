@@ -1,19 +1,60 @@
 use glium::*;
 use glium::index::*;
-use arrayvec::*;
 use lyon::*;
 use lyon::tessellation::geometry_builder::*;
 use lyon::math::*;
 use lyon::lyon_tessellation::*;
 use lyon::lyon_tessellation::basic_shapes::*;
+use self::tessellation::{FillVertex, StrokeVertex};
+
+use cgmath::*;
+
+use super::Vertex;
 
 #[derive(Copy, Clone, Debug)]
-struct Vertex {
+struct Vertex2d {
     position: [f32; 2],
     color: [f32; 3]
 }
 
-implement_vertex!(Vertex, position, color);
+implement_vertex!(Vertex2d, position, color);
+
+struct Constructor3d {
+    start: Vector3<f32>,
+    end: Vector3<f32>
+}
+
+impl Constructor3d {
+    fn new(start: Vector3<f32>, end: Vector3<f32>) -> Self {
+        Self {
+            start, end
+        }
+    }
+}
+
+impl VertexConstructor<FillVertex, Vertex> for Constructor3d {
+    fn new_vertex(&mut self, vertex: FillVertex) -> Vertex {
+        Vertex {
+            position: [vertex.position.x, 0.0, vertex.position.y],
+            normal: [1.0; 3],
+            texture: [1.0; 2]
+        }
+    }
+}
+
+impl VertexConstructor<StrokeVertex, Vertex> for Constructor3d {
+    fn new_vertex(&mut self, vertex: StrokeVertex) -> Vertex {
+        let distance = self.start.distance(self.end);
+        let position = vertex.advancement / distance;
+        let y = self.start.y + (self.end.y - self.start.y) * position;
+
+        Vertex {
+            position: [vertex.position.x, y, vertex.position.y],
+            normal: [1.0; 3],
+            texture: [1.0; 2]
+        }
+    }
+}
 
 struct Constructor {
     color: [f32; 3]
@@ -27,17 +68,17 @@ impl Constructor {
     }
 }
 
-impl VertexConstructor<tessellation::FillVertex, Vertex> for Constructor {
-    fn new_vertex(&mut self, vertex: tessellation::FillVertex) -> Vertex {
-        Vertex {
+impl VertexConstructor<FillVertex, Vertex2d> for Constructor {
+    fn new_vertex(&mut self, vertex: FillVertex) -> Vertex2d {
+        Vertex2d {
             position: vertex.position.to_array(),
             color: self.color
         }
     }
 }
-impl VertexConstructor<tessellation::StrokeVertex, Vertex> for Constructor {
-    fn new_vertex(&mut self, vertex: tessellation::StrokeVertex) -> Vertex {
-        Vertex {
+impl VertexConstructor<StrokeVertex, Vertex2d> for Constructor {
+    fn new_vertex(&mut self, vertex: StrokeVertex) -> Vertex2d {
+        Vertex2d {
             position: vertex.position.to_array(),
             color: self.color
         }
@@ -47,7 +88,7 @@ impl VertexConstructor<tessellation::StrokeVertex, Vertex> for Constructor {
 pub struct LineRenderer {
     program: Program,
     stroke_options: StrokeOptions,
-    vertex_buffers: VertexBuffers<Vertex, u16>
+    vertex_buffers: VertexBuffers<Vertex2d, u16>
 }
 
 impl LineRenderer {
@@ -90,7 +131,7 @@ impl LineRenderer {
         let (end_x, end_y) = end;
         
         stroke_polyline(
-            ArrayVec::from([point(start_x, start_y), point(end_x, end_y)]).into_iter(),
+            [point(start_x, start_y), point(end_x, end_y)].iter().cloned(),
             false,
             &self.stroke_options,
             &mut BuffersBuilder::new(&mut self.vertex_buffers, Constructor::new([1.0; 3]))
@@ -118,5 +159,21 @@ impl LineRenderer {
             &self.stroke_options,
             &mut BuffersBuilder::new(&mut self.vertex_buffers, Constructor::new(color))
         );
+    }
+
+    pub fn line_3d(&self, start: Vector3<f32>, end: Vector3<f32>, display: &Display) -> (VertexBuffer<Vertex>, IndexBuffer<u16>) {
+        let mut buffers = VertexBuffers::new();
+
+        stroke_polyline(
+            [point(start.x, start.z), point(end.x, end.z)].iter().cloned(),
+            false,
+            &StrokeOptions::tolerance(1.0).with_line_width(0.25),
+            &mut BuffersBuilder::new(&mut buffers, Constructor3d::new(start, end))
+        );
+
+        (
+            VertexBuffer::new(display, &buffers.vertices).unwrap(),
+            IndexBuffer::new(display, PrimitiveType::TrianglesList, &buffers.indices).unwrap()
+        )
     }
 }

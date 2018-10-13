@@ -237,24 +237,10 @@ impl Context {
             mode: Mode::Stars as i32
         };
 
-        let vertices = [
-            Vertex {
-                position: start.into(),
-                normal: [1.0; 3],
-                texture: [1.0; 2]
-            },
-            Vertex {
-                position: end.into(),
-                normal: [0.0; 3],
-                texture: [1.0; 2]
-            }
-        ];
-
-        let buffer = VertexBuffer::new(&self.display, &vertices).unwrap();
-        let indices = NoIndices(PrimitiveType::LinesList);
+        let (buffer, indices) = self.lines.line_3d(start, end, &self.display);
 
         let params = DrawParameters {
-            polygon_mode: PolygonMode::Line,
+            backface_culling: BackfaceCullingMode::CullingDisabled,
             .. Self::draw_params()
         };
 
