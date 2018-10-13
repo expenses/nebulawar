@@ -114,7 +114,7 @@ impl Resources {
             images: [
                 load_image(display, &fs::read("models/star.png").unwrap())
             ],
-            font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator-Bold.ttf"), display).unwrap()
+            font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display).unwrap()
         }
     }
 }

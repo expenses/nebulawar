@@ -1,6 +1,11 @@
+// up -> down -> clicked | dragging
+// clicked -> up
+// dragging -> dragged -> up
+
 #[derive(is_enum_variant, Debug)]
 enum MouseState {
-    Drag(f32, f32),
+    Dragging(f32, f32),
+    Dragged(f32, f32),
     Up,
     Clicked,
     Down(u8, f32, f32)
@@ -11,8 +16,9 @@ impl MouseState {
         let (mouse_x, mouse_y) = mouse;
         match *self {
             MouseState::Clicked => *self = MouseState::Up,
-            MouseState::Down(frames, x, y) if frames > 10 || (mouse_x - x).abs() > 10.0 || (mouse_y - y).abs() > 10.0 => *self = MouseState::Drag(x, y),
+            MouseState::Down(frames, x, y) if frames > 10 || (mouse_x - x).abs() > 10.0 || (mouse_y - y).abs() > 10.0 => *self = MouseState::Dragging(x, y),
             MouseState::Down(ref mut frames, _, _) => *frames += 1,
+            MouseState::Dragged(_, _) => *self = MouseState::Up,
             _ => {}
         }
     }
@@ -31,14 +37,21 @@ impl MouseState {
     }
 
     fn handle_up(&mut self) {
-        if self.is_drag() {
-            *self = MouseState::Up;
-        } else {
-            *self = MouseState::Clicked;
+        match *self {
+            MouseState::Down(_, _, _) => *self = MouseState::Clicked,
+            MouseState::Dragging(x, y) => *self = MouseState::Dragged(x, y),
+            _ => *self = MouseState::Up
         }
     }
 }
 
+impl Default for MouseState {
+    fn default() -> Self {
+        MouseState::Up
+    }
+}
+
+#[derive(Default)]
 pub struct Controls {
     mouse: (f32, f32),
 
@@ -49,25 +62,13 @@ pub struct Controls {
     pub left: bool,
     pub right: bool,
     pub forwards: bool,
-    pub back: bool
+    pub back: bool,
+    pub shift: bool
 }
 
 impl Controls {
-    pub fn new() -> Self {
-        Self {
-            mouse: (0.0, 0.0),
-            left_state: MouseState::Up,
-            right_state: MouseState::Up,
-            middle_state: MouseState::Up,
-            left: false,
-            right: false,
-            forwards: false,
-            back: false
-        }
-    }
-
     pub fn right_dragging(&self) -> bool {
-        self.right_state.is_drag()
+        self.right_state.is_dragging()
     }
 
     pub fn mouse(&self) -> (f32, f32) {
@@ -108,8 +109,16 @@ impl Controls {
         self.right_state.is_clicked()
     }
 
-    pub fn left_drag(&self) -> Option<(f32, f32)>  {
-        if let MouseState::Drag(x, y) = self.left_state {
+    pub fn left_dragged(&self) -> Option<(f32, f32)>  {
+        if let MouseState::Dragged(x, y) = self.left_state {
+            Some((x, y))
+        } else {
+            None
+        }
+    }
+
+    pub fn left_dragging(&self) -> Option<(f32, f32)> {
+        if let MouseState::Dragging(x, y) = self.left_state {
             Some((x, y))
         } else {
             None

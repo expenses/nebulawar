@@ -42,7 +42,7 @@ use ships::*;
 fn average_position(selection: &HashSet<ShipID>, ships: &AutoIDMap<ShipID, Ship>) -> Option<Vector3<f32>> {
     if !selection.is_empty() {
         let position = selection.iter().fold(Vector3::zero(), |vector, index| {
-            vector + ships[*index].position
+            vector + ships[*index].position()
         }) / selection.len() as f32;
 
         Some(position)
@@ -126,6 +126,36 @@ impl State {
         let file = ::std::fs::File::create(filename).unwrap();
         bincode::serialize_into(file, self).unwrap();
     }
+
+    fn selected(&self) -> impl Iterator<Item=&Ship> {
+        self.selected.iter().map(move |id| &self.ships[*id])
+    }
+
+    fn render(&self, context: &mut context::Context) {
+        for ship in self.ships.iter() {
+            ship.render(context, &self.camera, &self.system);
+        }
+
+        context.render_system(&self.system, &self.camera);
+
+        for ship in self.ships.iter() {
+            if self.selected.contains(&ship.id()) {
+                if let Some((x, y)) = context.screen_position(ship.position(), &self.camera) {
+                    let fuel = ship.fuel_perc();
+                    context.render_circle(x, y, 25.0, [1.0, fuel, fuel]);
+                }
+
+                let mut start = ship.position();
+
+                for command in &ship.commands {
+                    if let Command::MoveTo(point) = command {
+                        context.render_3d_line(start, *point, &self.camera, &self.system);
+                        start = *point;
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -147,8 +177,11 @@ impl System {
             .map(|_| (uniform_sphere_distribution(rng), rng.gen()))
             .collect();
 
+        let mut light = uniform_sphere_distribution(rng);
+        light.y = light.y.abs();
+
         Self {
-            light: uniform_sphere_distribution(rng),
+            light,
             background_color: (0.0, 0.0, rng.gen_range(0.0, 0.25)),
             stars, location
         }
@@ -170,7 +203,7 @@ impl Game {
         Self {
             context: context::Context::new(events_loop),
             state: State::new(&mut rng),
-            controls: Controls::new(),
+            controls: Controls::default(),
             rng
         }
     }
@@ -213,6 +246,7 @@ impl Game {
             VirtualKeyCode::C => self.state.camera.set_focus(&self.state.selected),
             VirtualKeyCode::Z if pressed => self.state.save("game.sav"),
             VirtualKeyCode::L if pressed => self.state = State::load("game.sav"),
+            VirtualKeyCode::LShift => self.controls.shift = pressed,
             _ => {}
         }
     }
@@ -230,7 +264,7 @@ impl Game {
             self.state.selected.clear();
         }
 
-        if let Some((mut left, mut top)) = self.controls.left_drag() {
+        if let Some((mut left, mut top)) = self.controls.left_dragged() {
             let (mut right, mut bottom) = self.controls.mouse();
             
             if right < left {
@@ -241,10 +275,12 @@ impl Game {
                 std::mem::swap(&mut top, &mut bottom);
             }
 
-            self.state.selected.clear();
+            if !self.controls.shift {
+                self.state.selected.clear();
+            }
 
             for ship in self.state.ships.iter() {
-                if let Some((x, y)) = self.context.screen_position(ship.position_matrix(), &self.state.camera) {
+                if let Some((x, y)) = self.context.screen_position(ship.position(), &self.state.camera) {
                     if left <= x && x <= right && top <= y && y <= bottom {
                         self.state.selected.insert(ship.id());
                     }
@@ -258,10 +294,19 @@ impl Game {
                     let positions = Formation::DeltaWing.arrange(self.state.selected.len(), avg, target, 2.5);
                     
                     let ships = &mut self.state.ships;
+                    let queue = self.controls.shift;
 
                     self.state.selected.iter()
                         .zip(positions.iter())
-                        .for_each(|(id, position)| ships.get_mut(*id).unwrap().commands.push(Command::MoveTo(*position)));
+                        .for_each(|(id, position)| {
+                            let ship = ships.get_mut(*id).unwrap();
+
+                            if !queue {
+                                ship.commands.clear();
+                            }
+
+                            ship.commands.push(Command::MoveTo(*position))
+                        });
                 }
             }
         }
@@ -294,34 +339,24 @@ impl Game {
     fn render(&mut self) {
         self.context.clear(&self.state.system);
 
-        for ship in self.state.ships.iter() {
-            ship.render(&mut self.context, &self.state.camera, &self.state.system);
-        }
+        self.state.render(&mut self.context);
 
-        self.context.render_system(&self.state.system, &self.state.camera);
-
-        for ship in self.state.ships.iter() {
-            if self.state.selected.contains(&ship.id()) {
-                if let Some((x, y)) = self.context.screen_position(ship.position_matrix(), &self.state.camera) {
-                    self.context.render_circle(x, y, 25.0);
-                }
-
-                if let Some(Command::MoveTo(e)) = ship.commands.first() {
-                    if let Some(e) = self.context.screen_position(Matrix4::from_translation(*e), &self.state.camera) {
-                        if let Some(s) = self.context.screen_position(ship.position_matrix(), &self.state.camera) {
-                            self.context.render_line(e, s);
-                        }
-                    } 
-                }
-            }
-        }
-
-        if let Some(top_left) = self.controls.left_drag() {
+        if let Some(top_left) = self.controls.left_dragging() {
             self.context.render_rect(top_left, self.controls.mouse());
+        }
+
+        let mut selection_info = BTreeMap::new();
+
+        for ship in self.state.selected() {
+            *selection_info.entry(ship.tag()).or_insert(0) += 1;
         }
 
         self.context.render_text(&format!("Ship count: {}", self.state.ships.len()), 10.0, 10.0);
         self.context.render_text(&format!("Population: {}", self.state.people.len()), 10.0, 40.0);
+
+        for (i, (tag, num)) in selection_info.iter().enumerate() {
+            self.context.render_text(&format!("{:?}: {}", tag, num), 10.0, 70.0 + i as f32 * 30.0);
+        }
 
         self.context.flush_ui();
         self.context.finish();

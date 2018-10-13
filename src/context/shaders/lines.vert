@@ -1,6 +1,9 @@
 #version 150
 
-in vec2 pos;
+in vec2 position;
+in vec3 color;
+out vec3 v_color;
+
 uniform vec2 window_dimensions;
 uniform vec2 offset;
 
@@ -9,5 +12,6 @@ vec2 screen_pos_to_opengl_pos(vec2 position) {
 }
 
 void main() {
-    gl_Position = vec4(screen_pos_to_opengl_pos(pos), 0.0, 1.0);
+    v_color = color;
+    gl_Position = vec4(screen_pos_to_opengl_pos(position), 0.0, 1.0);
 }

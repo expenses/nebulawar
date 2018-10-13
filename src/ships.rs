@@ -58,6 +58,7 @@ pub enum ComponentType {
     AX2900Drive,
     HG900Drive,
     HG43WarpDrive,
+    FuelDrum,
     Boltor89Cannons
 }
 
@@ -74,6 +75,15 @@ impl ComponentType {
         match *self {
             ComponentType::HG43WarpDrive => true,
             _ => false
+        }
+    }
+
+    fn fuel_storage(&self) -> f32 {
+        match *self {
+            ComponentType::AX2900Drive => 20.0,
+            ComponentType::HG900Drive => 100.0,
+            ComponentType::FuelDrum => 2000.0,
+            _ => 0.0
         }
     }
 }
@@ -94,10 +104,11 @@ impl Component {
 
 #[derive(Deserialize, Serialize)]
 pub enum Command {
-    MoveTo(Vector3<f32>)
+    MoveTo(Vector3<f32>),
+    Dummy
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
 pub enum ShipType {
     Fighter,
     Tanker
@@ -126,7 +137,8 @@ impl ShipType {
             ],
             ShipType::Tanker => vec![
                 Component::new(ComponentType::HG900Drive, age),
-                Component::new(ComponentType::HG43WarpDrive, age)
+                Component::new(ComponentType::HG43WarpDrive, age),
+                Component::new(ComponentType::FuelDrum, age)
             ]
         }
     } 
@@ -143,32 +155,62 @@ impl ShipType {
 pub struct Ship {
     id: ShipID,
     tag: ShipType,
-    pub position: Vector3<f32>,
+    position: Vector3<f32>,
     angle: Quaternion<f32>,
     pub commands: Vec<Command>,
-    components: Vec<Component>
+    components: Vec<Component>,
+    fuel: f32
 }
 
 impl Ship {
     pub fn new(tag: ShipType, position: Vector3<f32>, angle: (f32, f32, f32)) -> Self {
         let (pitch, yaw, roll) = angle;
 
-        Self {
+        let mut ship = Self {
             id: ShipID::default(),
             position,
             angle: Euler::new(Rad(pitch), Rad(yaw), Rad(roll)).into(),
             commands: Vec::new(),
             components: tag.default_components(0),
             tag,
-        }
+            fuel: 0.0
+        };
+
+        ship.fuel = ship.max_fuel();
+
+        ship
+    }
+
+    pub fn position(&self) -> Vector3<f32> {
+        self.position
+    }
+
+    pub fn tag(&self) -> ShipType {
+        self.tag
     }
 
     pub fn id(&self) -> ShipID {
         self.id
     }
 
+    pub fn fuel_perc(&self) -> f32 {
+        self.fuel / self.max_fuel()
+    }
+
+    fn component_types(&self) -> impl Iterator<Item=&ComponentType> {
+        self.components.iter().map(|component| &component.tag)
+    }
+
+    fn max_fuel(&self) -> f32 {
+        self.component_types().map(|tag| tag.fuel_storage()).sum()
+    }
+
+    fn thrust(&self) -> f32 {
+        self.component_types().map(|tag| tag.thrust()).sum() 
+    }
+
     fn speed(&self) -> f32 {
-        self.components.iter().map(|component| component.tag.thrust()).sum::<f32>() / self.tag.mass()
+        self.thrust() / self.tag.mass()
     }
 
     pub fn position_matrix(&self) -> Matrix4<f32> {
@@ -179,7 +221,13 @@ impl Ship {
     pub fn step(&mut self) {
         let mut clear = false;
         if let Some(Command::MoveTo(position)) = self.commands.first() {
+            if self.fuel < 0.01 {
+                return;
+            }
+            
             let delta = position - self.position;
+
+            self.fuel -= 0.01;
 
             if self.speed() < self.position.distance(*position) {
                 let step = delta.normalize_to(self.speed());

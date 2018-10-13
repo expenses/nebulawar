@@ -16,20 +16,27 @@ float map(float min, float max, float value) {
 const int NORMAL = 1;
 const int SHADELESS = 2;
 const int STARS = 3;
+const int WIREFRAME = 4;
+
+const vec3 GREEN = vec3(0.0, 1.0, 0.0);
+const vec3 WHITE = vec3(1.0);
+const float MIN_LIGHT = 0.1;
 
 void main() {
     vec4 texture_color = texture(tex, v_texture);
 
-    if (mode == SHADELESS) {
+    if (mode == WIREFRAME) {
+        color = vec4(GREEN, 1.0);
+    } else if (mode == SHADELESS) {
         color = texture_color;
     } else if (mode == STARS) {
-        color = vec4(vec3(1.0), v_texture.x);
+        color = vec4(WHITE, v_texture.x);
     } else {
         vec3 light_dir = normalize(light_direction);  
 
         float brightness = dot(normalize(v_normal), normalize(light_dir));
         
-        float norm_brightness = mix(0.1, 1.0, max(brightness, 0.0));
+        float norm_brightness = mix(MIN_LIGHT, 1.0, max(brightness, 0.0));
 
         color = vec4(norm_brightness * texture_color.rgb, texture_color.a);
     }
