@@ -31,6 +31,7 @@ mod context;
 mod ships;
 mod controls;
 mod people;
+mod maps;
 
 use people::*;
 use controls::*;
@@ -38,6 +39,7 @@ use controls::*;
 use camera::*;
 use util::*;
 use ships::*;
+use maps::*;
 
 fn average_position(selection: &HashSet<ShipID>, ships: &AutoIDMap<ShipID, Ship>) -> Option<Vector3<f32>> {
     if !selection.is_empty() {
@@ -55,32 +57,49 @@ fn average_position(selection: &HashSet<ShipID>, ships: &AutoIDMap<ShipID, Ship>
 fn uniform_sphere_distribution(rng: &mut ThreadRng) -> Vector3<f32> {
     use std::f64::consts::PI;
 
-    let uniform = Normal::new(0.0, 1.0);
+    let uniform = Uniform::new(0.0, 1.0);
 
-    let x = uniform.ind_sample(rng);
-    let y = uniform.ind_sample(rng);
+    let x = uniform.sample(rng);
+    let y = uniform.sample(rng);
 
     let theta = 2.0 * PI * x;
-
-    // Ensure that the phi value is between -1 and 1 but is still random
-
-    let mut value = 1.0 - 2.0 * y;
-
-    while value > 1.0 {
-        value -= 2.0;
-    }
-
-    while value < -1.0 {
-        value += 2.0;
-    }
-
-    let phi = value.acos();
+    let phi = (1.0 - 2.0 * y).acos();
 
     Vector3::new(
         (phi.sin() * theta.cos()) as f32,
         (phi.sin() * theta.sin()) as f32,
         phi.cos() as f32
     )
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct System {
+    pub location: Vector2<f32>,
+    pub stars: Vec<(Vector3<f32>, f32)>,
+    pub light: Vector3<f32>,
+    pub background_color: (f32, f32, f32)
+}
+
+impl System {
+    fn new(location: Vector2<f32>, rng: &mut ThreadRng) -> Self {
+        // todo: more random generation
+        let _distance_from_center = location.magnitude();
+
+        let stars = 10000;
+
+        let stars = (0 .. stars)
+            .map(|_| (uniform_sphere_distribution(rng), rng.gen()))
+            .collect();
+
+        let mut light = uniform_sphere_distribution(rng);
+        light.y = light.y.abs();
+
+        Self {
+            light,
+            background_color: (0.0, 0.0, rng.gen_range(0.0, 0.25)),
+            stars, location
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -97,7 +116,7 @@ impl State {
         let mut state = Self {
             ships: AutoIDMap::new(),
             people: AutoIDMap::new(),
-            system: System::new((-1.0, -1.0), rng),
+            system: System::new(Vector2::new(rng.gen_range(-1.0, 1.0), rng.gen_range(-1.0, 1.0)), rng),
             camera: Camera::default(),
             selected: HashSet::new()
         };
@@ -138,53 +157,23 @@ impl State {
 
         context.render_system(&self.system, &self.camera);
 
-        for ship in self.ships.iter() {
-            if self.selected.contains(&ship.id()) {
-                if let Some((x, y)) = context.screen_position(ship.position(), &self.camera) {
-                    let fuel = ship.fuel_perc();
-                    context.render_circle(x, y, 25.0, [1.0, fuel, fuel]);
-                }
+        for ship in self.selected() {
+            if let Some((x, y)) = context.screen_position(ship.position(), &self.camera) {
+                let fuel = ship.fuel_perc();
+                context.render_circle(x, y, 25.0, [1.0, fuel, fuel]);
+            }
 
-                let mut start = ship.position();
-
-                for command in &ship.commands {
-                    if let Command::MoveTo(point) = command {
-                        context.render_3d_line(start, *point, &self.camera, &self.system);
-                        start = *point;
-                    }
-                }
+            if !ship.commands.is_empty() {
+                context.render_3d_lines(ship.command_path());
             }
         }
     }
-}
 
-#[derive(Deserialize, Serialize)]
-pub struct System {
-    pub location: (f32, f32),
-    pub stars: Vec<(Vector3<f32>, f32)>,
-    pub light: Vector3<f32>,
-    pub background_color: (f32, f32, f32)
-}
-
-impl System {
-    fn new(location: (f32, f32), rng: &mut ThreadRng) -> Self {
-        let distance_from_center = location.0.hypot(location.1);
-
-        //let stars = rng.gen_range(100, 1000);
-        let stars = 10000;
-
-        let stars = (0 .. stars)
-            .map(|_| (uniform_sphere_distribution(rng), rng.gen()))
-            .collect();
-
-        let mut light = uniform_sphere_distribution(rng);
-        light.y = light.y.abs();
-
-        Self {
-            light,
-            background_color: (0.0, 0.0, rng.gen_range(0.0, 0.25)),
-            stars, location
-        }
+    fn selection_info(&self) -> BTreeMap<&ShipType, usize> {
+        self.selected().fold(BTreeMap::new(), |mut map, ship| {
+            *map.entry(ship.tag()).or_insert(0) += 1;
+            map
+        })
     }
 }
 
@@ -193,7 +182,8 @@ struct Game {
     
     state: State,
     controls: Controls,
-    rng: ThreadRng
+    rng: ThreadRng,
+    paused: bool
 }
 
 impl Game {
@@ -204,6 +194,7 @@ impl Game {
             context: context::Context::new(events_loop),
             state: State::new(&mut rng),
             controls: Controls::default(),
+            paused: false,
             rng
         }
     }
@@ -219,10 +210,10 @@ impl Game {
         }
     }
 
-    fn point_under_mouse(&self) -> Option<Vector3<f32>> {
+    fn point_under_mouse(&mut self) -> Option<Vector3<f32>> {
         let ray = self.context.ray(&self.state.camera, self.controls.mouse());
 
-        Plane::new(Vector3::new(0.0, 1.0, 0.0), 0.0).intersection(&ray).map(point_to_vector)
+        Plane::new(UP, 0.0).intersection(&ray).map(point_to_vector)
     }
 
     fn handle_mouse_button(&mut self, button: MouseButton, pressed: bool) {
@@ -240,13 +231,13 @@ impl Game {
             VirtualKeyCode::Right | VirtualKeyCode::D => self.controls.right    = pressed,
             VirtualKeyCode::Up    | VirtualKeyCode::W => self.controls.forwards = pressed,
             VirtualKeyCode::Down  | VirtualKeyCode::S => self.controls.back     = pressed,
-            VirtualKeyCode::T if pressed => if let Some(point) = self.point_under_mouse() {
-                self.state.ships.push(Ship::new(ShipType::Fighter, point, (0.0, 0.0, 0.0)));
-            },
+            VirtualKeyCode::T => self.controls.shift = pressed,
             VirtualKeyCode::C => self.state.camera.set_focus(&self.state.selected),
             VirtualKeyCode::Z if pressed => self.state.save("game.sav"),
             VirtualKeyCode::L if pressed => self.state = State::load("game.sav"),
             VirtualKeyCode::LShift => self.controls.shift = pressed,
+            VirtualKeyCode::P if pressed => self.paused = !self.paused,
+            VirtualKeyCode::Slash if pressed => self.context.toggle_debug(),
             _ => {}
         }
     }
@@ -329,8 +320,10 @@ impl Game {
             self.state.camera.move_forwards(-0.5);
         }
 
-        for ship in self.state.ships.iter_mut() {
-            ship.step();
+        if !self.paused {
+            for ship in self.state.ships.iter_mut() {
+                ship.step();
+            }
         }
 
         self.state.camera.step(&self.state.ships);
@@ -345,20 +338,14 @@ impl Game {
             self.context.render_rect(top_left, self.controls.mouse());
         }
 
-        let mut selection_info = BTreeMap::new();
-
-        for ship in self.state.selected() {
-            *selection_info.entry(ship.tag()).or_insert(0) += 1;
-        }
-
         self.context.render_text(&format!("Ship count: {}", self.state.ships.len()), 10.0, 10.0);
         self.context.render_text(&format!("Population: {}", self.state.people.len()), 10.0, 40.0);
 
-        for (i, (tag, num)) in selection_info.iter().enumerate() {
+        for (i, (tag, num)) in self.state.selection_info().iter().enumerate() {
             self.context.render_text(&format!("{:?}: {}", tag, num), 10.0, 70.0 + i as f32 * 30.0);
         }
 
-        self.context.flush_ui();
+        self.context.flush_ui(&self.state.camera, &self.state.system);
         self.context.finish();
     }
 

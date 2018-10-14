@@ -1,13 +1,16 @@
 use cgmath::*;
 use std::f32::consts::*;
+use arrayvec;
 use std::ops::*;
-use std::collections::*;
-use std::collections::hash_map::*;
-use std::hash::*;
 
 pub const FOV: f32 = FRAC_PI_3;
 pub const FAR: f32 = 10240.0;
 pub const NEAR: f32 = 0.1;
+pub const UP: Vector3<f32> = Vector3 {
+    x: 0.0,
+    y: 1.0,
+    z: 0.0
+};
 
 pub fn perspective_matrix(aspect_ratio: f32) -> Matrix4<f32> {
     let f = 1.0 / (FOV / 2.0).tan();
@@ -50,73 +53,49 @@ pub fn vector_to_array(vector: Vector3<f32>) -> [f32; 3] {
     vector.into()
 }
 
-pub fn mix(a: f32, b: f32, percentage: f32) -> f32 {
-    a + (b - a) * percentage
+pub fn iter_owned<T, A: arrayvec::Array<Item=T>>(array: A) -> arrayvec::IntoIter<A> {
+    arrayvec::ArrayVec::from(array).into_iter()
 }
 
-pub trait ID: Hash + Copy + Eq + Default {
-    fn increment(&mut self);
+pub fn look_at(point: Vector3<f32>) -> Quaternion<f32> {
+    Quaternion::look_at(point, UP).invert()
 }
 
-pub trait IDed<I> {
-    fn set_id(&mut self, id: I);
+pub trait Positioned {
+    fn distance(&self, other: &Self) -> f32;
+    fn normalize_to(&self, value: f32) -> Self;
 }
 
-#[derive(Deserialize, Serialize)]
-pub struct AutoIDMap<I: ID, T> {
-    next_id: I,
-    inner: HashMap<I, T>
+impl Positioned for Vector3<f32> {
+    fn distance(&self, other: &Self) -> f32 {
+        (*self).distance(*other)
+    }
+
+    fn normalize_to(&self, value: f32) -> Self {
+        (*self).normalize_to(value)
+    }
 }
 
-impl<I: ID, T: IDed<I>> AutoIDMap<I, T> {
-    pub fn new() -> Self {
-        Self {
-            next_id: I::default(),
-            inner: HashMap::new()
+impl Positioned for f32 {
+    fn distance(&self, other: &Self) -> f32 {
+        (*self - *other).abs()
+    }
+
+    fn normalize_to(&self, value: f32) -> Self {
+        if self.is_sign_positive() {
+            value
+        } else {
+            -value
         }
     }
-
-    pub fn push(&mut self, mut item: T) -> I {
-        let id = self.next_id;
-
-        item.set_id(id);
-        self.inner.insert(id, item);
-        self.next_id.increment();
-
-        id
-    }
-
-    pub fn get(&self, id: I) -> Option<&T> {
-        self.inner.get(&id)
-    }
-
-    pub fn get_mut(&mut self, id: I) -> Option<&mut T> {
-        self.inner.get_mut(&id)
-    }
-
-    pub fn iter(&self) -> Values<I, T> {
-        self.inner.values()
-    }
-
-    pub fn iter_mut(&mut self) -> ValuesMut<I, T> {
-        self.inner.values_mut()
-    }
-
-    pub fn len(&self) -> usize {
-        self.inner.len()
-    }
 }
 
-impl<I: ID, T> Index<I> for AutoIDMap<I, T> {
-    type Output = T;
+pub fn move_towards<T: Sub<Output=T> + Add<Output=T> + Positioned + Clone>(position: T, target: T, step: f32) -> T {
+    let delta = target.clone() - position.clone();
 
-    fn index(&self, index: I) -> &T {
-        &self.inner[&index]
-    }
-}
-
-impl<I: ID, T: IDed<I>> IndexMut<I> for AutoIDMap<I, T> {
-    fn index_mut(&mut self, index: I) -> &mut T {
-        self.get_mut(index).unwrap()
+    if step < position.distance(&target) {
+        position + delta.normalize_to(step)
+    } else {
+        target
     }
 }

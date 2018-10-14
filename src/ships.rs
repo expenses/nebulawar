@@ -17,7 +17,7 @@ impl Formation {
         match *self {
             Formation::Screen => {                
                 let step_sideways = Quaternion::from_angle_y(Rad(FRAC_PI_2)).rotate_vector(step);
-                let step_up = Vector3::new(0.0, distance, 0.0);
+                let step_up = UP * distance;
 
                 let width = (ships as f32).sqrt().ceil() as usize;
 
@@ -53,7 +53,7 @@ impl Formation {
     }
 }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ComponentType {
     AX2900Drive,
     HG900Drive,
@@ -108,7 +108,16 @@ pub enum Command {
     Dummy
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
+impl Command {
+    fn point(&self) -> Vector3<f32> {
+        match *self {
+            Command::MoveTo(point) => point,
+            Command::Dummy => Vector3::zero()
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub enum ShipType {
     Fighter,
     Tanker
@@ -185,8 +194,8 @@ impl Ship {
         self.position
     }
 
-    pub fn tag(&self) -> ShipType {
-        self.tag
+    pub fn tag(&self) -> &ShipType {
+        &self.tag
     }
 
     pub fn id(&self) -> ShipID {
@@ -202,11 +211,11 @@ impl Ship {
     }
 
     fn max_fuel(&self) -> f32 {
-        self.component_types().map(|tag| tag.fuel_storage()).sum()
+        self.component_types().map(ComponentType::fuel_storage).sum()
     }
 
     fn thrust(&self) -> f32 {
-        self.component_types().map(|tag| tag.thrust()).sum() 
+        self.component_types().map(ComponentType::thrust).sum() 
     }
 
     fn speed(&self) -> f32 {
@@ -229,16 +238,13 @@ impl Ship {
 
             self.fuel -= 0.01;
 
-            if self.speed() < self.position.distance(*position) {
-                let step = delta.normalize_to(self.speed());
+            self.position = move_towards(self.position, *position, self.speed());
 
-                self.position += step;
-            } else {
-                self.position = *position;
+            if self.position == *position {
                 clear = true;
             }
 
-            self.angle = Quaternion::look_at(delta, Vector3::new(0.0, 1.0, 0.0)).invert();;
+            self.angle = look_at(delta);
         }
 
         if clear {
@@ -250,8 +256,8 @@ impl Ship {
         context.render(self.tag.model(), self.position_matrix(), camera, system, Mode::Normal);
     }
 
-    pub fn info(&self) -> String {
-        format!("{:?} {:?} - Components: {:?}", self.tag, self.id, self.components.iter().map(|c| c.tag).collect::<Vec<_>>())
+    pub fn command_path(&self) -> impl Iterator<Item=Vector3<f32>> + '_ {
+        iter_owned([self.position()]).chain(self.commands.iter().map(Command::point))
     }
 }
 

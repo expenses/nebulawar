@@ -5,7 +5,6 @@ in vec3 normal;
 in vec2 texture;
 
 out vec3 v_normal;
-out vec3 v_position;
 out vec2 v_texture;
 
 uniform mat4 perspective;
@@ -14,7 +13,6 @@ uniform mat4 model;
 
 void main() {
     v_texture = texture;
-    v_position = vec3(model * vec4(position, 1));
     
     mat4 modelview = view * model;
     v_normal = transpose(inverse(mat3(model))) * normal;

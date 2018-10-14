@@ -2,7 +2,6 @@
 
 in vec3 v_normal;
 in vec2 v_texture;
-in vec3 v_position;
 
 out vec4 color;
 uniform vec3 light_direction;
@@ -16,18 +15,14 @@ float map(float min, float max, float value) {
 const int NORMAL = 1;
 const int SHADELESS = 2;
 const int STARS = 3;
-const int WIREFRAME = 4;
 
-const vec3 GREEN = vec3(0.0, 1.0, 0.0);
 const vec3 WHITE = vec3(1.0);
 const float MIN_LIGHT = 0.1;
 
 void main() {
     vec4 texture_color = texture(tex, v_texture);
 
-    if (mode == WIREFRAME) {
-        color = vec4(GREEN, 1.0);
-    } else if (mode == SHADELESS) {
+    if (mode == SHADELESS) {
         color = texture_color;
     } else if (mode == STARS) {
         color = vec4(WHITE, v_texture.x);

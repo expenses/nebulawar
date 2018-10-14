@@ -1,5 +1,5 @@
 use ships::*;
-use util::*;
+use maps::*;
 
 #[derive(Deserialize, Serialize)]
 pub enum Occupation {

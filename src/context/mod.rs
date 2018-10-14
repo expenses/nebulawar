@@ -23,11 +23,20 @@ use *;
 
 use runic;
 
+// ** Line Rendering Woes **
+// rendering in 2d: doesnt work with rest of scene, rendering lines that go behind the camera is hard
+// gl_lines: has a max width of 1 on my laptop
+// 2d lines in 3d: getting lines to join nicely is hard, too flat
+// geometry shader: complicated
+// assembling triangle/square line meshes by hand: complicated, but might be best shot
+
+const VERT: &str = include_str!("shaders/shader.vert");
+const FRAG: &str = include_str!("shaders/shader.frag");
+
 pub enum Mode {
     Normal = 1,
     Shadeless = 2,
-    Stars = 3,
-    Wireframe = 4
+    Stars = 3
 }
 
 #[derive(Copy, Clone)]
@@ -35,6 +44,16 @@ pub struct Vertex {
     pub position: [f32; 3],
     pub normal: [f32; 3],
     pub texture: [f32; 2],
+}
+
+impl Vertex {
+    fn new(position: Vector3<f32>) -> Self {
+        Self {
+            position: position.into(),
+            normal: [0.0; 3],
+            texture: [1.0; 2]
+        }
+    }
 }
 
 implement_vertex!(Vertex, position, normal, texture);
@@ -45,7 +64,9 @@ pub struct Context {
     target: Frame,
     resources: Resources,
     lines: LineRenderer,
-    text_program: Program
+    text_program: Program,
+    lines_3d: Vec<Vertex>,
+    debug: bool
 }
 
 impl Context {
@@ -60,18 +81,18 @@ impl Context {
 
         let program = glium::Program::from_source(
                 &display,
-                include_str!("shaders/shader.vert"),
-                include_str!("shaders/shader.frag"),
+                VERT, FRAG,
                 None
         ).unwrap();
 
         Self {
             resources: Resources::new(&display),
             target: display.draw(),
-            program,
             lines: LineRenderer::new(&display),
             text_program: runic::pixelated_program(&display).unwrap(),
-            display
+            display, program,
+            lines_3d: Vec::new(),
+            debug: false
         }
     }
 
@@ -80,8 +101,25 @@ impl Context {
         self.target.clear_color_srgb_and_depth((r, g, b, 1.0), 1.0);
     }
 
-    pub fn flush_ui(&mut self) {
+    pub fn flush_ui(&mut self, camera: &Camera, system: &System) {
         self.lines.flush(&mut self.target, &self.display);
+
+        let uniforms = uniform!{
+            model: matrix_to_array(Matrix4::identity()),
+            view: matrix_to_array(camera.view_matrix()),
+            perspective: matrix_to_array(self.perspective_matrix()),
+            light_direction: vector_to_array(system.light),
+            // todo: this is kinda lazy, so maybe change the name of the mode
+            mode: Mode::Stars as i32
+        };
+
+        let vertices = VertexBuffer::new(&self.display, &self.lines_3d).unwrap();
+        let indices = NoIndices(PrimitiveType::LinesList);
+
+        let params = self.draw_params();
+        self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
+
+        self.lines_3d.clear();
     }
 
     pub fn finish(&mut self) {
@@ -91,13 +129,14 @@ impl Context {
 
     fn render_billboard(&mut self, matrix: Matrix4<f32>, image: Image, camera: &Camera, system: &System) {
         let uniforms = self.uniforms(matrix, camera, system, &self.resources.images[image as usize], Mode::Shadeless);
+        let params = self.draw_params();
 
         self.target.draw(
             &billboard(&self.display),
             &NoIndices(PrimitiveType::TrianglesList),
             &self.program,
             &uniforms,
-            &Self::draw_params()
+            &params
         ).unwrap();
     }
 
@@ -120,20 +159,20 @@ impl Context {
             })
             .collect();
 
-        let buffer = VertexBuffer::new(&self.display, &vertices).unwrap();
+        let vertices = VertexBuffer::new(&self.display, &vertices).unwrap();
         let indices = NoIndices(PrimitiveType::Points);
 
         let params = DrawParameters {
             polygon_mode: PolygonMode::Point,
             point_size: Some(2.0 * self.dpi()),
-            .. Self::draw_params()
+            .. Self::draw_params(self)
         };
 
-        self.target.draw(&buffer, &indices, &self.program, &uniforms, &params).unwrap();
+        self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
 
         let offset = system.light * 1000.0;
 
-        let rotation: Matrix4<f32> = Quaternion::look_at(offset, Vector3::new(0.0, 1.0, 0.0)).invert().into();
+        let rotation: Matrix4<f32> = look_at(offset).into();
         let matrix = Matrix4::from_translation(camera.position() + offset) * rotation * Matrix4::from_scale(100.0);
 
         self.render_billboard(matrix, Image::Star, camera, system);
@@ -154,8 +193,7 @@ impl Context {
         let model = &self.resources.models[model as usize];
 
         let uniforms = self.uniforms(position, camera, system, &model.texture, mode);
-
-        let params = Self::draw_params();
+        let params = self.draw_params();
 
         self.target.draw(&model.vertices, &NoIndices(PrimitiveType::TrianglesList), &self.program, &uniforms, &params).unwrap();
     }
@@ -168,17 +206,13 @@ impl Context {
         self.lines.render_rect(top_left, bottom_right);
     }
 
-    pub fn render_line(&mut self, start: (f32, f32), end: (f32, f32)) {
-        self.lines.render_line(start, end);
-    }
-
     pub fn render_circle(&mut self, x: f32, y: f32, radius: f32, color: [f32; 3]) {
         self.lines.render_circle(x, y, radius, color);
     }
 
-    fn screen_dimensions(&self) -> (f32, f32) {
-        let (width, height) = self.target.get_dimensions();
-        (width as f32, height as f32)
+    pub fn screen_dimensions(&self) -> (f32, f32) {
+        let dimensions = self.display.gl_window().get_inner_size().unwrap();
+        (dimensions.width as f32, dimensions.height as f32)
     }
 
     fn aspect_ratio(&self) -> f32 {
@@ -206,7 +240,8 @@ impl Context {
 
         let (width, height) = self.screen_dimensions();
         let (x, y) = opengl_pos_to_screen_pos(x, y, width, height);
-        let (x, y) = (x * 2.0 / self.dpi(), y * 2.0 / self.dpi());
+        // todo: this may be dpi dependent
+        let (x, y) = (x * 2.0, y * 2.0);
 
         if z < 1.0 {
             Some((x, y))
@@ -215,8 +250,8 @@ impl Context {
         }
     }
 
-    fn draw_params() -> DrawParameters<'static> {
-        DrawParameters {
+    fn draw_params(&self) -> DrawParameters<'static> {
+        let mut params = DrawParameters {
             depth: Depth {
                 test: DepthTest::IfLess,
                 write: true,
@@ -225,34 +260,34 @@ impl Context {
             backface_culling: BackfaceCullingMode::CullCounterClockwise,
             blend: Blend::alpha_blending(),
             .. Default::default()
+        };
+
+        if self.debug {
+            params.polygon_mode = PolygonMode::Line;
         }
+
+        params
     }
 
-    pub fn render_3d_line(&mut self, start: Vector3<f32>, end: Vector3<f32>, camera: &Camera, system: &System) {
-        let uniforms = uniform!{
-            model: matrix_to_array(Matrix4::identity()),
-            view: matrix_to_array(camera.view_matrix()),
-            perspective: matrix_to_array(self.perspective_matrix()),
-            light_direction: vector_to_array(system.light),
-            mode: Mode::Stars as i32
-        };
+    pub fn render_3d_lines<I: Iterator<Item=Vector3<f32>>>(&mut self, iterator: I) {
+        let mut last = None;
 
-        let (buffer, indices) = self.lines.line_3d(start, end, &self.display);
+        for vector in iterator {
+            let vertex = Vertex::new(vector);
 
-        let params = DrawParameters {
-            backface_culling: BackfaceCullingMode::CullingDisabled,
-            .. Self::draw_params()
-        };
+            if let Some(last) = last {
+                self.lines_3d.push(last);
+                self.lines_3d.push(vertex);
+            }
 
-        self.target.draw(&buffer, &indices, &self.program, &uniforms, &params).unwrap();
+            last = Some(vertex);
+        }
     }
 
     // http://webglfactory.blogspot.com/2011/05/how-to-convert-world-to-screen.html
     pub fn ray(&self, camera: &Camera, mouse: (f32, f32)) -> collision::Ray<f32, Point3<f32>, Vector3<f32>> {
         // Get mouse position
         let (x, y) = mouse;
-        // Not sure why we have to do this
-        let (x, y) = (x * self.dpi(), y * self.dpi());
 
         let (width, height) = self.screen_dimensions();
         let (x, y) = screen_pos_to_opengl_pos(x, y, width, height);
@@ -266,10 +301,38 @@ impl Context {
         // Create a ray from the camera position to that point
         collision::Ray::new(vector_to_point(camera.position()), point)
     }
+
+    pub fn toggle_debug(&mut self) {
+        self.debug = !self.debug;
+    }
 }
 
 impl Drop for Context {
     fn drop(&mut self) {
         self.target.set_finish().unwrap();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use glium::*;
+    use glutin::*;
+
+    #[test]
+    fn test_shader() {
+        let context = HeadlessRendererBuilder::new(640, 480).build().unwrap();
+        let display = HeadlessRenderer::new(context).unwrap();
+        // Try create the program
+        Program::from_source(&display, super::VERT, super::FRAG, None)
+            .unwrap_or_else(|error| panic!("\n{}", error));
+    }
+
+    #[test]
+    fn test_lines_shader() {
+        let context = HeadlessRendererBuilder::new(640, 480).build().unwrap();
+        let display = HeadlessRenderer::new(context).unwrap();
+        // Try create the program
+        Program::from_source(&display, super::lines::VERT, super::lines::FRAG, None)
+            .unwrap_or_else(|error| panic!("\n{}", error));
     }
 }

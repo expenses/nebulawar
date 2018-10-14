@@ -3,12 +3,12 @@ use genmesh;
 use obj::*;
 use std::io::*;
 use context::Vertex;
-use arrayvec::*;
 use image;
 use std::fs;
 use runic;
-
+use util::*;
 use glium::texture::*;
+use std::path;
 
 pub fn billboard(display: &Display) -> VertexBuffer<Vertex> {
     let normal = [0.0, 0.0, 1.0];
@@ -59,7 +59,7 @@ pub fn load_wavefront(display: &Display, data: &[u8]) -> VertexBuffer<Vertex> {
         .flat_map(|group| group.polys)
         .flat_map(|polygon| {
             match polygon {
-                genmesh::Polygon::PolyTri(genmesh::Triangle { x: v1, y: v2, z: v3 }) => ArrayVec::from([v1, v2, v3]),
+                genmesh::Polygon::PolyTri(genmesh::Triangle { x: v1, y: v2, z: v3 }) => iter_owned([v1, v2, v3]),
                 genmesh::Polygon::PolyQuad(_) => unimplemented!("Quad polygons not supported, use triangles instead.")
             }
         })
@@ -90,10 +90,10 @@ pub struct ObjModel {
 }
 
 impl ObjModel {
-    fn new(display: &Display, model: &str, image_filename: &str) -> Self {
+    fn new<P: AsRef<path::Path>>(display: &Display, model: P, image: P) -> Self {
         Self {
             vertices: load_wavefront(display, &fs::read(model).unwrap()),
-            texture: load_image(display, &fs::read(image_filename).unwrap())
+            texture: load_image(display, &fs::read(image).unwrap())
         }
     }
 }
@@ -106,13 +106,16 @@ pub struct Resources {
 
 impl Resources {
     pub fn new(display: &Display) -> Self {
+        let root = path::PathBuf::from("resources");
+        let models = root.join("models");
+
         Self {
             models: [
-                ObjModel::new(display, "models/fighter.obj", "models/fighter.png"),
-                ObjModel::new(display, "models/tanker.obj", "models/tanker.png")
+                ObjModel::new(display, models.join("fighter.obj"), models.join("fighter.png")),
+                ObjModel::new(display, models.join("tanker.obj"), models.join("tanker.png"))
             ],
             images: [
-                load_image(display, &fs::read("models/star.png").unwrap())
+                load_image(display, &fs::read(root.join("star.png")).unwrap())
             ],
             font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display).unwrap()
         }

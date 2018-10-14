@@ -6,10 +6,9 @@ use lyon::math::*;
 use lyon::lyon_tessellation::*;
 use lyon::lyon_tessellation::basic_shapes::*;
 use self::tessellation::{FillVertex, StrokeVertex};
-use util::*;
-use cgmath::*;
 
-use super::Vertex;
+pub const VERT: &str = include_str!("shaders/lines.vert");
+pub const FRAG: &str = include_str!("shaders/lines.frag");
 
 #[derive(Copy, Clone, Debug)]
 struct Vertex2d {
@@ -18,45 +17,6 @@ struct Vertex2d {
 }
 
 implement_vertex!(Vertex2d, position, color);
-
-struct Constructor3d {
-    start: Vector3<f32>,
-    end: Vector3<f32>
-}
-
-impl Constructor3d {
-    fn new(start: Vector3<f32>, end: Vector3<f32>) -> Self {
-        Self {
-            start, end
-        }
-    }
-}
-
-impl VertexConstructor<FillVertex, Vertex> for Constructor3d {
-    fn new_vertex(&mut self, vertex: FillVertex) -> Vertex {
-        Vertex {
-            position: [vertex.position.x, 0.0, vertex.position.y],
-            normal: [1.0; 3],
-            texture: [1.0; 2]
-        }
-    }
-}
-
-impl VertexConstructor<StrokeVertex, Vertex> for Constructor3d {
-    fn new_vertex(&mut self, vertex: StrokeVertex) -> Vertex {
-        let delta = self.start - self.end;
-        // Get how far through the line is
-        let percentage = vertex.advancement / delta.x.hypot(delta.z);
-        // Get the y value
-        let y = mix(self.start.y, self.end.y, percentage);
-
-        Vertex {
-            position: [vertex.position.x, y, vertex.position.y],
-            normal: [1.0; 3],
-            texture: [1.0; 2]
-        }
-    }
-}
 
 struct Constructor {
     color: [f32; 3]
@@ -98,8 +58,7 @@ impl LineRenderer {
         Self {
             program: Program::from_source(
                 display,
-                include_str!("shaders/lines.vert"),
-                include_str!("shaders/lines.frag"),
+                VERT, FRAG,
                 None
             ).unwrap(),
             stroke_options: StrokeOptions::tolerance(1.0).with_line_width(1.0),            
@@ -128,18 +87,6 @@ impl LineRenderer {
         self.vertex_buffers.indices.clear();
     }
 
-    pub fn render_line(&mut self, start: (f32, f32), end: (f32, f32)) {
-        let (start_x, start_y) = start;
-        let (end_x, end_y) = end;
-        
-        stroke_polyline(
-            [point(start_x, start_y), point(end_x, end_y)].iter().cloned(),
-            false,
-            &self.stroke_options,
-            &mut BuffersBuilder::new(&mut self.vertex_buffers, Constructor::new([1.0; 3]))
-        );
-    }   
-
     pub fn render_rect(&mut self, top_left: (f32, f32), bottom_right: (f32, f32)) {
         let (left, top) = top_left;
         let (right, bottom) = bottom_right;
@@ -162,20 +109,5 @@ impl LineRenderer {
             &mut BuffersBuilder::new(&mut self.vertex_buffers, Constructor::new(color))
         );
     }
-
-    pub fn line_3d(&self, start: Vector3<f32>, end: Vector3<f32>, display: &Display) -> (VertexBuffer<Vertex>, IndexBuffer<u16>) {
-        let mut buffers = VertexBuffers::new();
-
-        stroke_polyline(
-            [point(start.x, start.z), point(end.x, end.z)].iter().cloned(),
-            false,
-            &StrokeOptions::tolerance(1.0).with_line_width(0.25),
-            &mut BuffersBuilder::new(&mut buffers, Constructor3d::new(start, end))
-        );
-
-        (
-            VertexBuffer::new(display, &buffers.vertices).unwrap(),
-            IndexBuffer::new(display, PrimitiveType::TrianglesList, &buffers.indices).unwrap()
-        )
-    }
 }
+

@@ -9,21 +9,30 @@ pub struct Camera {
     longitude: f32,
     latitude: f32,
     distance: f32,
+    target_distance: f32,
     focus: HashSet<ShipID>
 }
 
 impl Camera {
+    // the camera cannot go up to a latitude of a full half pi because they it starts to flip over, so go to 99%.
+    const MAX_VERTICALITY: f32 = FRAC_PI_2 * 0.99;
+
+    const MIN_ZOOM: f32 = 2.0;
+    const MAX_ZOOM: f32 = 100.0;
+    const MAX_ZOOM_SPEED: f32 = 2.0;
+    const DEFAULT_ZOOM: f32 = 30.0;
+
     pub fn rotate_longitude(&mut self, amount: f32) {
         self.longitude += amount;
     }
 
     pub fn rotate_latitude(&mut self, amount: f32) {
-        self.latitude = (self.latitude + amount).max(-FRAC_PI_2).min(FRAC_PI_2);
+        self.latitude = (self.latitude + amount).max(-Self::MAX_VERTICALITY).min(Self::MAX_VERTICALITY);
     }
 
     pub fn change_distance(&mut self, amount: f32) {
-        self.distance += amount;
-        self.distance = self.distance.max(2.0).min(100.0);
+        self.target_distance += amount;
+        self.target_distance = self.target_distance.max(Self::MIN_ZOOM).min(Self::MAX_ZOOM);
     }
 
     pub fn move_sideways(&mut self, amount: f32) {
@@ -40,9 +49,9 @@ impl Camera {
 
     fn direction(&self) -> Vector3<f32> {
         Vector3::new(
-            self.longitude.sin(),
+            self.longitude.sin() * self.latitude.cos(),
             self.latitude.sin(),
-            self.longitude.cos()
+            self.longitude.cos() * self.latitude.cos()
         )
     }
 
@@ -52,11 +61,13 @@ impl Camera {
 
     pub fn view_matrix(&self) -> Matrix4<f32> {
         Matrix4::look_at_dir(
-            vector_to_point(self.position()), self.direction(), Vector3::new(0.0, 1.0, 0.0)
+            vector_to_point(self.position()), self.direction(), UP
         )
     }
 
     pub fn step(&mut self, ships: &AutoIDMap<ShipID, Ship>) {
+        self.distance = move_towards(self.distance, self.target_distance, Self::MAX_ZOOM_SPEED);
+
         if let Some(position) = average_position(&self.focus, ships) {
             self.center = position;
         }
@@ -73,7 +84,8 @@ impl Default for Camera {
             center: Vector3::new(0.0, 0.0, 0.0),
             longitude: 0.0,
             latitude: FRAC_PI_4,
-            distance: 30.0,
+            distance: Self::DEFAULT_ZOOM,
+            target_distance: Self::DEFAULT_ZOOM,
             focus: HashSet::new()
         }
     }
