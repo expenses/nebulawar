@@ -105,14 +105,14 @@ impl Component {
 #[derive(Deserialize, Serialize)]
 pub enum Command {
     MoveTo(Vector3<f32>),
-    Dummy
+    Refuel(ShipID)
 }
 
 impl Command {
-    fn point(&self) -> Vector3<f32> {
+    fn point(&self, ships: &Ships) -> Vector3<f32> {
         match *self {
             Command::MoveTo(point) => point,
-            Command::Dummy => Vector3::zero()
+            Command::Refuel(id) => ships[id].position()
         }
     }
 }
@@ -256,8 +256,9 @@ impl Ship {
         context.render(self.tag.model(), self.position_matrix(), camera, system, Mode::Normal);
     }
 
-    pub fn command_path(&self) -> impl Iterator<Item=Vector3<f32>> + '_ {
-        iter_owned([self.position()]).chain(self.commands.iter().map(Command::point))
+    pub fn command_path<'a>(&'a self, ships: &'a Ships) -> impl Iterator<Item=Vector3<f32>> + 'a {
+        iter_owned([self.position()])
+            .chain(self.commands.iter().map(move |command| command.point(ships)))
     }
 }
 
@@ -275,3 +276,5 @@ impl ID for ShipID {
         *self = ShipID(self.0 + 1)
     }
 }
+
+pub type Ships = AutoIDMap<ShipID, Ship>;

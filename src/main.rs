@@ -16,7 +16,6 @@ extern crate bincode;
 
 use rand::*;
 use rand::distributions::*;
-
 use glium::*;
 use glutin::*;
 use glutin::dpi::*;
@@ -24,6 +23,7 @@ use cgmath::*;
 use collision::*;
 use std::collections::*;
 use std::f32::consts::*;
+use std::time::*;
 
 mod camera;
 mod util;
@@ -155,18 +155,18 @@ impl State {
             ship.render(context, &self.camera, &self.system);
         }
 
-        context.render_system(&self.system, &self.camera);
-
         for ship in self.selected() {
-            if let Some((x, y)) = context.screen_position(ship.position(), &self.camera) {
+            if let Some((x, y, z)) = context.screen_position(ship.position(), &self.camera) {
                 let fuel = ship.fuel_perc();
-                context.render_circle(x, y, 25.0, [1.0, fuel, fuel]);
+                context.render_circle(x, y, circle_size(z), [1.0, fuel, fuel, 1.0]);
             }
 
             if !ship.commands.is_empty() {
-                context.render_3d_lines(ship.command_path());
+                context.render_3d_lines(ship.command_path(&self.ships));
             }
         }
+
+        context.render_system(&self.system, &self.camera);
     }
 
     fn selection_info(&self) -> BTreeMap<&ShipType, usize> {
@@ -246,13 +246,31 @@ impl Game {
         average_position(&self.state.selected, &self.state.ships)
     }
 
-    fn update(&mut self) {
+    fn update(&mut self, secs: f32) {
         if self.controls.middle_clicked() {
             self.state.camera.set_focus(&self.state.selected);
         }
 
         if self.controls.left_clicked() {
-            self.state.selected.clear();
+            if !self.controls.shift {
+                self.state.selected.clear();
+            }
+
+            let (mouse_x, mouse_y) = self.controls.mouse();
+
+            let possible_closest_ship = self.state.ships.iter()
+                .filter_map(|ship| {
+                    self.context.screen_position(ship.position(), &self.state.camera).filter(|(x, y, z)| {
+                        (mouse_x - x).hypot(mouse_y - y) < circle_size(*z)
+                    })
+                    .map(|(_, _, z)| (ship, z))
+                })
+                .min_by(|(_, z_a), (_, z_b)| z_a.partial_cmp(z_b).unwrap_or(::std::cmp::Ordering::Less))
+                .map(|(ship, _)| ship);
+
+            if let Some(ship) = possible_closest_ship {
+                self.state.selected.insert(ship.id());
+            }
         }
 
         if let Some((mut left, mut top)) = self.controls.left_dragged() {
@@ -271,7 +289,7 @@ impl Game {
             }
 
             for ship in self.state.ships.iter() {
-                if let Some((x, y)) = self.context.screen_position(ship.position(), &self.state.camera) {
+                if let Some((x, y, _)) = self.context.screen_position(ship.position(), &self.state.camera) {
                     if left <= x && x <= right && top <= y && y <= bottom {
                         self.state.selected.insert(ship.id());
                     }
@@ -345,8 +363,23 @@ impl Game {
             self.context.render_text(&format!("{:?}: {}", tag, num), 10.0, 70.0 + i as f32 * 30.0);
         }
 
+        self.render_ui();
+
         self.context.flush_ui(&self.state.camera, &self.state.system);
         self.context.finish();
+    }
+
+    fn render_ui(&mut self) {
+        let (width, height) = self.context.screen_dimensions();
+
+        self.context.render_image(context::Image::Button, width - 32.0, height - 32.0, 64.0, 64.0);
+        self.context.render_image(context::Image::Move, width - 32.0, height - 32.0, 64.0, 64.0);
+
+        self.context.render_image(context::Image::Button, width - 96.0, height - 32.0, 64.0, 64.0);
+        self.context.render_image(context::Image::Refuel, width - 96.0, height - 32.0, 64.0, 64.0);
+
+        self.context.render_image(context::Image::Button, width - 160.0, height - 32.0, 64.0, 64.0);
+        self.context.render_image(context::Image::RefuelFrom, width - 160.0, height - 32.0, 64.0, 64.0);
     }
 
     fn change_distance(&mut self, delta: f32) {
@@ -358,6 +391,8 @@ fn main() {
     let mut events_loop = EventsLoop::new();
     
     let mut game = Game::new(&events_loop);
+
+    let mut time = Instant::now();
 
     let mut closed = false;
     while !closed {
@@ -379,7 +414,16 @@ fn main() {
             }
         });
 
-        game.update();
+        let now = Instant::now();
+        
+        let secs = now.duration_since(time).subsec_nanos() as f32 / 10.0_f32.powi(9);
+        time = now;
+
+        game.update(secs);
         game.render();
     }
+}
+
+fn circle_size(z: f32) -> f32 {
+    5000.0 * (1.0 - z)
 }

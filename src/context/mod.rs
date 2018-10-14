@@ -4,7 +4,7 @@ mod resources;
 use self::resources::*;
 use self::lines::*;
 
-pub use self::resources::Model;
+pub use self::resources::*;
 
 use cgmath::*;
 
@@ -206,7 +206,7 @@ impl Context {
         self.lines.render_rect(top_left, bottom_right);
     }
 
-    pub fn render_circle(&mut self, x: f32, y: f32, radius: f32, color: [f32; 3]) {
+    pub fn render_circle(&mut self, x: f32, y: f32, radius: f32, color: [f32; 4]) {
         self.lines.render_circle(x, y, radius, color);
     }
 
@@ -229,7 +229,7 @@ impl Context {
     }
 
     // Get the screen position of a point if it is in front of the camera
-    pub fn screen_position(&self, point: Vector3<f32>, camera: &Camera) -> Option<(f32, f32)> {
+    pub fn screen_position(&self, point: Vector3<f32>, camera: &Camera) -> Option<(f32, f32, f32)> {
         let modelview = camera.view_matrix() * Matrix4::from_translation(point);
 
         let gl_position = self.perspective_matrix() * modelview * Vector4::new(0.0, 0.0, 0.0, 1.0);
@@ -244,7 +244,7 @@ impl Context {
         let (x, y) = (x * 2.0, y * 2.0);
 
         if z < 1.0 {
-            Some((x, y))
+            Some((x, y, z))
         } else {
             None
         }
@@ -304,6 +304,10 @@ impl Context {
 
     pub fn toggle_debug(&mut self) {
         self.debug = !self.debug;
+    }
+
+    pub fn render_image(&mut self, image: Image, x: f32, y: f32, width: f32, height: f32) {
+        self.lines.render_image(image, x, y, width, height, &mut self.target, &self.display, &self.resources)
     }
 }
 

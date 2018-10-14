@@ -76,7 +76,11 @@ pub fn load_wavefront(display: &Display, data: &[u8]) -> VertexBuffer<Vertex> {
 }
 
 pub enum Image {
-    Star = 0
+    Star = 0,
+    Button = 1,
+    Move = 2,
+    Refuel = 3,
+    RefuelFrom = 4
 }
 
 pub enum Model {
@@ -100,7 +104,7 @@ impl ObjModel {
 
 pub struct Resources {
     pub models: [ObjModel; 2],
-    pub images: [SrgbTexture2d; 1],
+    pub images: [SrgbTexture2d; 5],
     pub font: runic::CachedFont<'static>
 }
 
@@ -108,6 +112,7 @@ impl Resources {
     pub fn new(display: &Display) -> Self {
         let root = path::PathBuf::from("resources");
         let models = root.join("models");
+        let ui = root.join("ui");
 
         Self {
             models: [
@@ -115,7 +120,11 @@ impl Resources {
                 ObjModel::new(display, models.join("tanker.obj"), models.join("tanker.png"))
             ],
             images: [
-                load_image(display, &fs::read(root.join("star.png")).unwrap())
+                load_image(display, &fs::read(root.join("star.png")).unwrap()),
+                load_image(display, &fs::read(ui.join("button.png")).unwrap()),               
+                load_image(display, &fs::read(ui.join("move.png")).unwrap()),
+                load_image(display, &fs::read(ui.join("refuel.png")).unwrap()),
+                load_image(display, &fs::read(ui.join("refuel_from.png")).unwrap())
             ],
             font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display).unwrap()
         }
