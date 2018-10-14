@@ -75,6 +75,7 @@ pub fn load_wavefront(display: &Display, data: &[u8]) -> VertexBuffer<Vertex> {
     VertexBuffer::new(display, &vertices).unwrap()
 }
 
+#[derive(Copy, Clone)]
 pub enum Image {
     Star = 0,
     Button = 1,
@@ -128,5 +129,9 @@ impl Resources {
             ],
             font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display).unwrap()
         }
+    }
+
+    pub fn image_dimensions(&self, image: Image) -> (u32, u32) {
+        self.images[image as usize].dimensions()
     }
 }

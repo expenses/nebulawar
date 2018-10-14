@@ -20,10 +20,9 @@ struct Vertex2d {
 }
 
 impl Vertex2d {
-    fn new_image(position: [f32; 2], uv: [f32; 2]) -> Self {
+    fn new(position: [f32; 2], uv: [f32; 2], color: [f32; 4]) -> Self {
         Self {
-            position, uv,
-            color: [0.0; 4]
+            position, uv, color
         }
     }
 }
@@ -125,7 +124,7 @@ impl LineRenderer {
         );
     }
 
-    pub fn render_image(&self, image: Image, x: f32, y: f32, width: f32, height: f32, target: &mut Frame, display: &Display, resources: &Resources) {
+    pub fn render_image(&self, image: Image, x: f32, y: f32, width: f32, height: f32, overlay: [f32; 4], target: &mut Frame, display: &Display, resources: &Resources) {
         let dimensions = display.gl_window().get_inner_size().unwrap();
 
         let uniforms = uniform!{
@@ -140,12 +139,12 @@ impl LineRenderer {
             blend: Blend::alpha_blending(),
             .. Default::default()
         };
-        
+
         let vertices = [
-            Vertex2d::new_image([x - width / 2.0, y - height / 2.0], [0.0, 1.0]),
-            Vertex2d::new_image([x + width / 2.0, y - height / 2.0], [1.0, 1.0]),
-            Vertex2d::new_image([x - width / 2.0, y + height / 2.0], [0.0, 0.0]),
-            Vertex2d::new_image([x + width / 2.0, y + height / 2.0], [1.0, 0.0])
+            Vertex2d::new([x - width / 2.0, y - height / 2.0], [0.0, 1.0], overlay),
+            Vertex2d::new([x + width / 2.0, y - height / 2.0], [1.0, 1.0], overlay),
+            Vertex2d::new([x - width / 2.0, y + height / 2.0], [0.0, 0.0], overlay),
+            Vertex2d::new([x + width / 2.0, y + height / 2.0], [1.0, 0.0], overlay)
         ];
 
         let vertices = VertexBuffer::new(display, &vertices).unwrap();

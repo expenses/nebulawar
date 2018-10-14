@@ -1,7 +1,6 @@
 mod lines;
 mod resources;
 
-use self::resources::*;
 use self::lines::*;
 
 pub use self::resources::*;
@@ -22,6 +21,7 @@ use camera::*;
 use *;
 
 use runic;
+use pedot::*;
 
 // ** Line Rendering Woes **
 // rendering in 2d: doesnt work with rest of scene, rendering lines that go behind the camera is hard
@@ -32,6 +32,9 @@ use runic;
 
 const VERT: &str = include_str!("shaders/shader.vert");
 const FRAG: &str = include_str!("shaders/shader.frag");
+
+const DEFAULT_WIDTH: f32 = 800.0;
+const DEFAULT_HEIGHT: f32 = 600.0;
 
 pub enum Mode {
     Normal = 1,
@@ -62,16 +65,19 @@ pub struct Context {
     display: Display,
     program: Program,
     target: Frame,
-    resources: Resources,
+    pub resources: Resources,
     lines: LineRenderer,
     text_program: Program,
     lines_3d: Vec<Vertex>,
-    debug: bool
+    debug: bool,
+    pub gui: Gui
 }
 
 impl Context {
     pub fn new(events_loop: &EventsLoop) -> Self {
-        let window = glutin::WindowBuilder::new();
+        let window = glutin::WindowBuilder::new()
+            .with_dimensions(LogicalSize::new(DEFAULT_WIDTH as f64, DEFAULT_HEIGHT as f64))
+            .with_title("Fleet Commander");
         let context = glutin::ContextBuilder::new()
             .with_multisampling(16)
             .with_depth_buffer(24)
@@ -92,8 +98,13 @@ impl Context {
             text_program: runic::pixelated_program(&display).unwrap(),
             display, program,
             lines_3d: Vec::new(),
-            debug: false
+            debug: false,
+            gui: Gui::new(DEFAULT_WIDTH, DEFAULT_HEIGHT)
         }
+    }
+
+    pub fn copy_event(&mut self, event: &WindowEvent) {
+        self.gui.update(event);
     }
 
     pub fn clear(&mut self, system: &System) {
@@ -120,6 +131,8 @@ impl Context {
         self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
 
         self.lines_3d.clear();
+
+        self.gui.clear();
     }
 
     pub fn finish(&mut self) {
@@ -306,8 +319,8 @@ impl Context {
         self.debug = !self.debug;
     }
 
-    pub fn render_image(&mut self, image: Image, x: f32, y: f32, width: f32, height: f32) {
-        self.lines.render_image(image, x, y, width, height, &mut self.target, &self.display, &self.resources)
+    pub fn render_image(&mut self, image: Image, x: f32, y: f32, width: f32, height: f32, overlay: [f32; 4]) {
+        self.lines.render_image(image, x, y, width, height, overlay, &mut self.target, &self.display, &self.resources)
     }
 }
 

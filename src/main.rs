@@ -13,6 +13,7 @@ extern crate rand;
 #[macro_use]
 extern crate serde_derive;
 extern crate bincode;
+extern crate pedot;
 
 use rand::*;
 use rand::distributions::*;
@@ -32,7 +33,9 @@ mod ships;
 mod controls;
 mod people;
 mod maps;
+mod ui;
 
+use ui::*;
 use people::*;
 use controls::*;
 
@@ -183,7 +186,8 @@ struct Game {
     state: State,
     controls: Controls,
     rng: ThreadRng,
-    paused: bool
+    paused: bool,
+    ui: UI
 }
 
 impl Game {
@@ -195,7 +199,8 @@ impl Game {
             state: State::new(&mut rng),
             controls: Controls::default(),
             paused: false,
-            rng
+            rng,
+            ui: UI::new()
         }
     }
 
@@ -363,23 +368,10 @@ impl Game {
             self.context.render_text(&format!("{:?}: {}", tag, num), 10.0, 70.0 + i as f32 * 30.0);
         }
 
-        self.render_ui();
+        self.ui.render(&mut self.context);
 
         self.context.flush_ui(&self.state.camera, &self.state.system);
         self.context.finish();
-    }
-
-    fn render_ui(&mut self) {
-        let (width, height) = self.context.screen_dimensions();
-
-        self.context.render_image(context::Image::Button, width - 32.0, height - 32.0, 64.0, 64.0);
-        self.context.render_image(context::Image::Move, width - 32.0, height - 32.0, 64.0, 64.0);
-
-        self.context.render_image(context::Image::Button, width - 96.0, height - 32.0, 64.0, 64.0);
-        self.context.render_image(context::Image::Refuel, width - 96.0, height - 32.0, 64.0, 64.0);
-
-        self.context.render_image(context::Image::Button, width - 160.0, height - 32.0, 64.0, 64.0);
-        self.context.render_image(context::Image::RefuelFrom, width - 160.0, height - 32.0, 64.0, 64.0);
     }
 
     fn change_distance(&mut self, delta: f32) {
@@ -397,6 +389,8 @@ fn main() {
     let mut closed = false;
     while !closed {
         events_loop.poll_events(|event| if let glutin::Event::WindowEvent {event, ..} = event {
+            game.context.copy_event(&event);
+
             match event {
                 glutin::WindowEvent::CloseRequested => closed = true,
                 glutin::WindowEvent::CursorMoved {position: LogicalPosition {x, y}, ..} => game.handle_mouse_movement(x as f32, y as f32),
