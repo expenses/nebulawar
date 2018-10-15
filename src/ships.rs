@@ -222,11 +222,6 @@ impl Ship {
         self.thrust() / self.tag.mass()
     }
 
-    pub fn position_matrix(&self) -> Matrix4<f32> {
-        let angle: Matrix4<f32> = self.angle.into();
-        Matrix4::from_translation(self.position) * angle
-    }
-
     pub fn step(&mut self) {
         let mut clear = false;
         if let Some(Command::MoveTo(position)) = self.commands.first() {
@@ -253,7 +248,7 @@ impl Ship {
     }
 
     pub fn render(&self, context: &mut context::Context, camera: &Camera, system: &System) {
-        context.render(self.tag.model(), self.position_matrix(), camera, system, Mode::Normal);
+        context.render_model(self.tag.model(), self.position, self.angle, 1.0, camera, system);
     }
 
     pub fn command_path<'a>(&'a self, ships: &'a Ships) -> impl Iterator<Item=Vector3<f32>> + 'a {

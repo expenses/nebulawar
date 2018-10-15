@@ -154,6 +154,10 @@ impl Context {
     }
 
     pub fn render_system(&mut self, system: &System, camera: &Camera) {
+        for asteroid in &system.asteroids {
+            asteroid.render(self, system, camera);
+        }
+
         let uniforms = uniform!{
             model: matrix_to_array(Matrix4::identity()),
             view: matrix_to_array(camera.view_matrix()),
@@ -202,10 +206,14 @@ impl Context {
         }
     }
 
-    pub fn render(&mut self, model: Model, position: Matrix4<f32>, camera: &Camera, system: &System, mode: Mode) {
+    pub fn render_model(&mut self, model: Model, location: Vector3<f32>, rotation: Quaternion<f32>, size: f32, camera: &Camera, system: &System) {
+        let scale = Matrix4::from_scale(model.size() * size);
+        let rotation: Matrix4<f32> = rotation.into();
+        let position = Matrix4::from_translation(location) * rotation * scale;
+
         let model = &self.resources.models[model as usize];
 
-        let uniforms = self.uniforms(position, camera, system, &model.texture, mode);
+        let uniforms = self.uniforms(position, camera, system, &model.texture, Mode::Normal);
         let params = self.draw_params();
 
         self.target.draw(&model.vertices, &NoIndices(PrimitiveType::TrianglesList), &self.program, &uniforms, &params).unwrap();
@@ -336,6 +344,7 @@ mod tests {
     use glutin::*;
 
     #[test]
+    #[cfg(not(target_os = "linux"))]
     fn test_shader() {
         let context = HeadlessRendererBuilder::new(640, 480).build().unwrap();
         let display = HeadlessRenderer::new(context).unwrap();

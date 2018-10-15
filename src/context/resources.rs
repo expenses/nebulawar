@@ -86,7 +86,17 @@ pub enum Image {
 
 pub enum Model {
     Fighter = 0,
-    Tanker = 1
+    Tanker = 1,
+    Asteroid = 2
+}
+
+impl Model {
+    pub fn size(&self) -> f32 {
+        match *self {
+            Model::Asteroid => 10.0,
+            _ => 1.0
+        }
+    }
 }
 
 pub struct ObjModel {
@@ -104,7 +114,7 @@ impl ObjModel {
 }
 
 pub struct Resources {
-    pub models: [ObjModel; 2],
+    pub models: [ObjModel; 3],
     pub images: [SrgbTexture2d; 5],
     pub font: runic::CachedFont<'static>
 }
@@ -118,7 +128,8 @@ impl Resources {
         Self {
             models: [
                 ObjModel::new(display, models.join("fighter.obj"), models.join("fighter.png")),
-                ObjModel::new(display, models.join("tanker.obj"), models.join("tanker.png"))
+                ObjModel::new(display, models.join("tanker.obj"), models.join("tanker.png")),
+                ObjModel::new(display, models.join("asteroid.obj"), models.join("asteroid.png"))
             ],
             images: [
                 load_image(display, &fs::read(root.join("star.png")).unwrap()),
