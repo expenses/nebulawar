@@ -41,7 +41,7 @@ pub fn billboard(display: &Display) -> VertexBuffer<Vertex> {
 }
 
 pub fn load_image(display: &Display, data: &[u8]) -> SrgbTexture2d {
-    let image = image::load_from_memory(data).unwrap().to_rgba();
+    let image = image::load_from_memory_with_format(data, image::ImageFormat::PNG).unwrap().to_rgba();
     let image_dimensions = image.dimensions();
     let image = RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
     SrgbTexture2d::new(display, image).unwrap()

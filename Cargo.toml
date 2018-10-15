@@ -10,7 +10,7 @@ glium = "*"
 obj = {version = "*", features = ["genmesh"]}
 genmesh = "*"
 # image loading
-image = "*"
+image = {version = "*", default-features = false, features = ["png_codec"]}
 # Useful wrapper around arrays
 arrayvec = "*"
 # Easier matrices stuff
