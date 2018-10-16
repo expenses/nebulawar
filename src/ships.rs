@@ -14,9 +14,10 @@ impl Formation {
         step.y = 0.0;
         let step = step.normalize_to(distance);
 
+        let step_sideways = Quaternion::from_angle_y(Rad(FRAC_PI_2)).rotate_vector(step);
+
         match *self {
             Formation::Screen => {                
-                let step_sideways = Quaternion::from_angle_y(Rad(FRAC_PI_2)).rotate_vector(step);
                 let step_up = UP * distance;
 
                 let width = (ships as f32).sqrt().ceil() as usize;
@@ -35,8 +36,6 @@ impl Formation {
                     .collect()
             },
             Formation::DeltaWing => {
-                let step_sideways = Quaternion::from_angle_y(Rad(FRAC_PI_2)).rotate_vector(step);
-
                 let middle_x = (ships - 1) as f32 / 2.0;
 
                 (0 .. ships)
@@ -102,17 +101,24 @@ impl Component {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone, Copy)]
+pub enum Interaction {
+    Follow,
+    Refuel,
+    RefuelFrom
+}
+
+#[derive(Deserialize, Serialize, Clone)]
 pub enum Command {
     MoveTo(Vector3<f32>),
-    Refuel(ShipID)
+    GoToAnd(ShipID, Interaction)
 }
 
 impl Command {
     fn point(&self, ships: &Ships) -> Vector3<f32> {
         match *self {
             Command::MoveTo(point) => point,
-            Command::Refuel(id) => ships[id].position()
+            Command::GoToAnd(id, _) => ships[id].position()
         }
     }
 }
@@ -168,7 +174,9 @@ pub struct Ship {
     angle: Quaternion<f32>,
     pub commands: Vec<Command>,
     components: Vec<Component>,
-    fuel: f32
+    fuel: Storage,
+    materials: Storage,
+    food: Storage
 }
 
 impl Ship {
@@ -182,10 +190,12 @@ impl Ship {
             commands: Vec::new(),
             components: tag.default_components(0),
             tag,
-            fuel: 0.0
+            fuel: Storage::empty(),
+            food: Storage::empty(),
+            materials: Storage::empty()
         };
 
-        ship.fuel = ship.max_fuel();
+        ship.fuel = Storage::new(ship.max_fuel());
 
         ship
     }
@@ -202,8 +212,12 @@ impl Ship {
         self.id
     }
 
+    pub fn out_of_fuel(&self) -> bool {
+        self.fuel.is_empty()
+    }
+
     pub fn fuel_perc(&self) -> f32 {
-        self.fuel / self.max_fuel()
+        self.fuel.amount() / self.max_fuel()
     }
 
     fn component_types(&self) -> impl Iterator<Item=&ComponentType> {
@@ -222,27 +236,44 @@ impl Ship {
         self.thrust() / self.tag.mass()
     }
 
-    pub fn step(&mut self) {
-        let mut clear = false;
-        if let Some(Command::MoveTo(position)) = self.commands.first() {
-            if self.fuel < 0.01 {
-                return;
+    fn move_towards(&mut self, point: Vector3<f32>) -> bool {
+        if self.fuel.is_empty() {
+            return self.position == point;
+        }
+        
+        self.fuel.reduce(0.01);
+
+        self.position = move_towards(self.position, point, self.speed());
+
+        if self.position == point {
+            true
+        } else {
+            self.angle = look_at(point - self.position);
+            false
+        }
+    }
+
+    pub fn step<'a>(&'a mut self, ships: &'a mut LimitedAccessMapView<'a, ShipID, Ship>) {
+        let mut next = false;
+
+        if let Some(command) = self.commands.first().cloned() {
+            match command {
+                Command::MoveTo(position) => {
+                    if self.move_towards(position) {
+                        next = true;
+                    }
+                },
+                Command::GoToAnd(ship, interaction) => {
+                    let target = ships.get_mut(ship).unwrap();
+
+                    if self.position.distance(target.position) < 5.0 || self.move_towards(target.position) {
+                        next = true;
+                    }
+                }
             }
-            
-            let delta = position - self.position;
-
-            self.fuel -= 0.01;
-
-            self.position = move_towards(self.position, *position, self.speed());
-
-            if self.position == *position {
-                clear = true;
-            }
-
-            self.angle = look_at(delta);
         }
 
-        if clear {
+        if next {
             self.commands.remove(0);
         }
     }
@@ -261,6 +292,10 @@ impl IDed<ShipID> for Ship {
     fn set_id(&mut self, id: ShipID) {
         self.id = id;
     }
+
+    fn get_id(&self) -> ShipID {
+        self.id
+    }
 }
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug, Default, Deserialize, Serialize)]
@@ -273,3 +308,43 @@ impl ID for ShipID {
 }
 
 pub type Ships = AutoIDMap<ShipID, Ship>;
+
+
+#[derive(Serialize, Deserialize)]
+struct Storage {
+    amount: f32
+}
+
+impl Storage {
+    fn empty() -> Self {
+        Self {
+            amount: 0.0
+        }
+    }
+
+    fn new(amount: f32) -> Self {
+        Self {
+            amount
+        }
+    }
+
+    fn reduce(&mut self, amount: f32) -> f32 {
+        let reduced_by = self.amount.min(amount);
+        self.amount -= reduced_by;
+        reduced_by
+    } 
+
+    fn increase(&mut self, amount: f32, limit: f32) -> f32 {
+        let increased_by = (limit - self.amount).min(amount);
+        self.amount += increased_by;
+        increased_by
+    }
+
+    fn is_empty(&self) -> bool {
+        self.amount == 0.0
+    }
+
+    fn amount(&self) -> f32 {
+        self.amount
+    }
+}

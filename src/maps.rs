@@ -10,6 +10,7 @@ pub trait ID: Hash + Copy + Eq + Default {
 
 pub trait IDed<I> {
     fn set_id(&mut self, id: I);
+    fn get_id(&self) -> I;
 }
 
 #[derive(Deserialize, Serialize)]
@@ -43,6 +44,14 @@ impl<I: ID, T: IDed<I>> AutoIDMap<I, T> {
         id
     }
 
+    pub fn remove(&mut self, id: I) -> Option<T> {
+        self.inner.remove(&id)
+    } 
+
+    pub fn reinsert(&mut self, item: T) {
+        self.inner.insert(item.get_id(), item);
+    }
+
     pub fn get(&self, id: I) -> Option<&T> {
         self.inner.get(&id)
     }
@@ -59,8 +68,26 @@ impl<I: ID, T: IDed<I>> AutoIDMap<I, T> {
         self.inner.values_mut()
     }
 
+    pub fn ids(&self) -> Keys<I, T> {
+        self.inner.keys()
+    }
+
     pub fn len(&self) -> usize {
         self.inner.len()
+    }
+
+    pub fn split_one_off(&mut self, id: I) -> Option<(&mut T, LimitedAccessMapView<I, T>)> {
+        let item = self.get(id).map(|item| {
+            // switch the &T to an &mut T
+            let mut_ptr = item as *const T as *mut T;
+            unsafe {
+                mut_ptr.as_mut()
+            }.unwrap()
+        });
+
+        item.map(move |item| {
+            (item, LimitedAccessMapView::new(self, id))
+        })
     }
 }
 
@@ -91,5 +118,24 @@ impl<I: ID, T: IDed<I>> FromIterator<T> for AutoIDMap<I, T> {
         }
 
         map
+    }
+}
+
+pub struct LimitedAccessMapView<'a, I: 'a + ID, T: 'a> {
+    map: &'a mut AutoIDMap<I, T>,
+    blocked_id: I
+}
+
+impl<'a, I: ID, T: IDed<I>> LimitedAccessMapView<'a, I, T> {
+    fn new(map: &'a mut AutoIDMap<I, T>, id: I) -> Self {
+        Self {
+            map,
+            blocked_id: id
+        }
+    }
+
+    pub fn get_mut(&'a mut self, id: I) -> Option<&'a mut T> {
+        assert!(id != self.blocked_id, "Attempted to access blocked id");
+        self.map.get_mut(id)
     }
 }

@@ -14,6 +14,11 @@ extern crate rand;
 extern crate serde_derive;
 extern crate bincode;
 extern crate pedot;
+extern crate failure;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
+extern crate odds;
 
 use rand::*;
 use glium::*;
@@ -110,8 +115,14 @@ impl Game {
             VirtualKeyCode::Down  | VirtualKeyCode::S => self.controls.back     = pressed,
             VirtualKeyCode::T => self.controls.shift = pressed,
             VirtualKeyCode::C => self.state.camera.set_focus(&self.state.selected),
-            VirtualKeyCode::Z if pressed => self.state.save("game.sav"),
-            VirtualKeyCode::L if pressed => self.state = State::load("game.sav"),
+            VirtualKeyCode::Z if pressed => {
+                let result = self.state.save("game.sav");
+                self.print_potential_error(result);
+            },
+            VirtualKeyCode::L if pressed => {
+                let result = self.state.load("game.sav");
+                self.print_potential_error(result);
+            },
             VirtualKeyCode::LShift => self.controls.shift = pressed,
             VirtualKeyCode::P if pressed => self.state.paused = !self.state.paused,
             VirtualKeyCode::Slash if pressed => self.context.toggle_debug(),
@@ -134,6 +145,27 @@ impl Game {
             .map(|(ship, _)| ship.id())
     }
 
+    fn order_ships_to(&mut self, target: Vector3<f32>) {
+        if let Some(avg) = self.state.average_position() {
+            let positions = Formation::DeltaWing.arrange(self.state.selected.len(), avg, target, 2.5);
+            
+            let ships = &mut self.state.ships;
+            let queue = self.controls.shift;
+
+            self.state.selected.iter()
+                .zip(positions.iter())
+                .for_each(|(id, position)| {
+                    let ship = ships.get_mut(*id).unwrap();
+
+                    if !queue {
+                        ship.commands.clear();
+                    }
+
+                    ship.commands.push(Command::MoveTo(*position))
+                });
+        }
+    }
+
     fn update(&mut self, secs: f32) {
         if self.controls.middle_clicked() {
             self.state.camera.set_focus(&self.state.selected);
@@ -149,17 +181,7 @@ impl Game {
             }
         }
 
-        if let Some((mut left, mut top)) = self.controls.left_dragged() {
-            let (mut right, mut bottom) = self.controls.mouse();
-            
-            if right < left {
-                std::mem::swap(&mut right, &mut left);
-            }
-
-            if bottom < top {
-                std::mem::swap(&mut top, &mut bottom);
-            }
-
+        if let Some((left, top, right, bottom)) = self.controls.left_drag_rect() {
             if !self.controls.shift {
                 self.state.selected.clear();
             }
@@ -174,25 +196,30 @@ impl Game {
         }
 
         if self.controls.right_clicked() {
-            if let Some(target) = self.point_under_mouse() {
-                if let Some(avg) = self.state.average_position() {
-                    let positions = Formation::DeltaWing.arrange(self.state.selected.len(), avg, target, 2.5);
-                    
-                    let ships = &mut self.state.ships;
-                    let queue = self.controls.shift;
+            if let Some(target) = self.ship_under_mouse() {
+                let interaction = if self.state.ships[target].out_of_fuel() {
+                    Interaction::Refuel
+                } else {
+                    Interaction::RefuelFrom
+                };
 
-                    self.state.selected.iter()
-                        .zip(positions.iter())
-                        .for_each(|(id, position)| {
-                            let ship = ships.get_mut(*id).unwrap();
+                if !self.state.ships[target].out_of_fuel() {
+                    for ship in &self.state.selected {
+                        if *ship != target {
+                            let ship = &mut self.state.ships[*ship];
 
-                            if !queue {
+                            if !self.controls.shift {
                                 ship.commands.clear();
                             }
 
-                            ship.commands.push(Command::MoveTo(*position))
-                        });
+                            ship.commands.push(Command::GoToAnd(target, interaction));
+                        }
+
+                        
+                    }
                 }
+            } else if let Some(target) = self.point_under_mouse() {
+                self.order_ships_to(target);
             }
         }
 
@@ -215,6 +242,7 @@ impl Game {
         }
         
         self.state.step(secs);
+        self.ui.step(secs);
     }
 
     fn render(&mut self) {
@@ -242,9 +270,26 @@ impl Game {
     fn change_distance(&mut self, delta: f32) {
         self.state.camera.change_distance(delta)
     }
+
+    fn print_error<E: failure::Fail>(&mut self, error: &E) {
+        error!("{}", error);
+        if let Some(cause) = error.cause() {
+            error!("Cause: {}", cause);
+        }
+
+        self.ui.append_to_log(error.to_string());
+    }
+
+    fn print_potential_error<E: failure::Fail>(&mut self, result: Result<(), E>) {
+        if let Err(error) = result {
+            self.print_error(&error);
+        }
+    }
 }
 
 fn main() {
+    env_logger::init();
+
     let mut events_loop = EventsLoop::new();
     
     let mut game = Game::new(&events_loop);

@@ -2,6 +2,8 @@
 // clicked -> up
 // dragging -> dragged -> up
 
+use std::mem::swap;
+
 #[derive(is_enum_variant, Debug)]
 enum MouseState {
     Dragging(f32, f32),
@@ -123,5 +125,21 @@ impl Controls {
         } else {
             None
         }
+    }
+
+    pub fn left_drag_rect(&self) -> Option<(f32, f32, f32, f32)> {
+        self.left_dragged().map(|(mut left, mut top)| {
+            let (mut right, mut bottom) = self.mouse();
+            
+            if right < left {
+                swap(&mut right, &mut left);
+            }
+
+            if bottom < top {
+                swap(&mut top, &mut bottom);
+            }
+
+            (left, top, right, bottom)
+        })
     }
 }

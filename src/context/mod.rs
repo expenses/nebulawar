@@ -76,7 +76,7 @@ pub struct Context {
 impl Context {
     pub fn new(events_loop: &EventsLoop) -> Self {
         let window = glutin::WindowBuilder::new()
-            .with_dimensions(LogicalSize::new(DEFAULT_WIDTH as f64, DEFAULT_HEIGHT as f64))
+            .with_dimensions(LogicalSize::new(f64::from(DEFAULT_WIDTH), f64::from(DEFAULT_HEIGHT)))
             .with_title("Fleet Commander");
         let context = glutin::ContextBuilder::new()
             .with_multisampling(16)

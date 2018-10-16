@@ -1,6 +1,7 @@
 use context::*;
 use pedot::*;
 use util::*;
+use odds::vec::*;
 
 pub struct Button {
     x: HorizontalAlign,
@@ -44,8 +45,14 @@ impl Button {
     }
 }
 
+struct LogItem {
+    age: f32,
+    content: String
+}
+
 pub struct UI {
-    buttons: [Button; 3]
+    buttons: [Button; 3],
+    log: Vec<LogItem>
 }
 
 impl UI {
@@ -55,8 +62,23 @@ impl UI {
                 Button::new(HorizontalAlign::Right(0.0), VerticalAlign::Bottom(0.0), Image::Move),
                 Button::new(HorizontalAlign::Right(1.0), VerticalAlign::Bottom(0.0), Image::Refuel),
                 Button::new(HorizontalAlign::Right(2.0), VerticalAlign::Bottom(0.0), Image::RefuelFrom),
-            ]
+            ],
+            log: Vec::new()
         }
+    }
+
+    pub fn append_to_log(&mut self, text: String) {
+        self.log.push(LogItem {
+            age: 0.0,
+            content: text
+        });
+    }
+
+    pub fn step(&mut self, secs: f32) {
+        self.log.retain_mut(|item| {
+            item.age += secs;
+            item.age < 5.0
+        });
     }
 
     pub fn button_clicked(&self, context: &Context) -> Option<CommandType> {
@@ -69,6 +91,12 @@ impl UI {
     pub fn render(&self, context: &mut Context) {
         for button in &self.buttons {
             button.render(context);
+        }
+
+        let (_, height) = context.screen_dimensions();
+
+        for (i, item) in self.log.iter().enumerate() {
+            context.render_text(&item.content, 10.0, height - 30.0 - i as f32 * 20.0);
         }
     }
 }

@@ -4,11 +4,12 @@ use context::{self, *};
 use ships::*;
 use people::*;
 use maps::*;
-use rand::*;
+use rand::{Rng, ThreadRng};
 use rand::distributions::*;
 use {average_position, circle_size};
 use util::*;
 use bincode;
+use failure::{self, ResultExt};
 
 use std::collections::*;
 
@@ -71,14 +72,22 @@ impl State {
         state
     }
 
-    pub fn load(filename: &str) -> Self {
-        let file = ::std::fs::File::open(filename).unwrap();
-        bincode::deserialize_from(file).unwrap()
+    pub fn load(&mut self, filename: &str) -> Result<(), failure::Context<String>> {
+        let file = ::std::fs::File::open(filename).context(format!("Failed to load '{}'.", filename))?;
+        *self = bincode::deserialize_from(file).context(format!("Failed to load '{}'.", filename))?;
+
+        info!("Loaded game from '{}'.", filename);
+
+        Ok(())
     }
 
-    pub fn save(&self, filename: &str) {
-        let file = ::std::fs::File::create(filename).unwrap();
-        bincode::serialize_into(file, self).unwrap();
+    pub fn save(&self, filename: &str) -> Result<(), failure::Context<String>> {
+        let file = ::std::fs::File::create(filename).context(format!("Failed to save to '{}'.", filename))?;
+        bincode::serialize_into(file, self).context(format!("Failed to save to '{}'.", filename))?;
+
+        info!("Saved game to '{}'", filename);
+
+        Ok(())
     }
 
     pub fn selected(&self) -> impl Iterator<Item=&Ship> {
@@ -89,8 +98,11 @@ impl State {
         if !self.paused {
             self.system.step();
 
-            for ship in self.ships.iter_mut() {
-                ship.step();
+            let ids: Vec<_> = self.ships.ids().cloned().collect();
+
+            for id in ids {
+                let (ship, mut ships) = self.ships.split_one_off(id).unwrap();
+                ship.step(&mut ships);
             }
         }
 

@@ -32,6 +32,10 @@ impl IDed<PersonID> for Person {
     fn set_id(&mut self, id: PersonID) {
         self.id = id;
     }
+
+    fn get_id(&self) -> PersonID {
+        self.id
+    }
 }
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug, Default, Deserialize, Serialize)]

@@ -1,11 +1,26 @@
 use cgmath::*;
 use super::*;
 
+#[derive(Debug)]
 enum SystemType {
     Asteroids,
     Planetoid,
     Nebula,
     BlackHole
+}
+
+impl SystemType {
+    fn random(rng: &mut ThreadRng) -> Self {
+        let num = rng.gen_range(0, 100);
+
+        match num {
+            0 ... 29 => SystemType::Asteroids,
+            30 ... 59 => SystemType::Planetoid,
+            60 ... 89 => SystemType::Nebula,
+            90 ... 100 => SystemType::BlackHole,
+            _ => unreachable!()
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -40,6 +55,10 @@ impl SystemObject {
 impl IDed<SystemObjectID> for SystemObject {
     fn set_id(&mut self, id: SystemObjectID) {
         self.id = id;
+    }
+
+    fn get_id(&self) -> SystemObjectID {
+        self.id
     }
 }
 
@@ -147,6 +166,10 @@ impl System {
 
         let mut light = uniform_sphere_distribution(rng);
         light.y = light.y.abs();
+
+        let system_type = SystemType::random(rng);
+
+        info!("Generated a {:?} system at {:?}.", system_type, location);
 
         Self {
             light,

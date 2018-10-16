@@ -23,8 +23,18 @@ lyon = "*"
 runic = {git = "https://github.com/expenses/runic"}
 # lazy derive
 derive_is_enum_variant = "*"
+# Randomness
 rand = "*"
+# Serialization
 serde = "*"
 serde_derive = "*"
 bincode = "*"
+# UI
 pedot = {git = "https://github.com/expenses/pedot"}
+# error handling
+failure = "*"
+# logging
+env_logger = {version = "*", default-features = false}
+log = "*"
+# 'retain_mut'
+odds = {version = "*", features = ["std-vec"]}
