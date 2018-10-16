@@ -119,6 +119,21 @@ impl Game {
         }
     }
 
+    fn ship_under_mouse(&self) -> Option<ShipID> {
+        let (mouse_x, mouse_y) = self.controls.mouse();
+
+        self.state.ships.iter()
+            .filter_map(|ship| {
+                self.context.screen_position(ship.position(), &self.state.camera)
+                    .filter(|(x, y, z)| {
+                        (mouse_x - x).hypot(mouse_y - y) < circle_size(*z)
+                    })
+                    .map(|(_, _, z)| (ship, z))
+            })
+            .min_by(|(_, z_a), (_, z_b)| z_a.partial_cmp(z_b).unwrap_or(::std::cmp::Ordering::Less))
+            .map(|(ship, _)| ship.id())
+    }
+
     fn update(&mut self, secs: f32) {
         if self.controls.middle_clicked() {
             self.state.camera.set_focus(&self.state.selected);
@@ -129,20 +144,8 @@ impl Game {
                 self.state.selected.clear();
             }
 
-            let (mouse_x, mouse_y) = self.controls.mouse();
-
-            let possible_closest_ship = self.state.ships.iter()
-                .filter_map(|ship| {
-                    self.context.screen_position(ship.position(), &self.state.camera).filter(|(x, y, z)| {
-                        (mouse_x - x).hypot(mouse_y - y) < circle_size(*z)
-                    })
-                    .map(|(_, _, z)| (ship, z))
-                })
-                .min_by(|(_, z_a), (_, z_b)| z_a.partial_cmp(z_b).unwrap_or(::std::cmp::Ordering::Less))
-                .map(|(ship, _)| ship);
-
-            if let Some(ship) = possible_closest_ship {
-                self.state.selected.insert(ship.id());
+            if let Some(ship) = self.ship_under_mouse() {
+                self.state.selected.insert(ship);
             }
         }
 

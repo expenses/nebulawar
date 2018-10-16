@@ -2,6 +2,7 @@ use std::ops::*;
 use std::collections::*;
 use std::collections::hash_map::*;
 use std::hash::*;
+use std::iter::*;
 
 pub trait ID: Hash + Copy + Eq + Default {
     fn increment(&mut self);
@@ -22,6 +23,13 @@ impl<I: ID, T: IDed<I>> AutoIDMap<I, T> {
         Self {
             next_id: I::default(),
             inner: HashMap::new()
+        }
+    }
+
+    pub fn with_capacity(cap: usize) -> Self {
+        Self {
+            next_id: I::default(),
+            inner: HashMap::with_capacity(cap)
         }
     }
 
@@ -67,5 +75,21 @@ impl<I: ID, T> Index<I> for AutoIDMap<I, T> {
 impl<I: ID, T: IDed<I>> IndexMut<I> for AutoIDMap<I, T> {
     fn index_mut(&mut self, index: I) -> &mut T {
         self.get_mut(index).unwrap()
+    }
+}
+
+impl<I: ID, T: IDed<I>> FromIterator<T> for AutoIDMap<I, T> {
+    fn from_iter<IT: IntoIterator<Item=T>>(iter: IT) -> Self {
+        let iter = iter.into_iter();
+        let (min, max) = iter.size_hint();
+        let size = max.unwrap_or(min);
+
+        let mut map = Self::with_capacity(size);
+
+        for item in iter {
+            map.push(item);
+        }
+
+        map
     }
 }

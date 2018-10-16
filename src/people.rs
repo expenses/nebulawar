@@ -14,6 +14,7 @@ pub enum Occupation {
 pub struct Person {
     id: PersonID,
     occupation: Occupation,
+    age: u16,
     ship: ShipID
 }
 
@@ -21,6 +22,7 @@ impl Person {
     pub fn new(occupation: Occupation, ship: ShipID) -> Self {
         Self {
             occupation, ship,
+            age: 30,
             id: PersonID::default()
         }
     }

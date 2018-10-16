@@ -154,8 +154,8 @@ impl Context {
     }
 
     pub fn render_system(&mut self, system: &System, camera: &Camera) {
-        for asteroid in &system.asteroids {
-            asteroid.render(self, system, camera);
+        for object in system.system_objects.iter() {
+            object.render(self, system, camera);
         }
 
         let uniforms = uniform!{
@@ -169,7 +169,7 @@ impl Context {
         let vertices: Vec<Vertex> = system.stars.iter()
             .map(|(vector, brightness)| {
                 context::Vertex {
-                    position: (camera.position() + vector * 1010.0).into(),
+                    position: (camera.position() + vector * (BACKGROUND_DISTANCE + 100.0)).into(),
                     normal: [0.0; 3],
                     texture: [*brightness; 2]
                 }
@@ -187,10 +187,10 @@ impl Context {
 
         self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
 
-        let offset = system.light * 1000.0;
+        let offset = system.light * BACKGROUND_DISTANCE;
 
         let rotation: Matrix4<f32> = look_at(offset).into();
-        let matrix = Matrix4::from_translation(camera.position() + offset) * rotation * Matrix4::from_scale(100.0);
+        let matrix = Matrix4::from_translation(camera.position() + offset) * rotation * Matrix4::from_scale(BACKGROUND_DISTANCE / 10.0);
 
         self.render_billboard(matrix, Image::Star, camera, system);
     }
