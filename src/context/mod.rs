@@ -92,7 +92,7 @@ impl Context {
         ).unwrap();
 
         Self {
-            resources: Resources::new(&display),
+            resources: Resources::new(&display).unwrap(),
             target: display.draw(),
             lines: LineRenderer::new(&display),
             text_program: runic::pixelated_program(&display).unwrap(),

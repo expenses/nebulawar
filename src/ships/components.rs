@@ -4,7 +4,8 @@ pub enum ComponentType {
     HG900Drive,
     HG43WarpDrive,
     FuelDrum,
-    Boltor89Cannons
+    Boltor89Cannons,
+    AX17KXDrive
 }
 
 impl ComponentType {
@@ -12,6 +13,7 @@ impl ComponentType {
         match self {
             ComponentType::AX2900Drive => 1.0,
             ComponentType::HG900Drive => 5.0,
+            ComponentType::AX17KXDrive => 100.0,
             _ => 0.0
         }
     }
@@ -19,6 +21,7 @@ impl ComponentType {
     pub fn can_warp(self) -> bool {
         match self {
             ComponentType::HG43WarpDrive => true,
+            ComponentType::AX17KXDrive => true,
             _ => false
         }
     }
@@ -28,6 +31,7 @@ impl ComponentType {
             ComponentType::AX2900Drive => 20.0,
             ComponentType::HG900Drive => 100.0,
             ComponentType::FuelDrum => 2000.0,
+            ComponentType::AX17KXDrive => 200.0,
             _ => 0.0
         }
     }

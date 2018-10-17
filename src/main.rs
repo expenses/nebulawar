@@ -249,17 +249,9 @@ impl Game {
 
     fn render(&mut self) {
         self.context.clear(&self.state.system);
-
-        self.render_2d_components();
         self.state.render(&mut self.context);
 
-        // actually draw ui components onto the screen
-        self.context.flush_ui(&self.state.camera, &self.state.system);
-
-        if let Some((_, interaction)) = self.right_click_interaction() {
-            let (x, y) = self.controls.mouse();
-            self.context.render_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4]);
-        }
+        self.render_2d_components();
 
         self.context.finish();
     }
@@ -269,6 +261,14 @@ impl Game {
         
         if let Some(top_left) = self.controls.left_dragging() {
             self.context.render_rect(top_left, self.controls.mouse());
+        }
+
+        // actually draw ui components onto the screen
+        self.context.flush_ui(&self.state.camera, &self.state.system);
+
+        if let Some((_, interaction)) = self.right_click_interaction() {
+            let (x, y) = self.controls.mouse();
+            self.context.render_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4]);
         }
     }
 

@@ -57,13 +57,31 @@ impl State {
             paused: false
         };
 
+        let carrier = state.ships.push(Ship::new(ShipType::Carrier, Vector3::new(0.0, 0.0, 10.0), (0.0, 0.0, 0.0)));
+
+        for _ in 0 .. 40 {
+            state.people.push(Person::new(Occupation::Worker, carrier));
+        }
+
+        for _ in 0 .. 20 {
+            state.people.push(Person::new(Occupation::Marine, carrier));
+        }
+
+        for _ in 0 .. 20 {
+            state.people.push(Person::new(Occupation::Pilot, carrier));
+        }
+
+        for _ in 0 .. 10 {
+            state.people.push(Person::new(Occupation::Government, carrier));
+        }
+
         let tanker = state.ships.push(Ship::new(ShipType::Tanker, Vector3::new(0.0, 0.0, 0.0), (0.0, 0.0, 0.0)));
 
         for _ in 0 .. 10 {
             state.people.push(Person::new(Occupation::Worker, tanker));
         }
         
-        for i in 0 .. 100 {
+        for i in 0 .. 20 {
             let x = (50.0 - i as f32) * 3.0;
             let fighter = state.ships.push(Ship::new(ShipType::Fighter, Vector3::new(x, 5.0, 0.0), (0.0, 0.0, 0.0)));
             state.people.push(Person::new(Occupation::Pilot, fighter));

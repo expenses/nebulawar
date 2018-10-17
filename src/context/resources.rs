@@ -1,14 +1,14 @@
 use glium::*;
 use genmesh;
 use obj::*;
-use std::io::*;
 use context::Vertex;
 use image;
 use std::fs;
 use runic;
 use util::*;
 use glium::texture::*;
-use std::path;
+use std::{path, io};
+use failure;
 
 pub fn billboard(display: &Display) -> VertexBuffer<Vertex> {
     let normal = [0.0, 0.0, 1.0];
@@ -49,7 +49,7 @@ pub fn load_image(display: &Display, data: &[u8]) -> SrgbTexture2d {
 
 // Returns a vertex buffer that should be rendered as `TrianglesList`.
 pub fn load_wavefront(display: &Display, data: &[u8]) -> VertexBuffer<Vertex> {
-    let mut data = BufReader::new(data);
+    let mut data = io::BufReader::new(data);
     let data = Obj::load_buf(&mut data).unwrap();
 
     let Obj {texture, normal, position, objects, ..} = data;
@@ -87,7 +87,8 @@ pub enum Image {
 pub enum Model {
     Fighter = 0,
     Tanker = 1,
-    Asteroid = 2
+    Carrier = 2,
+    Asteroid = 3
 }
 
 impl Model {
@@ -95,6 +96,7 @@ impl Model {
         match *self {
             Model::Asteroid => 10.0,
             Model::Tanker => 2.0,
+            Model::Carrier => 4.0,
             _ => 1.0
         }
     }
@@ -106,41 +108,42 @@ pub struct ObjModel {
 }
 
 impl ObjModel {
-    fn new<P: AsRef<path::Path>>(display: &Display, model: P, image: P) -> Self {
-        Self {
-            vertices: load_wavefront(display, &fs::read(model).unwrap()),
-            texture: load_image(display, &fs::read(image).unwrap())
-        }
+    fn new<P: AsRef<path::Path>>(display: &Display, model: P, image: P) -> io::Result<Self> {
+        Ok(Self {
+            vertices: load_wavefront(display, &fs::read(model)?),
+            texture: load_image(display, &fs::read(image)?)
+        })
     }
 }
 
 pub struct Resources {
-    pub models: [ObjModel; 3],
+    pub models: [ObjModel; 4],
     pub images: [SrgbTexture2d; 5],
     pub font: runic::CachedFont<'static>
 }
 
 impl Resources {
-    pub fn new(display: &Display) -> Self {
+    pub fn new(display: &Display) -> Result<Self, failure::Error> {
         let root = path::PathBuf::from("resources");
         let models = root.join("models");
         let ui = root.join("ui");
 
-        Self {
+        Ok(Self {
             models: [
-                ObjModel::new(display, models.join("fighter.obj"), models.join("fighter.png")),
-                ObjModel::new(display, models.join("tanker.obj"), models.join("tanker.png")),
-                ObjModel::new(display, models.join("asteroid.obj"), models.join("asteroid.png"))
+                ObjModel::new(display, models.join("fighter.obj"), models.join("fighter.png"))?,
+                ObjModel::new(display, models.join("tanker.obj"), models.join("tanker.png"))?,
+                ObjModel::new(display, models.join("carrier.obj"), models.join("carrier.png"))?,
+                ObjModel::new(display, models.join("asteroid.obj"), models.join("asteroid.png"))?
             ],
             images: [
-                load_image(display, &fs::read(root.join("star.png")).unwrap()),
-                load_image(display, &fs::read(ui.join("button.png")).unwrap()),               
-                load_image(display, &fs::read(ui.join("move.png")).unwrap()),
-                load_image(display, &fs::read(ui.join("refuel.png")).unwrap()),
-                load_image(display, &fs::read(ui.join("refuel_from.png")).unwrap())
+                load_image(display, &fs::read(root.join("star.png"))?),
+                load_image(display, &fs::read(ui.join("button.png"))?),
+                load_image(display, &fs::read(ui.join("move.png"))?),
+                load_image(display, &fs::read(ui.join("refuel.png"))?),
+                load_image(display, &fs::read(ui.join("refuel_from.png"))?)
             ],
-            font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display).unwrap()
-        }
+            font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display)?
+        })
     }
 
     pub fn image_dimensions(&self, image: Image) -> (u32, u32) {

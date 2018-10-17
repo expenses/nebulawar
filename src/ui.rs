@@ -92,11 +92,22 @@ impl UI {
             context.render_text(&item.content, 10.0, height - 30.0 - i as f32 * 20.0);
         }
 
-        for (i, (tag, num)) in state.selection_info().iter().enumerate() {
-            context.render_text(&format!("{:?}: {}", tag, num), 10.0, 70.0 + i as f32 * 30.0);
+        let y = &mut 10.0;
+
+        self.render_text(&format!("Ship count: {}", state.ships.len()), context, y);
+        self.render_text(&format!("Population: {}", state.people.len()), context, y);
+
+        for (tag, num) in state.selection_info() {
+            self.render_text(&format!("{:?}: {}", tag, num), context, y);
         }
 
-        context.render_text(&format!("Ship count: {}", state.ships.len()), 10.0, 10.0);
-        context.render_text(&format!("Population: {}", state.people.len()), 10.0, 40.0);
+        if let Some(ship) = state.selected().next() {
+            self.render_text(&format!("Fuel: {}", ship.fuel_perc()), context, y);
+        }
+    }
+
+    fn render_text(&self, text: &str, context: &mut Context, y: &mut f32) {
+        context.render_text(text, 10.0, *y);
+        *y += 30.0;
     }
 }

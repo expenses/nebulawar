@@ -872,7 +872,7 @@ dependencies = [
 [[package]]
 name = "runic"
 version = "0.1.0"
-source = "git+https://github.com/expenses/runic#4cf476cd6d3468e055c4f5bdf6647d6924362600"
+source = "git+https://github.com/expenses/runic#bfa597574839cd546ea906940851d06dd96a10e8"
 dependencies = [
  "glium 0.22.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusttype 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",

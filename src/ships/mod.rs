@@ -55,21 +55,24 @@ impl Command {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub enum ShipType {
     Fighter,
-    Tanker
+    Tanker,
+    Carrier
 }
 
 impl ShipType {
     fn model(&self) -> Model {
         match *self {
             ShipType::Fighter => Model::Fighter,
-            ShipType::Tanker => Model::Tanker
+            ShipType::Tanker => Model::Tanker,
+            ShipType::Carrier => Model::Carrier
         }
     }
 
     fn crew_capacity(&self) -> usize {
         match *self {
             ShipType::Fighter => 1,
-            ShipType::Tanker => 10
+            ShipType::Tanker => 10,
+            ShipType::Carrier => 100
         }
     }
 
@@ -83,6 +86,10 @@ impl ShipType {
                 Component::new(ComponentType::HG900Drive, age),
                 Component::new(ComponentType::HG43WarpDrive, age),
                 Component::new(ComponentType::FuelDrum, age)
+            ],
+            ShipType::Carrier => vec![
+                Component::new(ComponentType::AX17KXDrive, age),
+                Component::new(ComponentType::AX17KXDrive, age)
             ]
         }
     } 
@@ -90,7 +97,8 @@ impl ShipType {
     fn mass(&self) -> f32 {
         match *self {
             ShipType::Fighter => 2.0,
-            ShipType::Tanker => 100.0
+            ShipType::Tanker => 100.0,
+            ShipType::Carrier => 2000.0
         }
     }
 }
