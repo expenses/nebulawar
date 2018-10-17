@@ -74,7 +74,7 @@ impl LineRenderer {
                 VERT, FRAG,
                 None
             ).unwrap(),
-            stroke_options: StrokeOptions::tolerance(1.0).with_line_width(1.0),            
+            stroke_options: StrokeOptions::tolerance(0.5).with_line_width(1.0),            
             vertex_buffers: VertexBuffers::new()
         }
     }

@@ -3,109 +3,38 @@ use camera::*;
 use *;
 use context::*;
 
-pub enum Formation {
-    Screen,
-    DeltaWing
-}
+mod components;
+mod storage;
+mod formations;
 
-impl Formation {
-    pub fn arrange(&self, ships: usize, position: Vector3<f32>, target: Vector3<f32>, distance: f32) -> Vec<Vector3<f32>> {
-        let mut step = target - position;
-        step.y = 0.0;
-        let step = step.normalize_to(distance);
+use self::components::*;
+use self::storage::*;
+pub use self::formations::*;
 
-        let step_sideways = Quaternion::from_angle_y(Rad(FRAC_PI_2)).rotate_vector(step);
-
-        match *self {
-            Formation::Screen => {                
-                let step_up = UP * distance;
-
-                let width = (ships as f32).sqrt().ceil() as usize;
-
-                let middle_x = (width - 1) as f32 / 2.0;
-
-                let middle_y = (ships as f32 / width as f32).floor() / 2.0;
-
-                (0 .. ships)
-                    .map(|i| {
-                        let x = (i % width) as f32 - middle_x;
-                        let y = (i / width) as f32 - middle_y;
-
-                        target + step_sideways * x + step_up * y
-                    })
-                    .collect()
-            },
-            Formation::DeltaWing => {
-                let middle_x = (ships - 1) as f32 / 2.0;
-
-                (0 .. ships)
-                    .map(|i| {
-                        let x = i as f32 - middle_x;
-
-                        let y = -(i as f32 - middle_x).abs();
-
-                        target + step * y + step_sideways * x
-                    })
-                    .collect()
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ComponentType {
-    AX2900Drive,
-    HG900Drive,
-    HG43WarpDrive,
-    FuelDrum,
-    Boltor89Cannons
-}
-
-impl ComponentType {
-    fn thrust(&self) -> f32 {
-        match *self {
-            ComponentType::AX2900Drive => 1.0,
-            ComponentType::HG900Drive => 5.0,
-            _ => 0.0
-        }
-    }
-
-    fn can_warp(&self) -> bool {
-        match *self {
-            ComponentType::HG43WarpDrive => true,
-            _ => false
-        }
-    }
-
-    fn fuel_storage(&self) -> f32 {
-        match *self {
-            ComponentType::AX2900Drive => 20.0,
-            ComponentType::HG900Drive => 100.0,
-            ComponentType::FuelDrum => 2000.0,
-            _ => 0.0
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Component {
-    age: u8,
-    tag: ComponentType
-}
-
-impl Component {
-    fn new(tag: ComponentType, age: u8) -> Self {
-        Self {
-            tag, age
-        }
-    }
-}
+pub type Ships = AutoIDMap<ShipID, Ship>;
 
 #[derive(Deserialize, Serialize, Clone, Copy)]
 pub enum Interaction {
     Follow,
     Refuel,
     RefuelFrom
+}
+
+impl Interaction {
+    pub fn image(&self) -> Image {
+        match *self {
+            Interaction::Follow => Image::Move,
+            Interaction::RefuelFrom => Image::RefuelFrom,
+            Interaction::Refuel => Image::Refuel
+        }
+    }
+}
+
+#[derive(PartialEq)]
+enum MovementStatus {
+    Moving, 
+    Reached,
+    OutOfFuel
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -220,8 +149,8 @@ impl Ship {
         self.fuel.amount() / self.max_fuel()
     }
 
-    fn component_types(&self) -> impl Iterator<Item=&ComponentType> {
-        self.components.iter().map(|component| &component.tag)
+    fn component_types(&self) -> impl Iterator<Item=ComponentType> + '_ {
+        self.components.iter().map(Component::tag)
     }
 
     fn max_fuel(&self) -> f32 {
@@ -236,9 +165,9 @@ impl Ship {
         self.thrust() / self.tag.mass()
     }
 
-    fn move_towards(&mut self, point: Vector3<f32>) -> bool {
+    fn move_towards(&mut self, point: Vector3<f32>) -> MovementStatus {
         if self.fuel.is_empty() {
-            return self.position == point;
+            return MovementStatus::OutOfFuel;
         }
         
         self.fuel.reduce(0.01);
@@ -246,10 +175,10 @@ impl Ship {
         self.position = move_towards(self.position, point, self.speed());
 
         if self.position == point {
-            true
+            MovementStatus::Reached
         } else {
             self.angle = look_at(point - self.position);
-            false
+            MovementStatus::Moving
         }
     }
 
@@ -259,15 +188,35 @@ impl Ship {
         if let Some(command) = self.commands.first().cloned() {
             match command {
                 Command::MoveTo(position) => {
-                    if self.move_towards(position) {
+                    if self.move_towards(position) == MovementStatus::Reached {
                         next = true;
                     }
                 },
                 Command::GoToAnd(ship, interaction) => {
                     let target = ships.get_mut(ship).unwrap();
 
-                    if self.position.distance(target.position) < 5.0 || self.move_towards(target.position) {
-                        next = true;
+                    if self.position.distance(target.position) < 5.0 {
+                        match interaction {
+                            Interaction::Follow => {},
+                            Interaction::Refuel => {
+                                let target_max = target.max_fuel();
+
+                                if self.fuel.transfer_to(&mut target.fuel, 0.1, target_max) == 0.0 {
+                                    next = true;
+                                }
+                            },
+                            Interaction::RefuelFrom => {
+                                let max = self.max_fuel();
+
+                                if target.fuel.transfer_to(&mut self.fuel, 0.1, max) == 0.0 {
+                                    next = true;
+                                }
+                            }
+                        }
+                    } else {
+                        if self.move_towards(target.position) == MovementStatus::OutOfFuel {
+                            next = true;
+                        }
                     }
                 }
             }
@@ -304,47 +253,5 @@ pub struct ShipID(u32);
 impl ID for ShipID {
     fn increment(&mut self) {
         *self = ShipID(self.0 + 1)
-    }
-}
-
-pub type Ships = AutoIDMap<ShipID, Ship>;
-
-
-#[derive(Serialize, Deserialize)]
-struct Storage {
-    amount: f32
-}
-
-impl Storage {
-    fn empty() -> Self {
-        Self {
-            amount: 0.0
-        }
-    }
-
-    fn new(amount: f32) -> Self {
-        Self {
-            amount
-        }
-    }
-
-    fn reduce(&mut self, amount: f32) -> f32 {
-        let reduced_by = self.amount.min(amount);
-        self.amount -= reduced_by;
-        reduced_by
-    } 
-
-    fn increase(&mut self, amount: f32, limit: f32) -> f32 {
-        let increased_by = (limit - self.amount).min(amount);
-        self.amount += increased_by;
-        increased_by
-    }
-
-    fn is_empty(&self) -> bool {
-        self.amount == 0.0
-    }
-
-    fn amount(&self) -> f32 {
-        self.amount
     }
 }

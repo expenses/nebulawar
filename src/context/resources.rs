@@ -94,6 +94,7 @@ impl Model {
     pub fn size(&self) -> f32 {
         match *self {
             Model::Asteroid => 10.0,
+            Model::Tanker => 2.0,
             _ => 1.0
         }
     }

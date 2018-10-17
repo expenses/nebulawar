@@ -33,8 +33,8 @@ use pedot::*;
 const VERT: &str = include_str!("shaders/shader.vert");
 const FRAG: &str = include_str!("shaders/shader.frag");
 
-const DEFAULT_WIDTH: f32 = 800.0;
-const DEFAULT_HEIGHT: f32 = 600.0;
+const DEFAULT_WIDTH: f32 = 1280.0;
+const DEFAULT_HEIGHT: f32 = 800.0;
 
 pub enum Mode {
     Normal = 1,

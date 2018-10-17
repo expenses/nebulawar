@@ -27,7 +27,6 @@ use glutin::dpi::*;
 use cgmath::*;
 use collision::*;
 use std::collections::*;
-use std::f32::consts::*;
 use std::time::*;
 
 mod camera;
@@ -145,6 +144,19 @@ impl Game {
             .map(|(ship, _)| ship.id())
     }
 
+    fn right_click_interaction(&self) -> Option<(ShipID, Interaction)> {
+        self.ship_under_mouse()
+            .map(|ship| {
+                let interaction = if self.state.ships[ship].out_of_fuel() {
+                    Interaction::Refuel
+                } else {
+                    Interaction::RefuelFrom
+                };
+
+                (ship, interaction)
+            })
+    }
+
     fn order_ships_to(&mut self, target: Vector3<f32>) {
         if let Some(avg) = self.state.average_position() {
             let positions = Formation::DeltaWing.arrange(self.state.selected.len(), avg, target, 2.5);
@@ -196,26 +208,16 @@ impl Game {
         }
 
         if self.controls.right_clicked() {
-            if let Some(target) = self.ship_under_mouse() {
-                let interaction = if self.state.ships[target].out_of_fuel() {
-                    Interaction::Refuel
-                } else {
-                    Interaction::RefuelFrom
-                };
+            if let Some((target, interaction)) = self.right_click_interaction() {
+                for ship in &self.state.selected {
+                    if *ship != target {
+                        let ship = &mut self.state.ships[*ship];
 
-                if !self.state.ships[target].out_of_fuel() {
-                    for ship in &self.state.selected {
-                        if *ship != target {
-                            let ship = &mut self.state.ships[*ship];
-
-                            if !self.controls.shift {
-                                ship.commands.clear();
-                            }
-
-                            ship.commands.push(Command::GoToAnd(target, interaction));
+                        if !self.controls.shift {
+                            ship.commands.clear();
                         }
 
-                        
+                        ship.commands.push(Command::GoToAnd(target, interaction));
                     }
                 }
             } else if let Some(target) = self.point_under_mouse() {
@@ -248,23 +250,26 @@ impl Game {
     fn render(&mut self) {
         self.context.clear(&self.state.system);
 
+        self.render_2d_components();
         self.state.render(&mut self.context);
 
+        // actually draw ui components onto the screen
+        self.context.flush_ui(&self.state.camera, &self.state.system);
+
+        if let Some((_, interaction)) = self.right_click_interaction() {
+            let (x, y) = self.controls.mouse();
+            self.context.render_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4]);
+        }
+
+        self.context.finish();
+    }
+
+    fn render_2d_components(&mut self) {
+        self.ui.render(&self.state, &mut self.context);
+        
         if let Some(top_left) = self.controls.left_dragging() {
             self.context.render_rect(top_left, self.controls.mouse());
         }
-
-        self.context.render_text(&format!("Ship count: {}", self.state.ships.len()), 10.0, 10.0);
-        self.context.render_text(&format!("Population: {}", self.state.people.len()), 10.0, 40.0);
-
-        for (i, (tag, num)) in self.state.selection_info().iter().enumerate() {
-            self.context.render_text(&format!("{:?}: {}", tag, num), 10.0, 70.0 + i as f32 * 30.0);
-        }
-
-        self.ui.render(&mut self.context);
-
-        self.context.flush_ui(&self.state.camera, &self.state.system);
-        self.context.finish();
     }
 
     fn change_distance(&mut self, delta: f32) {

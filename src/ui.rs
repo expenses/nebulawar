@@ -1,7 +1,7 @@
 use context::*;
 use pedot::*;
-use util::*;
 use odds::vec::*;
+use state::*;
 
 pub struct Button {
     x: HorizontalAlign,
@@ -81,14 +81,7 @@ impl UI {
         });
     }
 
-    pub fn button_clicked(&self, context: &Context) -> Option<CommandType> {
-        self.buttons.iter()
-            .zip(iter_owned([CommandType::Move, CommandType::Refuel, CommandType::RefuelOther]))
-            .find(|(button, _)| button.state(context).is_clicked())
-            .map(|(_, which)| which)
-    }
-
-    pub fn render(&self, context: &mut Context) {
+    pub fn render(&self, state: &State, context: &mut Context) {
         for button in &self.buttons {
             button.render(context);
         }
@@ -98,11 +91,12 @@ impl UI {
         for (i, item) in self.log.iter().enumerate() {
             context.render_text(&item.content, 10.0, height - 30.0 - i as f32 * 20.0);
         }
-    }
-}
 
-pub enum CommandType {
-    Move,
-    Refuel,
-    RefuelOther
+        for (i, (tag, num)) in state.selection_info().iter().enumerate() {
+            context.render_text(&format!("{:?}: {}", tag, num), 10.0, 70.0 + i as f32 * 30.0);
+        }
+
+        context.render_text(&format!("Ship count: {}", state.ships.len()), 10.0, 10.0);
+        context.render_text(&format!("Population: {}", state.people.len()), 10.0, 40.0);
+    }
 }
