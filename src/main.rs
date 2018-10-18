@@ -48,12 +48,14 @@ use ships::*;
 use maps::*;
 
 fn average_position(selection: &HashSet<ShipID>, ships: &AutoIDMap<ShipID, Ship>) -> Option<Vector3<f32>> {
-    if !selection.is_empty() {
-        let position = selection.iter().fold(Vector3::zero(), |vector, index| {
-            vector + ships[*index].position()
-        }) / selection.len() as f32;
+    let (sum_position, num) = selection.iter()
+            .filter_map(|id| ships.get(*id))
+            .fold((Vector3::zero(), 0), |(vector, total), ship| {
+                (vector + ship.position(), total + 1)
+            });
 
-        Some(position)
+    if num > 0 {
+        Some(sum_position / num as f32)
     } else {
         None
     }
@@ -125,6 +127,11 @@ impl Game {
             VirtualKeyCode::LShift => self.controls.shift = pressed,
             VirtualKeyCode::P if pressed => self.state.paused = !self.state.paused,
             VirtualKeyCode::Slash if pressed => self.context.toggle_debug(),
+            VirtualKeyCode::Comma if pressed => self.state.formation.rotate_left(),
+            VirtualKeyCode::Period if pressed => self.state.formation.rotate_right(),
+            VirtualKeyCode::Back if pressed => for ship in &self.state.selected {
+                self.state.ships.remove(*ship);
+            },
             _ => {}
         }
     }
@@ -159,7 +166,7 @@ impl Game {
 
     fn order_ships_to(&mut self, target: Vector3<f32>) {
         if let Some(avg) = self.state.average_position() {
-            let positions = Formation::DeltaWing.arrange(self.state.selected.len(), avg, target, 2.5);
+            let positions = self.state.formation.arrange(self.state.selected.len(), avg, target, 2.5);
             
             let ships = &mut self.state.ships;
             let queue = self.controls.shift;
@@ -201,7 +208,9 @@ impl Game {
             for ship in self.state.ships.iter() {
                 if let Some((x, y, _)) = self.context.screen_position(ship.position(), &self.state.camera) {
                     if left <= x && x <= right && top <= y && y <= bottom {
-                        self.state.selected.insert(ship.id());
+                        if !self.state.selected.remove(&ship.id()) {
+                            self.state.selected.insert(ship.id());
+                        }
                     }
                 }
             }
@@ -211,13 +220,13 @@ impl Game {
             if let Some((target, interaction)) = self.right_click_interaction() {
                 for ship in &self.state.selected {
                     if *ship != target {
-                        let ship = &mut self.state.ships[*ship];
+                        if let Some(ship) = self.state.ships.get_mut(*ship) {
+                            if !self.controls.shift {
+                                ship.commands.clear();
+                            }
 
-                        if !self.controls.shift {
-                            ship.commands.clear();
+                            ship.commands.push(Command::GoToAnd(target, interaction));
                         }
-
-                        ship.commands.push(Command::GoToAnd(target, interaction));
                     }
                 }
             } else if let Some(target) = self.point_under_mouse() {
@@ -253,6 +262,10 @@ impl Game {
 
         self.render_2d_components();
 
+        if self.context.is_debugging() {
+            self.render_debug();
+        }
+
         self.context.finish();
     }
 
@@ -269,6 +282,12 @@ impl Game {
         if let Some((_, interaction)) = self.right_click_interaction() {
             let (x, y) = self.controls.mouse();
             self.context.render_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4]);
+        }
+    }
+
+    fn render_debug(&mut self) {
+        if let Some(point) = self.point_under_mouse() {
+            self.context.render_model(context::Model::Asteroid, point, Quaternion::zero(), 0.1, &self.state.camera, &self.state.system);
         }
     }
 

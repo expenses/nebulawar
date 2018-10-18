@@ -7,8 +7,22 @@ use std::fs;
 use runic;
 use util::*;
 use glium::texture::*;
-use std::{path, io};
+use std::io;
 use failure;
+
+#[cfg(feature = "embed_resources")]
+macro_rules! load_resource {
+    ($filename:expr) => (
+        include_bytes!(concat!("../../", $filename))
+    )
+}
+
+#[cfg(not(feature = "embed_resources"))]
+macro_rules! load_resource {
+    ($filename:expr) => (
+        &fs::read($filename)?
+    )
+}
 
 pub fn billboard(display: &Display) -> VertexBuffer<Vertex> {
     let normal = [0.0, 0.0, 1.0];
@@ -108,10 +122,10 @@ pub struct ObjModel {
 }
 
 impl ObjModel {
-    fn new<P: AsRef<path::Path>>(display: &Display, model: P, image: P) -> io::Result<Self> {
+    fn new(display: &Display, model: &[u8], image: &[u8]) -> io::Result<Self> {
         Ok(Self {
-            vertices: load_wavefront(display, &fs::read(model)?),
-            texture: load_image(display, &fs::read(image)?)
+            vertices: load_wavefront(display, model),
+            texture: load_image(display, image)
         })
     }
 }
@@ -124,23 +138,19 @@ pub struct Resources {
 
 impl Resources {
     pub fn new(display: &Display) -> Result<Self, failure::Error> {
-        let root = path::PathBuf::from("resources");
-        let models = root.join("models");
-        let ui = root.join("ui");
-
         Ok(Self {
             models: [
-                ObjModel::new(display, models.join("fighter.obj"), models.join("fighter.png"))?,
-                ObjModel::new(display, models.join("tanker.obj"), models.join("tanker.png"))?,
-                ObjModel::new(display, models.join("carrier.obj"), models.join("carrier.png"))?,
-                ObjModel::new(display, models.join("asteroid.obj"), models.join("asteroid.png"))?
+                ObjModel::new(display, load_resource!("resources/models/fighter.obj"),   load_resource!("resources/models/fighter.png"))?,
+                ObjModel::new(display, load_resource!("resources/models/tanker.obj"),    load_resource!("resources/models/tanker.png"))?,
+                ObjModel::new(display, load_resource!("resources/models/carrier.obj"),   load_resource!("resources/models/carrier.png"))?,
+                ObjModel::new(display, load_resource!("resources/models/asteroid.obj"),  load_resource!("resources/models/asteroid.png"))?
             ],
             images: [
-                load_image(display, &fs::read(root.join("star.png"))?),
-                load_image(display, &fs::read(ui.join("button.png"))?),
-                load_image(display, &fs::read(ui.join("move.png"))?),
-                load_image(display, &fs::read(ui.join("refuel.png"))?),
-                load_image(display, &fs::read(ui.join("refuel_from.png"))?)
+                load_image(display, load_resource!("resources/star.png")),
+                load_image(display, load_resource!("resources/ui/button.png")),
+                load_image(display, load_resource!("resources/ui/move.png")),
+                load_image(display, load_resource!("resources/ui/refuel.png")),
+                load_image(display, load_resource!("resources/ui/refuel_from.png"))
             ],
             font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display)?
         })

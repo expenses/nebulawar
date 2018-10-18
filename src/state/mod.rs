@@ -17,6 +17,9 @@ mod system;
 
 pub use self::system::*;
 
+pub type Ships = AutoIDMap<ShipID, Ship>;
+pub type People = AutoIDMap<PersonID, Person>;
+
 // http://corysimon.github.io/articles/uniformdistn-on-sphere/
 fn uniform_sphere_distribution(rng: &mut ThreadRng) -> Vector3<f32> {
     use std::f64::consts::PI;
@@ -43,6 +46,8 @@ pub struct State {
     pub system: System,
     pub camera: Camera,
     pub selected: HashSet<ShipID>,
+    pub formation: Formation,
+    time: f32,
     pub paused: bool
 }
 
@@ -54,12 +59,14 @@ impl State {
             system: System::new(Vector2::new(rng.gen_range(-1.0, 1.0), rng.gen_range(-1.0, 1.0)), rng),
             camera: Camera::default(),
             selected: HashSet::new(),
+            formation: Formation::DeltaWing,
+            time: 0.0,
             paused: false
         };
 
         let carrier = state.ships.push(Ship::new(ShipType::Carrier, Vector3::new(0.0, 0.0, 10.0), (0.0, 0.0, 0.0)));
 
-        for _ in 0 .. 40 {
+        for _ in 0 .. 45 {
             state.people.push(Person::new(Occupation::Worker, carrier));
         }
 
@@ -67,7 +74,7 @@ impl State {
             state.people.push(Person::new(Occupation::Marine, carrier));
         }
 
-        for _ in 0 .. 20 {
+        for _ in 0 .. 25 {
             state.people.push(Person::new(Occupation::Pilot, carrier));
         }
 
@@ -90,6 +97,10 @@ impl State {
         state
     }
 
+    pub fn time(&self) -> f32 {
+        self.time
+    }
+
     pub fn load(&mut self, filename: &str) -> Result<(), failure::Context<String>> {
         let file = ::std::fs::File::open(filename).context(format!("Failed to load '{}'.", filename))?;
         *self = bincode::deserialize_from(file).context(format!("Failed to load '{}'.", filename))?;
@@ -109,18 +120,24 @@ impl State {
     }
 
     pub fn selected(&self) -> impl Iterator<Item=&Ship> {
-        self.selected.iter().map(move |id| &self.ships[*id])
+        self.selected.iter().filter_map(move |id| self.ships.get(*id))
+    }
+
+    pub fn people_on_ship(&self, ship: ShipID) -> impl Iterator<Item=&Person> {
+        self.people.iter().filter(move |person| person.ship() == ship)
     }
 
     pub fn step(&mut self, secs: f32) {
         if !self.paused {
+            self.time += secs;
+
             self.system.step();
 
             let ids: Vec<_> = self.ships.ids().cloned().collect();
 
             for id in ids {
                 let (ship, mut ships) = self.ships.split_one_off(id).unwrap();
-                ship.step(&mut ships);
+                ship.step(secs, &mut ships, &self.people);
             }
         }
 
@@ -146,11 +163,8 @@ impl State {
         context.render_system(&self.system, &self.camera);
     }
 
-    pub fn selection_info(&self) -> BTreeMap<&ShipType, usize> {
-        self.selected().fold(BTreeMap::new(), |mut map, ship| {
-            *map.entry(ship.tag()).or_insert(0) += 1;
-            map
-        })
+    pub fn selection_info(&self) -> BTreeMap<&ShipType, u64> {
+        summarize(self.selected().map(Ship::tag)).0
     }
 
     pub fn average_position(&self) -> Option<Vector3<f32>> {

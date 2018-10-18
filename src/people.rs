@@ -1,7 +1,7 @@
 use ships::*;
 use maps::*;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Occupation {
     Worker,
     Pilot,
@@ -25,6 +25,14 @@ impl Person {
             age: 30,
             id: PersonID::default()
         }
+    }
+
+    pub fn ship(&self) -> ShipID {
+        self.ship
+    }
+
+    pub fn occupation(&self) -> Occupation {
+        self.occupation
     }
 }
 

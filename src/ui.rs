@@ -2,6 +2,7 @@ use context::*;
 use pedot::*;
 use odds::vec::*;
 use state::*;
+use util::*;
 
 pub struct Button {
     x: HorizontalAlign,
@@ -94,15 +95,28 @@ impl UI {
 
         let y = &mut 10.0;
 
+        self.render_text(&format!("Time: {:.1}", state.time()), context, y);
         self.render_text(&format!("Ship count: {}", state.ships.len()), context, y);
         self.render_text(&format!("Population: {}", state.people.len()), context, y);
+
+        self.render_text(&format!("Formation: {:?}", state.formation), context, y);        
 
         for (tag, num) in state.selection_info() {
             self.render_text(&format!("{:?}: {}", tag, num), context, y);
         }
 
         if let Some(ship) = state.selected().next() {
-            self.render_text(&format!("Fuel: {}", ship.fuel_perc()), context, y);
+            self.render_text(&format!("Fuel: {:.2}%", ship.fuel_perc() * 100.0), context, y);
+            let (summary, num_people) = summarize(state.people_on_ship(ship.id()).map(|person| person.occupation()));
+            
+            self.render_text(&format!("Total people: {}", num_people), context, y);
+
+            for (tag, num) in summary {
+                self.render_text(&format!("{:?}: {}", tag, num), context, y);
+            }
+
+            self.render_text(&format!("Food: {}", ship.food()), context, y);
+            self.render_text(&format!("Waste: {}", ship.waste()), context, y);
         }
     }
 

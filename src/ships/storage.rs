@@ -1,19 +1,32 @@
+use std::fmt;
+
 #[derive(Serialize, Deserialize)]
 pub struct Storage {
-    amount: f32
+    amount: f32,
+    capacity: f32
 }
 
 impl Storage {
-    pub fn empty() -> Self {
+    pub fn empty(capacity: f32) -> Self {
+        Self::new(0.0, capacity)
+    }
+
+    pub fn full(capacity: f32) -> Self {
+        Self::new(capacity, capacity)
+    }
+
+    pub fn new(amount: f32, capacity: f32) -> Self {
+        debug_assert!(amount <= capacity);
+        debug_assert!(capacity >= 0.0);
+        debug_assert!(amount >= 0.0);
+
         Self {
-            amount: 0.0
+            amount, capacity
         }
     }
 
-    pub fn new(amount: f32) -> Self {
-        Self {
-            amount
-        }
+    pub fn percentage(&self) -> f32 {
+        self.amount / self.capacity
     }
 
     pub fn reduce(&mut self, amount: f32) -> f32 {
@@ -22,8 +35,8 @@ impl Storage {
         reduced_by
     } 
 
-    pub fn increase(&mut self, amount: f32, limit: f32) -> f32 {
-        let increased_by = (limit - self.amount).min(amount);
+    pub fn increase(&mut self, amount: f32) -> f32 {
+        let increased_by = (self.capacity - self.amount).min(amount);
         self.amount += increased_by;
         increased_by
     }
@@ -36,22 +49,32 @@ impl Storage {
         self.amount
     }
 
-    pub fn transfer_to(&mut self, other: &mut Self, amount: f32, other_max: f32) -> f32 {
-        let amount = self.transfer_amount(other, amount, other_max);
+    pub fn capacity(&self) -> f32 {
+        self.capacity
+    }
+
+    pub fn transfer_to(&mut self, other: &mut Self, amount: f32) -> f32 {
+        let amount = self.transfer_amount(other, amount);
         self.reduce(amount);
-        other.increase(amount, other_max);
+        other.increase(amount);
         amount
     }
 
-    fn transfer_amount(&self, other: &Self, amount: f32, other_max: f32) -> f32 {
-        self.amount_can_transfer(other, other_max).min(amount)
+    pub fn transfer_amount(&self, other: &Self, amount: f32) -> f32 {
+        self.amount_can_transfer(other).min(amount)
     }
 
-    fn amount_can_transfer(&self, other: &Self, other_max: f32) -> f32 {
-        self.amount.min(other.amount_to_max(other_max))
+    fn amount_can_transfer(&self, other: &Self) -> f32 {
+        self.amount.min(other.amount_to_capacity())
     }
 
-    fn amount_to_max(&self, max: f32) -> f32 {
-        max - self.amount
+    fn amount_to_capacity(&self) -> f32 {
+        self.capacity - self.amount
+    }
+}
+
+impl fmt::Display for Storage {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "{:.2}/{:.2}", self.amount, self.capacity)
     }
 }

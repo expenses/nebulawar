@@ -2,6 +2,7 @@ use cgmath::*;
 use std::f32::consts::*;
 use arrayvec;
 use std::ops::*;
+use std::collections::*;
 
 pub const BACKGROUND_DISTANCE: f32 = 10000.0;
 pub const FOV: f32 = FRAC_PI_3;
@@ -99,4 +100,14 @@ pub fn move_towards<T: Sub<Output=T> + Add<Output=T> + Positioned + Clone>(posit
     } else {
         target
     }
+}
+
+pub fn summarize<T: Ord, I: Iterator<Item=T>>(iterator: I) -> (BTreeMap<T, u64>, u64) {
+    iterator.fold(
+        (BTreeMap::new(), 0),
+        |(mut map, total), item| {
+            *map.entry(item).or_insert(0) += 1;
+            (map, total + 1)
+        }
+    )
 }

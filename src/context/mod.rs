@@ -306,25 +306,30 @@ impl Context {
     }
 
     // http://webglfactory.blogspot.com/2011/05/how-to-convert-world-to-screen.html
+    // http://antongerdelan.net/opengl/raycasting.html
     pub fn ray(&self, camera: &Camera, mouse: (f32, f32)) -> collision::Ray<f32, Point3<f32>, Vector3<f32>> {
         // Get mouse position
         let (x, y) = mouse;
 
         let (width, height) = self.screen_dimensions();
         let (x, y) = screen_pos_to_opengl_pos(x, y, width, height);
-        let point = Vector4::new(x, y, 1.0, 1.0);
 
-        // Invert the perspective/view matrix
-        let perspective_view_inverse = (self.perspective_matrix() * camera.view_matrix()).invert().unwrap();
-        // Multiply the point by it and truncate
-        let point = (perspective_view_inverse * point).truncate();
+        let clip = Vector4::new(-x, -y, -1.0, 1.0);
 
-        // Create a ray from the camera position to that point
-        collision::Ray::new(vector_to_point(camera.position()), point)
+        let eye = self.perspective_matrix().invert().unwrap() * clip;
+        let eye = Vector4::new(eye.x, eye.y, -1.0, 0.0);
+
+        let direction = (camera.view_matrix().invert().unwrap() * eye).truncate().normalize_to(-1.0);
+
+        collision::Ray::new(vector_to_point(camera.position()), direction)
     }
 
     pub fn toggle_debug(&mut self) {
         self.debug = !self.debug;
+    }
+
+    pub fn is_debugging(&self) -> bool {
+        self.debug
     }
 
     pub fn render_image(&mut self, image: Image, x: f32, y: f32, width: f32, height: f32, overlay: [f32; 4]) {

@@ -2,9 +2,11 @@ use cgmath::*;
 use util::*;
 use std::f32::consts::*;
 
+#[derive(Deserialize, Serialize, Debug)]
 pub enum Formation {
     Screen,
-    DeltaWing
+    DeltaWing,
+    GoTo
 }
 
 impl Formation {
@@ -46,7 +48,24 @@ impl Formation {
                         target + step * y + step_sideways * x
                     })
                     .collect()
-            }
+            },
+            Formation::GoTo => (0 .. ships).map(|_| target).collect()
+        }
+    }
+
+    pub fn rotate_right(&mut self) {
+        match *self {
+            Formation::Screen    => *self = Formation::DeltaWing,
+            Formation::DeltaWing => *self = Formation::GoTo,
+            Formation::GoTo      => *self = Formation::Screen,    
+        }
+    }
+
+    pub fn rotate_left(&mut self) {
+        match *self {
+            Formation::Screen    => *self = Formation::GoTo,
+            Formation::DeltaWing => *self = Formation::Screen,
+            Formation::GoTo      => *self = Formation::DeltaWing,    
         }
     }
 }

@@ -1,5 +1,5 @@
 [package]
-name = "game"
+name = "fleet_commander"
 version = "0.1.0"
 authors = ["Expenses <expenses@airmail.cc>"]
 
@@ -38,3 +38,6 @@ env_logger = {version = "*", default-features = false}
 log = "*"
 # 'retain_mut'
 odds = {version = "*", features = ["std-vec"]}
+
+[features]
+embed_resources = []
