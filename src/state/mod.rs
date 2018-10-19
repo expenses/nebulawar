@@ -1,6 +1,6 @@
 use cgmath::*;
 use camera::*;
-use context::{self, *};
+use context;
 use ships::*;
 use people::*;
 use maps::*;
@@ -10,6 +10,7 @@ use {average_position, circle_size};
 use util::*;
 use bincode;
 use failure::{self, ResultExt};
+use specs::World;
 
 use std::collections::*;
 
@@ -52,11 +53,11 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(rng: &mut ThreadRng) -> Self {
+    pub fn new(world: &mut World, rng: &mut ThreadRng) -> Self {
         let mut state = Self {
             ships: AutoIDMap::new(),
             people: AutoIDMap::new(),
-            system: System::new(Vector2::new(rng.gen_range(-1.0, 1.0), rng.gen_range(-1.0, 1.0)), rng),
+            system: System::new(Vector2::new(rng.gen_range(-1.0, 1.0), rng.gen_range(-1.0, 1.0)), rng, world),
             camera: Camera::default(),
             selected: HashSet::new(),
             formation: Formation::DeltaWing,
@@ -130,8 +131,6 @@ impl State {
     pub fn step(&mut self, secs: f32) {
         if !self.paused {
             self.time += secs;
-
-            self.system.step();
 
             let ids: Vec<_> = self.ships.ids().cloned().collect();
 

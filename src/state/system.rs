@@ -1,5 +1,7 @@
 use cgmath::*;
 use super::*;
+use specs::{DenseVecStorage, World, Builder};
+use context::*;
 
 #[derive(Debug)]
 enum SystemType {
@@ -23,72 +25,21 @@ impl SystemType {
     }
 }
 
-#[derive(Deserialize, Serialize)]
-pub struct SystemObject {
-    id: SystemObjectID,
-    inner: SystemObjectInner
-}
+#[derive(Deserialize, Serialize, Component)]
+pub struct Position(pub Vector3<f32>);
 
-impl SystemObject {
-    fn new_asteroid(asteroid: Asteroid) -> Self {
-        Self {
-            id: SystemObjectID::default(),
-            inner: SystemObjectInner::Asteroid(asteroid)
-        }
-    }
+#[derive(Deserialize, Serialize, Component)]
+pub struct MineableMaterials(u32);
 
-    fn step(&mut self) {
-        match self.inner {
-            SystemObjectInner::Asteroid(ref mut a) => a.step(),
-            _ => unimplemented!()
-        }
-    }
+#[derive(Deserialize, Serialize, Component)]
+pub struct Size(pub f32);
 
-    pub fn render(&self, context: &mut Context, system: &System, camera: &Camera) {
-        match self.inner {
-            SystemObjectInner::Asteroid(ref a) => a.render(context, system, camera),
-            _ => unimplemented!()
-        }
-    }
-}
-
-impl IDed<SystemObjectID> for SystemObject {
-    fn set_id(&mut self, id: SystemObjectID) {
-        self.id = id;
-    }
-
-    fn get_id(&self) -> SystemObjectID {
-        self.id
-    }
-}
-
-#[derive(Deserialize, Serialize)]
-enum SystemObjectInner {
-    Asteroid(Asteroid),
-    Station(Station)
-}
-
-#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug, Default, Deserialize, Serialize)]
-pub struct SystemObjectID(u32);
-
-impl ID for SystemObjectID {
-    fn increment(&mut self) {
-        *self = SystemObjectID(self.0 + 1)
-    }
-}
-
-#[derive(Deserialize, Serialize)]
-struct Station {
-    location: Vector3<f32>,
-    spin: ObjectSpin
-}
-
-
-#[derive(Deserialize, Serialize)]
-struct ObjectSpin {
+#[derive(Deserialize, Serialize, Component)]
+pub struct ObjectSpin {
     initial_rotation: Quaternion<f32>,
     rotation_axis: Vector3<f32>,
-    rotation: f32
+    rotation: f32,
+    rotation_speed: f32
 }
 
 impl ObjectSpin {
@@ -98,50 +49,40 @@ impl ObjectSpin {
         Self {
             initial_rotation: Quaternion::between_vectors(UP, initial),
             rotation_axis: uniform_sphere_distribution(rng),
-            rotation: 0.0
+            rotation: 0.0,
+            rotation_speed: 0.1
         }
     }
 
-    fn turn(&mut self, amount: f32) {
-        self.rotation += amount;
+    pub fn turn(&mut self, secs: f32) {
+        self.rotation += self.rotation_speed * secs;
     }
 
-    fn to_quat(&self) -> Quaternion<f32> {
+    pub fn to_quat(&self) -> Quaternion<f32> {
         self.initial_rotation * Quaternion::from_axis_angle(self.rotation_axis, Rad(self.rotation))
     }
 }
 
-#[derive(Deserialize, Serialize)]
-pub struct Asteroid {
-    location: Vector3<f32>,
-    resources: u32,
-    size: f32,
-    spin: ObjectSpin
-}
+pub fn add_asteroid(rng: &mut ThreadRng, world: &mut World) {
+    let size: f32 = rng.gen_range(0.5, 5.0);
 
-impl Asteroid {
-    fn new(rng: &mut ThreadRng) -> Self {
-        let size: f32 = rng.gen_range(0.5, 5.0);
+    let x = rng.gen_range(500.0, 1000.0) * rng.gen_range(-1.0, 1.0);
+    let y = rng.gen_range(-100.0, 100.0);
+    let z = rng.gen_range(500.0, 1000.0) * rng.gen_range(-1.0, 1.0);
 
-        let x = rng.gen_range(500.0, 1000.0) * rng.gen_range(-1.0, 1.0);
-        let y = rng.gen_range(-100.0, 100.0);
-        let z = rng.gen_range(500.0, 1000.0) * rng.gen_range(-1.0, 1.0);
-       
-        Self {
-            size,
-            resources: (size.powi(3) * rng.gen_range(0.1, 1.0)) as u32,
-            location: Vector3::new(x, y, z),
-            spin: ObjectSpin::random(rng)
-        }
-    }
+    let location = Vector3::new(x, y, z);
 
-    fn step(&mut self) {
-        self.spin.turn(0.002);
-    }
+    let resources = (size.powi(3) * rng.gen_range(0.1, 1.0)) as u32;
 
-    fn render(&self, context: &mut Context, system: &System, camera: &Camera) {
-        context.render_model(Model::Asteroid, self.location, self.spin.to_quat(), self.size, camera, system);
-    }
+    let spin = ObjectSpin::random(rng);
+
+    world.create_entity()
+        .with(Model::Asteroid)
+        .with(spin)
+        .with(Position(location))
+        .with(MineableMaterials(resources))
+        .with(Size(size))
+        .build();
 }
 
 #[derive(Deserialize, Serialize)]
@@ -149,12 +90,11 @@ pub struct System {
     pub location: Vector2<f32>,
     pub stars: Vec<(Vector3<f32>, f32)>,
     pub light: Vector3<f32>,
-    pub background_color: (f32, f32, f32),
-    pub system_objects: AutoIDMap<SystemObjectID, SystemObject>
+    pub background_color: (f32, f32, f32)
 }
 
 impl System {
-    pub fn new(location: Vector2<f32>, rng: &mut ThreadRng) -> Self {
+    pub fn new(location: Vector2<f32>, rng: &mut ThreadRng, world: &mut World) -> Self {
         // todo: more random generation
         let _distance_from_center = location.magnitude();
 
@@ -171,17 +111,14 @@ impl System {
 
         info!("Generated a {:?} system at {:?}.", system_type, location);
 
+        for _ in 0 .. rng.gen_range(5, 10) {
+            add_asteroid(rng, world);
+        }
+
         Self {
             light,
             background_color: (0.0, 0.0, rng.gen_range(0.0, 0.25)),
-            stars, location,
-            system_objects: (0 .. rng.gen_range(5, 10)).map(|_| SystemObject::new_asteroid(Asteroid::new(rng))).collect()
-        }
-    }
-
-    pub fn step(&mut self) {
-        for object in self.system_objects.iter_mut() {
-            object.step();
+            stars, location
         }
     }
 }

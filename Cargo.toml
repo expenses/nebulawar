@@ -24,7 +24,7 @@ runic = {git = "https://github.com/expenses/runic"}
 # lazy derive
 derive_is_enum_variant = "*"
 # Randomness
-rand = "*"
+rand = "0.5"
 # Serialization
 serde = "*"
 serde_derive = "*"
@@ -38,6 +38,9 @@ env_logger = {version = "*", default-features = false}
 log = "*"
 # 'retain_mut'
 odds = {version = "*", features = ["std-vec"]}
+# ECS
+specs = "*"
+specs-derive = "*"
 
 [features]
 embed_resources = []

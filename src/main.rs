@@ -20,6 +20,10 @@ extern crate log;
 extern crate env_logger;
 extern crate odds;
 
+extern crate specs;
+#[macro_use]
+extern crate specs_derive;
+
 use rand::*;
 use glium::*;
 use glutin::*;
@@ -28,6 +32,7 @@ use cgmath::*;
 use collision::*;
 use std::collections::*;
 use std::time::*;
+use specs::{Join, World, RunNow, DenseVecStorage};
 
 mod camera;
 mod util;
@@ -66,19 +71,21 @@ struct Game {
     state: State,
     controls: Controls,
     rng: ThreadRng,
-    ui: UI
+    ui: UI,
+    world: specs::World
 }
 
 impl Game {
-    fn new(events_loop: &EventsLoop) -> Self {
+    fn new(mut world: World, events_loop: &EventsLoop) -> Self {
         let mut rng = rand::thread_rng();
 
         Self {
             context: context::Context::new(events_loop),
-            state: State::new(&mut rng),
+            state: State::new(&mut world, &mut rng),
             controls: Controls::default(),
             rng,
-            ui: UI::new()
+            ui: UI::new(),
+            world
         }
     }
 
@@ -186,6 +193,13 @@ impl Game {
     }
 
     fn update(&mut self, secs: f32) {
+        {
+            let mut world_secs = self.world.write_resource::<Secs>();
+            *world_secs = Secs(secs);
+        }
+
+        SpinSystem.run_now(&self.world.res);
+
         if self.controls.middle_clicked() {
             self.state.camera.set_focus(&self.state.selected);
         }
@@ -266,6 +280,12 @@ impl Game {
             self.render_debug();
         }
 
+        AsteroidRenderer {
+            context: &mut self.context,
+            camera: &self.state.camera,
+            system: &self.state.system
+        }.run_now(&self.world.res);
+
         self.context.finish();
     }
 
@@ -311,12 +331,59 @@ impl Game {
     }
 }
 
+struct AsteroidRenderer<'a> {
+    context: &'a mut context::Context,
+    camera: &'a camera::Camera,
+    system: &'a System
+}
+
+impl<'a> specs::System<'a> for AsteroidRenderer<'a> {
+    type SystemData = (
+        specs::ReadStorage<'a, Position>,
+        specs::ReadStorage<'a, ObjectSpin>,
+        specs::ReadStorage<'a, Size>,
+        specs::ReadStorage<'a, context::Model>
+    );
+
+    fn run(&mut self, (pos, spin, size, model): Self::SystemData) {
+        for (pos, spin, size, model) in (&pos, &spin, &size, &model).join() {
+            self.context.render_model(*model, pos.0, spin.to_quat(), size.0, &self.camera, &self.system);
+        }
+    }
+}
+
+struct SpinSystem;
+
+impl<'a> specs::System<'a> for SpinSystem {
+    type SystemData = (
+        specs::Read<'a, Secs>,
+        specs::WriteStorage<'a, ObjectSpin>
+    );
+
+    fn run(&mut self, (secs, mut spins): Self::SystemData) {
+        for spin in (&mut spins).join() {
+            spin.turn(secs.0);
+        }
+    }
+}
+
+#[derive(Component, Default)]
+struct Secs(f32);
+
 fn main() {
     env_logger::init();
 
+    let mut world = World::new();
+    world.add_resource(Secs(0.0));
+    world.register::<context::Model>();
+    world.register::<Position>();
+    world.register::<ObjectSpin>();
+    world.register::<MineableMaterials>();
+    world.register::<Size>();
+
     let mut events_loop = EventsLoop::new();
     
-    let mut game = Game::new(&events_loop);
+    let mut game = Game::new(world, &events_loop);
 
     let mut time = Instant::now();
 

@@ -154,10 +154,6 @@ impl Context {
     }
 
     pub fn render_system(&mut self, system: &System, camera: &Camera) {
-        for object in system.system_objects.iter() {
-            object.render(self, system, camera);
-        }
-
         let uniforms = uniform!{
             model: matrix_to_array(Matrix4::identity()),
             view: matrix_to_array(camera.view_matrix()),

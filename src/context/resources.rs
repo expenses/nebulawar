@@ -9,6 +9,7 @@ use util::*;
 use glium::texture::*;
 use std::io;
 use failure;
+use specs::*;
 
 #[cfg(feature = "embed_resources")]
 macro_rules! load_resource {
@@ -98,6 +99,7 @@ pub enum Image {
     RefuelFrom = 4
 }
 
+#[derive(Deserialize, Serialize, Component, Copy, Clone)]
 pub enum Model {
     Fighter = 0,
     Tanker = 1,

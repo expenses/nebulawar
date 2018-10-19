@@ -1,8 +1,12 @@
+- more ecs stuff
 - add lots more ships
+- especially capital ship
 - look up some space flocking behavious, especially avoidance
-- watch https://www.youtube.com/watch?v=Ao5T2OXZ95w
 - look up more stuff about proceedural generation
 - keep an eye on this tutorial: https://falseidolfactory.com/2018/10/09/gfx-hal-part-2-vertex-buffers.html in case of a switch to gfx sometime
 - look up more stuff for proceedural generation
 - eventually find a better line drawing method
-- watch rust talk on ecs-like stuff, especially parts on doing stuff gradually
+- convertion efficency
+- make flying look smoother
+- patrols
+- government stuff
