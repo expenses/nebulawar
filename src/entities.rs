@@ -89,4 +89,8 @@ pub fn add_starting_entities(world: &mut World) {
         let fighter = create_ship(world, ShipType::Fighter, Vector3::new(x, 5.0, 0.0));
         create_person(fighter, world, Occupation::Pilot);
     }
+
+    for i in 0 .. 2 {
+        create_ship(world, ShipType::Miner, Vector3::new(0.0, 2.5 - i as f32 * 5.0, 30.0));
+    }
 }

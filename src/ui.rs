@@ -2,7 +2,7 @@ use context::*;
 use pedot::*;
 use odds::vec::*;
 
-pub struct Button {
+/*pub struct Button {
     x: HorizontalAlign,
     y: VerticalAlign,
     image: Image
@@ -42,7 +42,7 @@ impl Button {
         context.render_image(Image::Button, x, y, width, height, color);
         context.render_image(self.image, x, y, width, height, color);
     }
-}
+}*/
 
 struct LogItem {
     age: f32,
@@ -50,18 +50,18 @@ struct LogItem {
 }
 
 pub struct UI {
-    buttons: [Button; 3],
+    //buttons: [Button; 3],
     log: Vec<LogItem>
 }
 
 impl UI {
     pub fn new() -> Self {
         Self {
-            buttons: [
+            /*buttons: [
                 Button::new(HorizontalAlign::Right(0.0), VerticalAlign::Bottom(0.0), Image::Move),
                 Button::new(HorizontalAlign::Right(1.0), VerticalAlign::Bottom(0.0), Image::Refuel),
                 Button::new(HorizontalAlign::Right(2.0), VerticalAlign::Bottom(0.0), Image::RefuelFrom),
-            ],
+            ],*/
             log: Vec::new()
         }
     }
@@ -81,9 +81,9 @@ impl UI {
     }
 
     pub fn render(&self, context: &mut Context) {
-        for button in &self.buttons {
+        /*for button in &self.buttons {
             button.render(context);
-        }
+        }*/
 
         let (_, height) = context.screen_dimensions();
 

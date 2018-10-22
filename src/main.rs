@@ -32,7 +32,7 @@ use glutin::dpi::*;
 use cgmath::{Vector3, Zero, Quaternion};
 use collision::*;
 use std::time::*;
-use specs::{World, RunNow};
+use specs::{World, RunNow, Entities, ReadStorage, Join};
 use specs::shred::{Fetch, FetchMut};
 
 mod camera;
@@ -118,6 +118,7 @@ impl Game {
             VirtualKeyCode::T => self.controls.shift = pressed,
             VirtualKeyCode::C => focus_on_selected(&mut self.world),
             VirtualKeyCode::Z if pressed => {
+                // todo: saving etc
                 //let result = self.state.save("game.sav");
                 //self.print_potential_error(result);
             },
@@ -130,10 +131,18 @@ impl Game {
             VirtualKeyCode::Slash if pressed => self.context.toggle_debug(),
             VirtualKeyCode::Comma if pressed => self.world.write_resource::<Formation>().rotate_left(),
             VirtualKeyCode::Period if pressed => self.world.write_resource::<Formation>().rotate_right(),
-            // todo: shit removal
-            //VirtualKeyCode::Back if pressed => for ship in &self.state.selected {
-            //    self.state.ships.remove(*ship);
-            //}
+            VirtualKeyCode::Back if pressed => {
+                let to_delete: Vec<_> = {
+                    let (entities, selectable): (Entities, ReadStorage<Selectable>) = self.world.system_data();
+
+                    (&entities, &selectable).join()
+                        .filter(|(_, selectable)| selectable.selected)
+                        .map(|(entity, _)| entity)
+                        .collect()
+                };
+
+                self.world.delete_entities(&to_delete).unwrap();
+            }
             _ => {}
         }
     }
@@ -286,6 +295,7 @@ fn main() {
     world.add_resource(Paused(false));
     world.add_resource(LeftClick(None));
     world.add_resource(Mouse((0.0, 0.0)));
+    world.add_resource(RightClickInteraction(None));
 
     world.register::<context::Model>();
     world.register::<Position>();

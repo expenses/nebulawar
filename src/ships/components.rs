@@ -30,7 +30,8 @@ pub enum ShipComponentType {
     FuelDrum,
     Boltor89Cannons,
     AX17KXDrive,
-    FoodRecycler
+    FoodRecycler,
+    MiningDrill
 }
 
 impl ShipComponentType {
@@ -65,6 +66,13 @@ impl ShipComponentType {
         match self {
             ShipComponentType::FoodRecycler => Some(Converter::new(Resource::Waste, Resource::Food, 1.0)),
             _ => None
+        }
+    }
+
+    pub fn drill_speed(self) -> f32 {
+        match self {
+            ShipComponentType::MiningDrill => 10.0,
+            _ => 0.0
         }
     }
 }
@@ -113,6 +121,11 @@ impl Components {
 
     pub fn converters(&self) -> impl Iterator<Item=Converter> + '_ {
         self.component_types().filter_map(ShipComponentType::converter)
+    }
+
+    pub fn drill_speed(&self) -> Option<f32> {
+        let speed = self.component_types().map(ShipComponentType::drill_speed).sum();
+        Some(speed).filter(|speed| *speed > 0.0)
     }
 }
 

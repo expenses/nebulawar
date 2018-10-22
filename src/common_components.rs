@@ -2,6 +2,7 @@ use specs::*;
 use cgmath::*;
 use util::*;
 use rand::*;
+use ships::*;
 
 #[derive(Component, Default)]
 pub struct Drag(pub Option<(f32, f32, f32, f32)>);
@@ -32,6 +33,9 @@ impl Paused {
         self.0 = !self.0;
     }
 }
+
+#[derive(Component, Default)]
+pub struct RightClickInteraction(pub Option<Interaction>);
 
 #[derive(Deserialize, Serialize, Component)]
 pub struct Position(pub Vector3<f32>);

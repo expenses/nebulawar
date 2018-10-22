@@ -49,7 +49,8 @@ impl Command {
 pub enum ShipType {
     Fighter,
     Tanker,
-    Carrier
+    Carrier,
+    Miner
 }
 
 impl ShipType {
@@ -57,7 +58,8 @@ impl ShipType {
         match *self {
             ShipType::Fighter => Model::Fighter,
             ShipType::Tanker => Model::Tanker,
-            ShipType::Carrier => Model::Carrier
+            ShipType::Carrier => Model::Carrier,
+            ShipType::Miner => Model::Miner
         }
     }
 
@@ -65,7 +67,8 @@ impl ShipType {
         match *self {
             ShipType::Fighter => 1,
             ShipType::Tanker => 10,
-            ShipType::Carrier => 100
+            ShipType::Carrier => 100,
+            ShipType::Miner => 5
         }
     }
 
@@ -85,6 +88,10 @@ impl ShipType {
                     ShipComponent::new(ShipComponentType::AX17KXDrive, age),
                     ShipComponent::new(ShipComponentType::AX17KXDrive, age),
                     ShipComponent::new(ShipComponentType::FoodRecycler, age)
+                ],
+                ShipType::Miner => vec![
+                    ShipComponent::new(ShipComponentType::HG900Drive, age),
+                    ShipComponent::new(ShipComponentType::HG43WarpDrive, age),
                 ]
             }
         )
@@ -94,7 +101,8 @@ impl ShipType {
         match *self {
             ShipType::Fighter => 2.0,
             ShipType::Tanker => 100.0,
-            ShipType::Carrier => 2000.0
+            ShipType::Carrier => 2000.0,
+            ShipType::Miner => 20.0
         }
     }
 
@@ -102,7 +110,8 @@ impl ShipType {
         match *self {
             ShipType::Fighter => 1.0,
             ShipType::Tanker => 2.0,
-            ShipType::Carrier => 4.0
+            ShipType::Carrier => 4.0,
+            ShipType::Miner => 2.0
         }
     }
 }

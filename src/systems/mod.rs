@@ -85,14 +85,11 @@ impl<'a> System<'a> for ShipMovementSystem {
         }
 
         for (entity, rot, commands, tag, components) in (&entities, &mut rot, &mut commands, &tag, &components).join() {
-            let mut next = false;
-
-            if let Some(command) = commands.0.first() {
-                handle_command(command, entity, &mut rot.0, &mut pos, components, tag, &mut storages, &size);
-            }
-
-            if next {
-                println!("{:?}", commands.0);
+            let finished = commands.0.first()
+                .map(|command| handle_command(command, entity, &mut rot.0, &mut pos, components, tag, &mut storages, &size).unwrap_or(true))
+                .unwrap_or(false);
+            
+            if finished {
                 commands.0.remove(0);
             }
         }
@@ -142,32 +139,32 @@ fn transfer_fuel(storage: &mut WriteStorage<ShipStorage>, ship_a: Entity, ship_b
     }
 } 
 
-fn handle_command(command: &Command, entity: Entity, rot: &mut Quaternion<f32>, pos: &mut WriteStorage<Position>, components: &Components, tag: &ShipType, storages: &mut WriteStorage<ShipStorage>, size: &ReadStorage<Size>) -> bool {
+fn handle_command(command: &Command, entity: Entity, rot: &mut Quaternion<f32>, pos: &mut WriteStorage<Position>, components: &Components, tag: &ShipType, storages: &mut WriteStorage<ShipStorage>, size: &ReadStorage<Size>) -> Option<bool> {
     match command {
         Command::MoveTo(position) => {
-            let pos = pos.get_mut(entity).unwrap();
-            let storage = storages.get_mut(entity).unwrap();
+            let pos = pos.get_mut(entity)?;
+            let storage = storages.get_mut(entity)?;
 
-            move_ship(&mut pos.0, rot, storage, tag, components, *position) == MovementStatus::Reached
+            Some(move_ship(&mut pos.0, rot, storage, tag, components, *position) == MovementStatus::Reached)
         },
-        Command::GoToAnd(ship, interaction) => {
-            let position = pos.get(entity).unwrap().0;
-            let target_position = pos.get(*ship).unwrap().0;
+        Command::GoToAnd(target, interaction) => {
+            let position = pos.get(entity)?.0;
+            let target_position = pos.get(*target)?.0;
 
-            let distance = (size.get(*ship).unwrap().0) * 2.0;
+            let distance = (size.get(*target)?.0) * 2.0;
 
             if position.distance(&target_position) < distance {
                 match interaction {
-                    Interaction::Follow => false,
-                    Interaction::Refuel => transfer_fuel(storages, entity, *ship, 0.1).unwrap_or(true),
-                    Interaction::RefuelFrom => transfer_fuel(storages, *ship, entity, 0.1).unwrap_or(true),
-                    Interaction::Mine => false
+                    Interaction::Follow => Some(false),
+                    Interaction::Refuel => transfer_fuel(storages, entity, *target, 0.1),
+                    Interaction::RefuelFrom => transfer_fuel(storages, *target, entity, 0.1),
+                    Interaction::Mine => Some(false)
                 }
             } else {
-                let pos = pos.get_mut(entity).unwrap();
-                let storage = storages.get_mut(entity).unwrap();
+                let pos = pos.get_mut(entity)?;
+                let storage = storages.get_mut(entity)?;
 
-                move_ship(&mut pos.0, rot, storage, tag, components, target_position) == MovementStatus::OutOfFuel
+                Some(move_ship(&mut pos.0, rot, storage, tag, components, target_position) == MovementStatus::OutOfFuel)
             }
         }
     }
@@ -347,3 +344,7 @@ impl<'a> System<'a> for LeftClickSystem<'a> {
         }
     }
 }
+
+// todo: write a system that stores whats under the cursor
+
+pub struct RightClickInteractionSystem;
