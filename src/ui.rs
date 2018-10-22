@@ -1,8 +1,6 @@
 use context::*;
 use pedot::*;
 use odds::vec::*;
-use state::*;
-use util::*;
 
 pub struct Button {
     x: HorizontalAlign,
@@ -82,7 +80,7 @@ impl UI {
         });
     }
 
-    pub fn render(&self, state: &State, context: &mut Context) {
+    pub fn render(&self, context: &mut Context) {
         for button in &self.buttons {
             button.render(context);
         }
@@ -92,36 +90,5 @@ impl UI {
         for (i, item) in self.log.iter().enumerate() {
             context.render_text(&item.content, 10.0, height - 30.0 - i as f32 * 20.0);
         }
-
-        let y = &mut 10.0;
-
-        self.render_text(&format!("Time: {:.1}", state.time()), context, y);
-        self.render_text(&format!("Ship count: {}", state.ships.len()), context, y);
-        self.render_text(&format!("Population: {}", state.people.len()), context, y);
-
-        self.render_text(&format!("Formation: {:?}", state.formation), context, y);        
-
-        for (tag, num) in state.selection_info() {
-            self.render_text(&format!("{:?}: {}", tag, num), context, y);
-        }
-
-        if let Some(ship) = state.selected().next() {
-            self.render_text(&format!("Fuel: {:.2}%", ship.fuel_perc() * 100.0), context, y);
-            let (summary, num_people) = summarize(state.people_on_ship(ship.id()).map(|person| person.occupation()));
-            
-            self.render_text(&format!("Total people: {}", num_people), context, y);
-
-            for (tag, num) in summary {
-                self.render_text(&format!("{:?}: {}", tag, num), context, y);
-            }
-
-            self.render_text(&format!("Food: {}", ship.food()), context, y);
-            self.render_text(&format!("Waste: {}", ship.waste()), context, y);
-        }
-    }
-
-    fn render_text(&self, text: &str, context: &mut Context, y: &mut f32) {
-        context.render_text(text, 10.0, *y);
-        *y += 30.0;
     }
 }

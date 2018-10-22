@@ -96,7 +96,8 @@ pub enum Image {
     Button = 1,
     Move = 2,
     Refuel = 3,
-    RefuelFrom = 4
+    RefuelFrom = 4,
+    Mine = 5
 }
 
 #[derive(Deserialize, Serialize, Component, Copy, Clone)]
@@ -105,17 +106,6 @@ pub enum Model {
     Tanker = 1,
     Carrier = 2,
     Asteroid = 3
-}
-
-impl Model {
-    pub fn size(&self) -> f32 {
-        match *self {
-            Model::Asteroid => 10.0,
-            Model::Tanker => 2.0,
-            Model::Carrier => 4.0,
-            _ => 1.0
-        }
-    }
 }
 
 pub struct ObjModel {
@@ -134,7 +124,7 @@ impl ObjModel {
 
 pub struct Resources {
     pub models: [ObjModel; 4],
-    pub images: [SrgbTexture2d; 5],
+    pub images: [SrgbTexture2d; 6],
     pub font: runic::CachedFont<'static>
 }
 
@@ -152,7 +142,8 @@ impl Resources {
                 load_image(display, load_resource!("resources/ui/button.png")),
                 load_image(display, load_resource!("resources/ui/move.png")),
                 load_image(display, load_resource!("resources/ui/refuel.png")),
-                load_image(display, load_resource!("resources/ui/refuel_from.png"))
+                load_image(display, load_resource!("resources/ui/refuel_from.png")),
+                load_image(display, load_resource!("resources/ui/mine.png"))
             ],
             font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display)?
         })

@@ -1,172 +1,83 @@
 use cgmath::*;
-use camera::*;
+use super::*;
+use specs::{DenseVecStorage, World, Component};
 use context;
-use ships::*;
-use people::*;
-use maps::*;
-use rand::{Rng, ThreadRng};
-use rand::distributions::*;
-use {average_position, circle_size};
 use util::*;
-use bincode;
-use failure::{self, ResultExt};
-use specs::World;
+use entities::*;
 
-use std::collections::*;
-
-mod system;
-
-pub use self::system::*;
-
-pub type Ships = AutoIDMap<ShipID, Ship>;
-pub type People = AutoIDMap<PersonID, Person>;
-
-// http://corysimon.github.io/articles/uniformdistn-on-sphere/
-fn uniform_sphere_distribution(rng: &mut ThreadRng) -> Vector3<f32> {
-    use std::f64::consts::PI;
-
-    let uniform = Uniform::new(0.0, 1.0);
-
-    let x = uniform.sample(rng);
-    let y = uniform.sample(rng);
-
-    let theta = 2.0 * PI * x;
-    let phi = (1.0 - 2.0 * y).acos();
-
-    Vector3::new(
-        (phi.sin() * theta.cos()) as f32,
-        (phi.sin() * theta.sin()) as f32,
-        phi.cos() as f32
-    )
+#[derive(Debug)]
+enum SystemType {
+    Asteroids,
+    Planetoid,
+    Nebula,
+    BlackHole
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct State {
-    pub ships: AutoIDMap<ShipID, Ship>,
-    pub people: AutoIDMap<PersonID, Person>,
-    pub system: System,
-    pub camera: Camera,
-    pub selected: HashSet<ShipID>,
-    pub formation: Formation,
-    time: f32,
-    pub paused: bool
+impl SystemType {
+    fn random(rng: &mut ThreadRng) -> Self {
+        let num = rng.gen_range(0, 100);
+
+        match num {
+            0 ... 29 => SystemType::Asteroids,
+            30 ... 59 => SystemType::Planetoid,
+            60 ... 89 => SystemType::Nebula,
+            90 ... 100 => SystemType::BlackHole,
+            _ => unreachable!()
+        }
+    }
 }
 
-impl State {
-    pub fn new(world: &mut World, rng: &mut ThreadRng) -> Self {
-        let mut state = Self {
-            ships: AutoIDMap::new(),
-            people: AutoIDMap::new(),
-            system: System::new(Vector2::new(rng.gen_range(-1.0, 1.0), rng.gen_range(-1.0, 1.0)), rng, world),
-            camera: Camera::default(),
-            selected: HashSet::new(),
-            formation: Formation::DeltaWing,
-            time: 0.0,
-            paused: false
-        };
+#[derive(Deserialize, Serialize, Component)]
+pub struct System {
+    pub location: Vector2<f32>,
+    pub stars: Vec<context::Vertex>,
+    pub light: Vector3<f32>,
+    pub background_color: (f32, f32, f32),
+}
 
-        let carrier = state.ships.push(Ship::new(ShipType::Carrier, Vector3::new(0.0, 0.0, 10.0), (0.0, 0.0, 0.0)));
+impl System {
+    pub fn new(location: Vector2<f32>, rng: &mut ThreadRng, world: &mut World) -> Self {
+        // todo: more random generation
+        let _distance_from_center = location.magnitude();
 
-        for _ in 0 .. 45 {
-            state.people.push(Person::new(Occupation::Worker, carrier));
+        let stars = 10000;
+
+        let stars = (0 .. stars)
+            .map(|_| {
+                context::Vertex {
+                    position: (uniform_sphere_distribution(rng) * (BACKGROUND_DISTANCE + 100.0)).into(),
+                    normal: [0.0; 3],
+                    texture: [rng.gen_range(0.0_f32, 1.0); 2]
+                }
+            })
+            .collect();
+
+        let mut light = uniform_sphere_distribution(rng);
+        light.y = light.y.abs();
+
+        let system_type = SystemType::random(rng);
+
+        info!("Generated a {:?} system at {:?}.", system_type, location);
+
+        for _ in 0 .. rng.gen_range(5, 10) {
+            add_asteroid(rng, world);
         }
 
-        for _ in 0 .. 20 {
-            state.people.push(Person::new(Occupation::Marine, carrier));
+        Self {
+            light,
+            background_color: (0.0, 0.0, rng.gen_range(0.0, 0.25)),
+            stars, location
         }
+    }
+}
 
-        for _ in 0 .. 25 {
-            state.people.push(Person::new(Occupation::Pilot, carrier));
+impl Default for System {
+    fn default() -> Self {
+        Self {
+            location: Vector2::zero(),
+            stars: Vec::new(),
+            light: Vector3::zero(),
+            background_color: (0.0, 0.0, 0.0)
         }
-
-        for _ in 0 .. 10 {
-            state.people.push(Person::new(Occupation::Government, carrier));
-        }
-
-        let tanker = state.ships.push(Ship::new(ShipType::Tanker, Vector3::new(0.0, 0.0, 0.0), (0.0, 0.0, 0.0)));
-
-        for _ in 0 .. 10 {
-            state.people.push(Person::new(Occupation::Worker, tanker));
-        }
-        
-        for i in 0 .. 20 {
-            let x = (50.0 - i as f32) * 3.0;
-            let fighter = state.ships.push(Ship::new(ShipType::Fighter, Vector3::new(x, 5.0, 0.0), (0.0, 0.0, 0.0)));
-            state.people.push(Person::new(Occupation::Pilot, fighter));
-        }
-
-        state
-    }
-
-    pub fn time(&self) -> f32 {
-        self.time
-    }
-
-    pub fn load(&mut self, filename: &str) -> Result<(), failure::Context<String>> {
-        let file = ::std::fs::File::open(filename).context(format!("Failed to load '{}'.", filename))?;
-        *self = bincode::deserialize_from(file).context(format!("Failed to load '{}'.", filename))?;
-
-        info!("Loaded game from '{}'.", filename);
-
-        Ok(())
-    }
-
-    pub fn save(&self, filename: &str) -> Result<(), failure::Context<String>> {
-        let file = ::std::fs::File::create(filename).context(format!("Failed to save to '{}'.", filename))?;
-        bincode::serialize_into(file, self).context(format!("Failed to save to '{}'.", filename))?;
-
-        info!("Saved game to '{}'", filename);
-
-        Ok(())
-    }
-
-    pub fn selected(&self) -> impl Iterator<Item=&Ship> {
-        self.selected.iter().filter_map(move |id| self.ships.get(*id))
-    }
-
-    pub fn people_on_ship(&self, ship: ShipID) -> impl Iterator<Item=&Person> {
-        self.people.iter().filter(move |person| person.ship() == ship)
-    }
-
-    pub fn step(&mut self, secs: f32) {
-        if !self.paused {
-            self.time += secs;
-
-            let ids: Vec<_> = self.ships.ids().cloned().collect();
-
-            for id in ids {
-                let (ship, mut ships) = self.ships.split_one_off(id).unwrap();
-                ship.step(secs, &mut ships, &self.people);
-            }
-        }
-
-        self.camera.step(&self.ships);
-    }
-
-    pub fn render(&self, context: &mut context::Context) {
-        for ship in self.selected() {
-            if let Some((x, y, z)) = context.screen_position(ship.position(), &self.camera) {
-                let fuel = ship.fuel_perc();
-                context.render_circle(x, y, circle_size(z), [1.0, fuel, fuel, 1.0]);
-            }
-
-            if !ship.commands.is_empty() {
-                context.render_3d_lines(ship.command_path(&self.ships));
-            }
-        }
-
-        for ship in self.ships.iter() {
-            ship.render(context, &self.camera, &self.system);
-        }
-
-        context.render_system(&self.system, &self.camera);
-    }
-
-    pub fn selection_info(&self) -> BTreeMap<&ShipType, u64> {
-        summarize(self.selected().map(Ship::tag)).0
-    }
-
-    pub fn average_position(&self) -> Option<Vector3<f32>> {
-        average_position(&self.selected, &self.ships)
     }
 }

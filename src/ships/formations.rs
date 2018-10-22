@@ -1,8 +1,9 @@
 use cgmath::*;
 use util::*;
 use std::f32::consts::*;
+use specs::*;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Component)]
 pub enum Formation {
     Screen,
     DeltaWing,
@@ -67,5 +68,11 @@ impl Formation {
             Formation::DeltaWing => *self = Formation::Screen,
             Formation::GoTo      => *self = Formation::DeltaWing,    
         }
+    }
+}
+
+impl Default for Formation {
+    fn default() -> Self {
+        Formation::DeltaWing
     }
 }

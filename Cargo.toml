@@ -39,8 +39,8 @@ log = "*"
 # 'retain_mut'
 odds = {version = "*", features = ["std-vec"]}
 # ECS
-specs = "*"
-specs-derive = "*"
+specs = {git = "https://github.com/slide-rs/specs", default-features = false, features = ["serde"]}
+specs-derive = {git = "https://github.com/slide-rs/specs"}
 
 [features]
 embed_resources = []

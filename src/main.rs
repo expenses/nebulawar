@@ -10,6 +10,7 @@ extern crate runic;
 #[macro_use]
 extern crate derive_is_enum_variant;
 extern crate rand;
+extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate bincode;
@@ -28,47 +29,35 @@ use rand::*;
 use glium::*;
 use glutin::*;
 use glutin::dpi::*;
-use cgmath::*;
+use cgmath::{Vector3, Zero, Quaternion};
 use collision::*;
-use std::collections::*;
 use std::time::*;
-use specs::{Join, World, RunNow, DenseVecStorage};
+use specs::{World, RunNow};
+use specs::shred::{Fetch, FetchMut};
 
 mod camera;
 mod util;
 mod context;
 mod ships;
 mod controls;
-mod people;
-mod maps;
 mod ui;
 mod state;
+mod common_components;
+mod systems;
+mod entities;
 
 use state::*;
 use ui::*;
 use controls::*;
-
+use common_components::*;
+use systems::*;
 use util::*;
 use ships::*;
-use maps::*;
-
-fn average_position(selection: &HashSet<ShipID>, ships: &AutoIDMap<ShipID, Ship>) -> Option<Vector3<f32>> {
-    let (sum_position, num) = selection.iter()
-            .filter_map(|id| ships.get(*id))
-            .fold((Vector3::zero(), 0), |(vector, total), ship| {
-                (vector + ship.position(), total + 1)
-            });
-
-    if num > 0 {
-        Some(sum_position / num as f32)
-    } else {
-        None
-    }
-}
+use systems::focus_on_selected;
+use entities::*;
 
 struct Game {
     context: context::Context,
-    state: State,
     controls: Controls,
     rng: ThreadRng,
     ui: UI,
@@ -79,9 +68,14 @@ impl Game {
     fn new(mut world: World, events_loop: &EventsLoop) -> Self {
         let mut rng = rand::thread_rng();
 
+        use cgmath::Vector2;
+        let system = System::new(Vector2::new(rng.gen_range(-1.0, 1.0), rng.gen_range(-1.0, 1.0)), &mut rng, &mut world);
+        world.add_resource(system);
+
+        add_starting_entities(&mut world);
+
         Self {
             context: context::Context::new(events_loop),
-            state: State::new(&mut world, &mut rng),
             controls: Controls::default(),
             rng,
             ui: UI::new(),
@@ -95,13 +89,13 @@ impl Game {
         self.controls.set_mouse(x, y);
 
         if self.controls.right_dragging() {
-            self.state.camera.rotate_longitude(delta_x / 200.0);
-            self.state.camera.rotate_latitude(delta_y / 200.0);
+            self.camera_mut().rotate_longitude(delta_x / 200.0);
+            self.camera_mut().rotate_latitude(delta_y / 200.0);
         }
     }
 
     fn point_under_mouse(&mut self) -> Option<Vector3<f32>> {
-        let ray = self.context.ray(&self.state.camera, self.controls.mouse());
+        let ray = self.context.ray(&self.camera(), self.controls.mouse());
 
         Plane::new(UP, 0.0).intersection(&ray).map(point_to_vector)
     }
@@ -122,197 +116,143 @@ impl Game {
             VirtualKeyCode::Up    | VirtualKeyCode::W => self.controls.forwards = pressed,
             VirtualKeyCode::Down  | VirtualKeyCode::S => self.controls.back     = pressed,
             VirtualKeyCode::T => self.controls.shift = pressed,
-            VirtualKeyCode::C => self.state.camera.set_focus(&self.state.selected),
+            VirtualKeyCode::C => focus_on_selected(&mut self.world),
             VirtualKeyCode::Z if pressed => {
-                let result = self.state.save("game.sav");
-                self.print_potential_error(result);
+                //let result = self.state.save("game.sav");
+                //self.print_potential_error(result);
             },
             VirtualKeyCode::L if pressed => {
-                let result = self.state.load("game.sav");
-                self.print_potential_error(result);
+                //let result = self.state.load("game.sav");
+                //self.print_potential_error(result);
             },
             VirtualKeyCode::LShift => self.controls.shift = pressed,
-            VirtualKeyCode::P if pressed => self.state.paused = !self.state.paused,
+            VirtualKeyCode::P if pressed => self.world.write_resource::<Paused>().switch(),
             VirtualKeyCode::Slash if pressed => self.context.toggle_debug(),
-            VirtualKeyCode::Comma if pressed => self.state.formation.rotate_left(),
-            VirtualKeyCode::Period if pressed => self.state.formation.rotate_right(),
-            VirtualKeyCode::Back if pressed => for ship in &self.state.selected {
-                self.state.ships.remove(*ship);
-            },
+            VirtualKeyCode::Comma if pressed => self.world.write_resource::<Formation>().rotate_left(),
+            VirtualKeyCode::Period if pressed => self.world.write_resource::<Formation>().rotate_right(),
+            // todo: shit removal
+            //VirtualKeyCode::Back if pressed => for ship in &self.state.selected {
+            //    self.state.ships.remove(*ship);
+            //}
             _ => {}
         }
     }
 
-    fn ship_under_mouse(&self) -> Option<ShipID> {
-        let (mouse_x, mouse_y) = self.controls.mouse();
-
-        self.state.ships.iter()
-            .filter_map(|ship| {
-                self.context.screen_position(ship.position(), &self.state.camera)
-                    .filter(|(x, y, z)| {
-                        (mouse_x - x).hypot(mouse_y - y) < circle_size(*z)
-                    })
-                    .map(|(_, _, z)| (ship, z))
-            })
-            .min_by(|(_, z_a), (_, z_b)| z_a.partial_cmp(z_b).unwrap_or(::std::cmp::Ordering::Less))
-            .map(|(ship, _)| ship.id())
-    }
-
-    fn right_click_interaction(&self) -> Option<(ShipID, Interaction)> {
-        self.ship_under_mouse()
-            .map(|ship| {
-                let interaction = if self.state.ships[ship].out_of_fuel() {
-                    Interaction::Refuel
-                } else {
-                    Interaction::RefuelFrom
-                };
-
-                (ship, interaction)
-            })
-    }
-
-    fn order_ships_to(&mut self, target: Vector3<f32>) {
-        if let Some(avg) = self.state.average_position() {
-            let positions = self.state.formation.arrange(self.state.selected.len(), avg, target, 2.5);
-            
-            let ships = &mut self.state.ships;
-            let queue = self.controls.shift;
-
-            self.state.selected.iter()
-                .zip(positions.iter())
-                .for_each(|(id, position)| {
-                    let ship = ships.get_mut(*id).unwrap();
-
-                    if !queue {
-                        ship.commands.clear();
-                    }
-
-                    ship.commands.push(Command::MoveTo(*position))
-                });
-        }
-    }
-
     fn update(&mut self, secs: f32) {
-        {
-            let mut world_secs = self.world.write_resource::<Secs>();
-            *world_secs = Secs(secs);
-        }
+        *self.world.write_resource() = Secs(secs);
+        *self.world.write_resource() = Drag(self.controls.left_drag_rect());
+        *self.world.write_resource() = ShiftPressed(self.controls.shift);
+        *self.world.write_resource() = LeftClick(Some(self.controls.mouse()).filter(|_| self.controls.left_clicked()));
+        *self.world.write_resource() = RightClick(Some(self.controls.mouse()).filter(|_| self.controls.right_clicked()));
+        *self.world.write_resource() = Mouse(self.controls.mouse());
 
         SpinSystem.run_now(&self.world.res);
 
         if self.controls.middle_clicked() {
-            self.state.camera.set_focus(&self.state.selected);
+            focus_on_selected(&mut self.world);
         }
 
-        if self.controls.left_clicked() {
-            if !self.controls.shift {
-                self.state.selected.clear();
-            }
+        LeftClickSystem {
+            context: &self.context
+        }.run_now(&self.world.res);
 
-            if let Some(ship) = self.ship_under_mouse() {
-                self.state.selected.insert(ship);
-            }
-        }
+        DragSelectSystem {
+            context: &self.context
+        }.run_now(&self.world.res);
 
-        if let Some((left, top, right, bottom)) = self.controls.left_drag_rect() {
-            if !self.controls.shift {
-                self.state.selected.clear();
-            }
-
-            for ship in self.state.ships.iter() {
-                if let Some((x, y, _)) = self.context.screen_position(ship.position(), &self.state.camera) {
-                    if left <= x && x <= right && top <= y && y <= bottom {
-                        if !self.state.selected.remove(&ship.id()) {
-                            self.state.selected.insert(ship.id());
-                        }
-                    }
-                }
-            }
-        }
-
-        if self.controls.right_clicked() {
-            if let Some((target, interaction)) = self.right_click_interaction() {
-                for ship in &self.state.selected {
-                    if *ship != target {
-                        if let Some(ship) = self.state.ships.get_mut(*ship) {
-                            if !self.controls.shift {
-                                ship.commands.clear();
-                            }
-
-                            ship.commands.push(Command::GoToAnd(target, interaction));
-                        }
-                    }
-                }
-            } else if let Some(target) = self.point_under_mouse() {
-                self.order_ships_to(target);
-            }
-        }
+        RightClickSystem {
+            context: &self.context
+        }.run_now(&self.world.res);
 
         self.controls.update();
 
         if self.controls.left {
-            self.state.camera.move_sideways(-0.5);
+            self.camera_mut().move_sideways(-0.5);
+            clear_focus(&mut self.world);
         }
 
         if self.controls.right {
-            self.state.camera.move_sideways(0.5);
+            self.camera_mut().move_sideways(0.5);
+            clear_focus(&mut self.world);
         }
 
         if self.controls.forwards {
-            self.state.camera.move_forwards(0.5);
+            self.camera_mut().move_forwards(0.5);
+            clear_focus(&mut self.world);
         }
 
         if self.controls.back {
-            self.state.camera.move_forwards(-0.5);
+            self.camera_mut().move_forwards(-0.5);
+            clear_focus(&mut self.world);
         }
         
-        self.state.step(secs);
+        TimeStepSystem.run_now(&self.world.res);
+        ShipMovementSystem.run_now(&self.world.res);
+        StepCameraSystem.run_now(&self.world.res);
         self.ui.step(secs);
     }
 
     fn render(&mut self) {
-        self.context.clear(&self.state.system);
-        self.state.render(&mut self.context);
+        self.context.clear(&self.world.read_resource());
+        self.context.render_system(&self.world.read_resource(), &self.world.read_resource());
 
-        self.render_2d_components();
+        RenderCommandPaths {
+            context: &mut self.context
+        }.run_now(&self.world.res);
+
+        ObjectRenderer {
+            context: &mut self.context
+        }.run_now(&self.world.res);
 
         if self.context.is_debugging() {
             self.render_debug();
         }
 
-        AsteroidRenderer {
-            context: &mut self.context,
-            camera: &self.state.camera,
-            system: &self.state.system
+        RenderSelected {
+            context: &mut self.context
         }.run_now(&self.world.res);
+
+        self.render_2d_components();
 
         self.context.finish();
     }
 
     fn render_2d_components(&mut self) {
-        self.ui.render(&self.state, &mut self.context);
+        RenderUI {
+            context: &mut self.context
+        }.run_now(&self.world.res);
+        self.ui.render(&mut self.context);
         
         if let Some(top_left) = self.controls.left_dragging() {
             self.context.render_rect(top_left, self.controls.mouse());
         }
 
         // actually draw ui components onto the screen
-        self.context.flush_ui(&self.state.camera, &self.state.system);
+        let camera = self.world.read_resource();
+        self.context.flush_ui(&camera, &self.world.read_resource());
 
-        if let Some((_, interaction)) = self.right_click_interaction() {
-            let (x, y) = self.controls.mouse();
-            self.context.render_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4]);
-        }
+        RenderMouse {
+            context: &mut self.context
+        }.run_now(&self.world.res);
     }
 
     fn render_debug(&mut self) {
         if let Some(point) = self.point_under_mouse() {
-            self.context.render_model(context::Model::Asteroid, point, Quaternion::zero(), 0.1, &self.state.camera, &self.state.system);
+            let camera = self.world.read_resource();
+            self.context.render_model(context::Model::Asteroid, point, Quaternion::zero(), 0.1, &camera, &self.world.read_resource());
         }
     }
 
     fn change_distance(&mut self, delta: f32) {
-        self.state.camera.change_distance(delta)
+        self.camera_mut().change_distance(delta)
+    }
+
+    fn camera(&self) -> Fetch<camera::Camera> {
+        self.world.read_resource()
+    }
+
+    fn camera_mut(&mut self) -> FetchMut<camera::Camera> {
+        self.world.write_resource()
     }
 
     fn print_error<E: failure::Fail>(&mut self, error: &E) {
@@ -331,55 +271,36 @@ impl Game {
     }
 }
 
-struct AsteroidRenderer<'a> {
-    context: &'a mut context::Context,
-    camera: &'a camera::Camera,
-    system: &'a System
-}
-
-impl<'a> specs::System<'a> for AsteroidRenderer<'a> {
-    type SystemData = (
-        specs::ReadStorage<'a, Position>,
-        specs::ReadStorage<'a, ObjectSpin>,
-        specs::ReadStorage<'a, Size>,
-        specs::ReadStorage<'a, context::Model>
-    );
-
-    fn run(&mut self, (pos, spin, size, model): Self::SystemData) {
-        for (pos, spin, size, model) in (&pos, &spin, &size, &model).join() {
-            self.context.render_model(*model, pos.0, spin.to_quat(), size.0, &self.camera, &self.system);
-        }
-    }
-}
-
-struct SpinSystem;
-
-impl<'a> specs::System<'a> for SpinSystem {
-    type SystemData = (
-        specs::Read<'a, Secs>,
-        specs::WriteStorage<'a, ObjectSpin>
-    );
-
-    fn run(&mut self, (secs, mut spins): Self::SystemData) {
-        for spin in (&mut spins).join() {
-            spin.turn(secs.0);
-        }
-    }
-}
-
-#[derive(Component, Default)]
-struct Secs(f32);
-
 fn main() {
     env_logger::init();
 
     let mut world = World::new();
+    
+    world.add_resource(Time(0.0));
     world.add_resource(Secs(0.0));
+    world.add_resource(Drag(None));
+    world.add_resource(ShiftPressed(false));
+    world.add_resource(RightClick(None));
+    world.add_resource(Formation::default());
+    world.add_resource(camera::Camera::default());
+    world.add_resource(Paused(false));
+    world.add_resource(LeftClick(None));
+    world.add_resource(Mouse((0.0, 0.0)));
+
     world.register::<context::Model>();
     world.register::<Position>();
     world.register::<ObjectSpin>();
     world.register::<MineableMaterials>();
     world.register::<Size>();
+    world.register::<ShipStorage>();
+    world.register::<Commands>();
+    world.register::<common_components::Rotation>();
+    world.register::<ships::components::Components>();
+    world.register::<ships::ShipType>();
+    world.register::<Selectable>();
+    world.register::<CreationTime>();
+    world.register::<Location>();
+    world.register::<Occupation>();
 
     let mut events_loop = EventsLoop::new();
     
@@ -419,6 +340,9 @@ fn main() {
     }
 }
 
+// todo: redo circle drawing
 fn circle_size(z: f32) -> f32 {
-    5000.0 * (1.0 - z)
+    FAR / 2.0 * (1.0 - z)
 }
+
+// todo: proper model intersections

@@ -42,7 +42,7 @@ pub enum Mode {
     Stars = 3
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct Vertex {
     pub position: [f32; 3],
     pub normal: [f32; 3],
@@ -76,7 +76,7 @@ pub struct Context {
 impl Context {
     pub fn new(events_loop: &EventsLoop) -> Self {
         let window = glutin::WindowBuilder::new()
-            .with_dimensions(LogicalSize::new(f64::from(DEFAULT_WIDTH), f64::from(DEFAULT_HEIGHT)))
+            .with_dimensions(LogicalSize::new(DEFAULT_WIDTH.into(), DEFAULT_HEIGHT.into()))
             .with_title("Fleet Commander");
         let context = glutin::ContextBuilder::new()
             .with_multisampling(16)
@@ -156,23 +156,13 @@ impl Context {
     pub fn render_system(&mut self, system: &System, camera: &Camera) {
         let uniforms = uniform!{
             model: matrix_to_array(Matrix4::identity()),
-            view: matrix_to_array(camera.view_matrix()),
+            view: matrix_to_array(camera.view_matrix_only_direction()),
             perspective: matrix_to_array(self.perspective_matrix()),
             light_direction: vector_to_array(system.light),
             mode: Mode::Stars as i32
         };
 
-        let vertices: Vec<Vertex> = system.stars.iter()
-            .map(|(vector, brightness)| {
-                context::Vertex {
-                    position: (camera.position() + vector * (BACKGROUND_DISTANCE + 100.0)).into(),
-                    normal: [0.0; 3],
-                    texture: [*brightness; 2]
-                }
-            })
-            .collect();
-
-        let vertices = VertexBuffer::new(&self.display, &vertices).unwrap();
+        let vertices = VertexBuffer::new(&self.display, &system.stars).unwrap();
         let indices = NoIndices(PrimitiveType::Points);
 
         let params = DrawParameters {
@@ -203,7 +193,7 @@ impl Context {
     }
 
     pub fn render_model(&mut self, model: Model, location: Vector3<f32>, rotation: Quaternion<f32>, size: f32, camera: &Camera, system: &System) {
-        let scale = Matrix4::from_scale(model.size() * size);
+        let scale = Matrix4::from_scale(size);
         let rotation: Matrix4<f32> = rotation.into();
         let position = Matrix4::from_translation(location) * rotation * scale;
 

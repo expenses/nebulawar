@@ -1,16 +1,15 @@
 use cgmath::*;
 use std::f32::consts::*;
 use util::*;
-use *;
+use specs::*;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Component)]
 pub struct Camera {
     center: Vector3<f32>,
     longitude: f32,
     latitude: f32,
     distance: f32,
-    target_distance: f32,
-    focus: HashSet<ShipID>
+    target_distance: f32
 }
 
 impl Camera {
@@ -38,13 +37,11 @@ impl Camera {
     pub fn move_sideways(&mut self, amount: f32) {
         self.center.x -= amount * (-self.longitude).cos();
         self.center.z -= amount * (-self.longitude).sin();
-        self.focus.clear();
     }
 
     pub fn move_forwards(&mut self, amount: f32) {
         self.center.x -= amount * self.longitude.sin();
         self.center.z -= amount * self.longitude.cos();
-        self.focus.clear();
     }
 
     fn direction(&self) -> Vector3<f32> {
@@ -59,22 +56,24 @@ impl Camera {
         self.center + self.direction() * self.distance
     }
 
+    pub fn view_matrix_only_direction(&self) -> Matrix4<f32> {
+        Matrix4::look_at_dir(
+            vector_to_point(Vector3::zero()), self.direction(), UP
+        )
+    }
+
     pub fn view_matrix(&self) -> Matrix4<f32> {
         Matrix4::look_at_dir(
             vector_to_point(self.position()), self.direction(), UP
         )
     }
 
-    pub fn step(&mut self, ships: &AutoIDMap<ShipID, Ship>) {
+    pub fn step(&mut self) {
         self.distance = move_towards(self.distance, self.target_distance, Self::MAX_ZOOM_SPEED);
-
-        if let Some(position) = average_position(&self.focus, ships) {
-            self.center = position;
-        }
     }
 
-    pub fn set_focus(&mut self, ships: &HashSet<ShipID>) {
-        self.focus.clone_from(ships)
+    pub fn move_towards(&mut self, target: Vector3<f32>) {
+        self.center = move_towards(self.center, target, 50.0);
     }
 }
 
@@ -85,8 +84,7 @@ impl Default for Camera {
             longitude: 0.0,
             latitude: FRAC_PI_4,
             distance: Self::DEFAULT_ZOOM,
-            target_distance: Self::DEFAULT_ZOOM,
-            focus: HashSet::new()
+            target_distance: Self::DEFAULT_ZOOM
         }
     }
 }
