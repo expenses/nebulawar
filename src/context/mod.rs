@@ -140,7 +140,7 @@ impl Context {
         self.target = self.display.draw();
     }
 
-    fn render_billboard(&mut self, matrix: Matrix4<f32>, image: Image, camera: &Camera, system: &System) {
+    pub fn render_billboard(&mut self, matrix: Matrix4<f32>, image: Image, camera: &Camera, system: &System) {
         let uniforms = self.uniforms(matrix, camera, system, &self.resources.images[image as usize], Mode::Shadeless);
         let params = self.draw_params();
 
@@ -153,19 +153,7 @@ impl Context {
         ).unwrap();
     }
 
-    pub fn render_system(&mut self, system: &System, camera: &Camera) {
-        let uniforms = self.background_uniforms(camera, system, Mode::Background);
-
-        let vertices = VertexBuffer::new(&self.display, &system.background).unwrap();
-        let indices = NoIndices(PrimitiveType::TrianglesList);
-
-        let params = self.draw_params();
-
-        self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
-
-
-
-
+    pub fn render_stars(&mut self, system: &System, camera: &Camera) {
         let uniforms = self.background_uniforms(camera, system, Mode::Stars);
 
         let vertices = VertexBuffer::new(&self.display, &system.stars).unwrap();
@@ -178,16 +166,17 @@ impl Context {
         };
 
         self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
+    }
 
+    pub fn render_skybox(&mut self, system: &System, camera: &Camera) {
+         let uniforms = self.background_uniforms(camera, system, Mode::Background);
 
+        let vertices = VertexBuffer::new(&self.display, &system.background).unwrap();
+        let indices = NoIndices(PrimitiveType::TrianglesList);
 
+        let params = self.draw_params();
 
-        let offset = system.light * BACKGROUND_DISTANCE;
-
-        let rotation: Matrix4<f32> = look_at(offset).into();
-        let matrix = Matrix4::from_translation(camera.position() + offset) * rotation * Matrix4::from_scale(BACKGROUND_DISTANCE / 10.0);
-
-        self.render_billboard(matrix, Image::Star, camera, system);
+        self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
     }
 
     pub fn background_uniforms<'a>(&self, camera: &Camera, system: &System, mode: Mode) -> impl Uniforms + 'a {

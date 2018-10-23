@@ -1,12 +1,12 @@
 use std::fmt;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Storage {
+pub struct StoredResource {
     amount: f32,
     capacity: f32
 }
 
-impl Storage {
+impl StoredResource {
     pub fn empty(capacity: f32) -> Self {
         Self::new(0.0, capacity)
     }
@@ -73,7 +73,7 @@ impl Storage {
     }
 }
 
-impl fmt::Display for Storage {
+impl fmt::Display for StoredResource {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{:.2}/{:.2}", self.amount, self.capacity)
     }

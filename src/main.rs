@@ -25,16 +25,16 @@ extern crate specs;
 extern crate specs_derive;
 extern crate spade;
 extern crate noise;
+#[macro_use]
+extern crate newtype_proxy;
 
 use rand::*;
 use glium::*;
 use glutin::*;
 use glutin::dpi::*;
-use cgmath::{Vector3, Zero, Quaternion};
-use collision::*;
 use std::time::*;
 use specs::{World, RunNow, Entities, ReadStorage, Join};
-use specs::shred::{Fetch, FetchMut};
+use specs::shred::FetchMut;
 
 mod camera;
 mod util;
@@ -93,12 +93,6 @@ impl Game {
             self.camera_mut().rotate_longitude(delta_x / 200.0);
             self.camera_mut().rotate_latitude(delta_y / 200.0);
         }
-    }
-
-    fn point_under_mouse(&mut self) -> Option<Vector3<f32>> {
-        let ray = self.context.ray(&self.camera(), self.controls.mouse());
-
-        Plane::new(UP, 0.0).intersection(&ray).map(point_to_vector)
     }
 
     fn handle_mouse_button(&mut self, button: MouseButton, pressed: bool) {
@@ -166,6 +160,8 @@ impl Game {
             focus_on_selected(&mut self.world);
         }
 
+        // todo: make context a resource
+
         LeftClickSystem {
             context: &self.context
         }.run_now(&self.world.res);
@@ -208,7 +204,10 @@ impl Game {
 
     fn render(&mut self) {
         self.context.clear();
-        self.context.render_system(&self.world.read_resource(), &self.world.read_resource());
+
+        RenderSystem {
+            context: &mut self.context
+        }.run_now(&self.world.res);
 
         RenderCommandPaths {
             context: &mut self.context
@@ -218,9 +217,9 @@ impl Game {
             context: &mut self.context
         }.run_now(&self.world.res);
 
-        if self.context.is_debugging() {
-            self.render_debug();
-        }
+        RenderDebug {
+            context: &mut self.context
+        }.run_now(&self.world.res);
 
         RenderSelected {
             context: &mut self.context
@@ -250,19 +249,8 @@ impl Game {
         }.run_now(&self.world.res);
     }
 
-    fn render_debug(&mut self) {
-        if let Some(point) = self.point_under_mouse() {
-            let camera = self.world.read_resource();
-            self.context.render_model(context::Model::Asteroid, point, Quaternion::zero(), 0.1, &camera, &self.world.read_resource());
-        }
-    }
-
     fn change_distance(&mut self, delta: f32) {
         self.camera_mut().change_distance(delta)
-    }
-
-    fn camera(&self) -> Fetch<camera::Camera> {
-        self.world.read_resource()
     }
 
     fn camera_mut(&mut self) -> FetchMut<camera::Camera> {

@@ -118,13 +118,12 @@ impl ShipType {
 
 #[derive(Component, Debug)]
 pub struct ShipStorage {
-    pub fuel: Storage,
-    pub materials: Storage,
-    pub food: Storage,
-    pub waste: Storage
+    pub materials: StoredResource,
+    pub food: StoredResource,
+    pub waste: StoredResource
 }
 
-#[derive(Component)]
+#[derive(Component, NewtypeProxy)]
 pub struct Commands(pub Vec<Command>);
 
 /*

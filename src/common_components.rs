@@ -3,11 +3,12 @@ use cgmath::*;
 use util::*;
 use rand::*;
 use ships::*;
+use std::ops::*;
 
 #[derive(Component, Default)]
 pub struct Drag(pub Option<(f32, f32, f32, f32)>);
 
-#[derive(Component, Default)]
+#[derive(Component, Default, NewtypeProxy)]
 pub struct Secs(pub f32);
 
 #[derive(Component, Default)]
@@ -15,6 +16,12 @@ pub struct Time(pub f32);
 
 #[derive(Component, Default)]
 pub struct ShiftPressed(pub bool);
+
+impl ShiftPressed {
+    pub fn pressed(&self) -> bool {
+        self.0
+    }
+}
 
 #[derive(Component, Default)]
 pub struct LeftClick(pub Option<(f32, f32)>);
@@ -37,16 +44,16 @@ impl Paused {
 #[derive(Component, Default)]
 pub struct RightClickInteraction(pub Option<(Entity, Interaction)>);
 
-#[derive(Deserialize, Serialize, Component)]
+#[derive(Deserialize, Serialize, Component, NewtypeProxy)]
 pub struct Position(pub Vector3<f32>);
 
 #[derive(Deserialize, Serialize, Component)]
 pub struct MineableMaterials(pub u32);
 
-#[derive(Deserialize, Serialize, Component)]
+#[derive(Deserialize, Serialize, Component, NewtypeProxy)]
 pub struct Size(pub f32);
 
-#[derive(Component)]
+#[derive(Component, NewtypeProxy)]
 pub struct Rotation(pub Quaternion<f32>);
 
 #[derive(Component)]
@@ -75,7 +82,7 @@ impl CreationTime {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, NewtypeProxy)]
 pub struct Parent(pub Entity);
 
 #[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Component)]
@@ -118,3 +125,6 @@ impl ObjectSpin {
         self.initial_rotation * Quaternion::from_axis_angle(self.rotation_axis, Rad(self.rotation))
     }
 }
+
+#[derive(Component, NewtypeProxy)]
+pub struct Fuel(pub StoredResource);

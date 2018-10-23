@@ -5,6 +5,7 @@ use context::*;
 use circle_size;
 use state;
 use super::*;
+use cgmath::Matrix4;
 
 pub struct ObjectRenderer<'a> {
     pub context: &'a mut Context
@@ -72,7 +73,7 @@ impl<'a> System<'a> for RenderCommandPaths<'a> {
     fn run(&mut self, (positions, commands): Self::SystemData) {
         for (pos, commands) in (&positions, &commands).join() {
             let points = iter_owned([pos.0])
-                .chain(commands.0.iter().map(|command| command.point(&positions)));
+                .chain(commands.iter().map(|command| command.point(&positions)));
 
             self.context.render_3d_lines(points);
         }
@@ -100,10 +101,10 @@ impl<'a> System<'a> for RenderUI<'a> {
         ReadStorage<'a, Selectable>,
         ReadStorage<'a, Occupation>,
         ReadStorage<'a, Parent>,
-        ReadStorage<'a, ShipStorage>
+        ReadStorage<'a, Fuel>
     );
 
-    fn run(&mut self, (entities, time, formation, paused, tag, selectable, occupation, parent, storage): Self::SystemData) {
+    fn run(&mut self, (entities, time, formation, paused, tag, selectable, occupation, parent, fuel): Self::SystemData) {
         let y = &mut 10.0;
 
         if paused.0 {
@@ -121,16 +122,16 @@ impl<'a> System<'a> for RenderUI<'a> {
             self.render_text(&format!("{:?}: {}", tag, num), y);
         }
 
-        let selected = (&entities, &storage, &selectable).join()
+        let selected = (&entities, &fuel, &selectable).join()
             .filter(|(_, _, selectable)| selectable.selected)
-            .map(|(entity, storage, _)| (entity, storage))
+            .map(|(entity, fuel, _)| (entity, fuel))
             .next();
 
-        if let Some((entity, storage)) = selected {
+        if let Some((entity, fuel)) = selected {
             self.render_text("---------------------", y);
-            self.render_text(&format!("Fuel: {:.2}%", storage.fuel.percentage() * 100.0), y);
-            self.render_text(&format!("Food: {}", storage.food), y);
-            self.render_text(&format!("Waste: {}", storage.waste), y);
+            self.render_text(&format!("Fuel: {:.2}%", fuel.percentage() * 100.0), y);
+            //self.render_text(&format!("Food: {}", storage.food), y);
+            //self.render_text(&format!("Waste: {}", storage.waste), y);
 
             let people = (&occupation, &parent).join()
                 .filter(|(_, parent)| parent.0 == entity)
@@ -165,5 +166,51 @@ impl<'a> System<'a> for RenderMouse<'a> {
         if let Some((_, interaction)) = interaction.0 {
             self.context.render_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4]);
         }
+    }
+}
+
+pub struct RenderDebug<'a> {
+    pub context: &'a mut Context
+}
+
+impl<'a> System<'a> for RenderDebug<'a> {
+    type SystemData = (
+        Read<'a, Mouse>,
+        Read<'a, Camera>,
+        Read<'a, state::System>
+    );
+
+    fn run(&mut self, (mouse, camera, system): Self::SystemData) {
+        if !self.context.is_debugging() {
+            return;
+        }
+
+        let ray = self.context.ray(&camera, mouse.0);
+        if let Some(point) = Plane::new(UP, 0.0).intersection(&ray).map(point_to_vector) {
+            self.context.render_model(Model::Asteroid, point, Quaternion::zero(), 1.0, &camera, &system);
+        }
+    }
+}
+
+pub struct RenderSystem<'a> {
+    pub context: &'a mut Context
+}
+
+impl<'a> System<'a> for RenderSystem<'a> {
+    type SystemData = (
+        Read<'a, Camera>,
+        Read<'a, state::System>
+    );
+
+    fn run(&mut self, (camera, system): Self::SystemData) {
+        self.context.render_skybox(&system, &camera);
+        self.context.render_stars(&system, &camera);
+
+        let offset = system.light * BACKGROUND_DISTANCE;
+
+        let rotation: Matrix4<f32> = look_at(offset).into();
+        let matrix = Matrix4::from_translation(camera.position() + offset) * rotation * Matrix4::from_scale(BACKGROUND_DISTANCE / 10.0);
+
+        self.context.render_billboard(matrix, Image::Star, &camera, &system);
     }
 }

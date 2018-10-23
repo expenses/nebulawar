@@ -45,6 +45,8 @@ specs-derive = {git = "https://github.com/slide-rs/specs"}
 spade = "*"
 # Noise (waiting on: image being optional)
 noise = {git = "https://github.com/Razaekel/noise-rs", branch = "develop", default-features = false}
+# easier newtype structs
+newtype-proxy = {git = "https://github.com/expenses/newtype-proxy", branch = "deref_mut"}
 
 [features]
 embed_resources = []

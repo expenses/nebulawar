@@ -73,24 +73,24 @@ impl<'a> System<'a> for ShipMovementSystem {
         WriteStorage<'a, Position>,
         WriteStorage<'a, common_components::Rotation>,
         WriteStorage<'a, Commands>,
-        WriteStorage<'a, ShipStorage>,
+        WriteStorage<'a, Fuel>,
         ReadStorage<'a, ShipType>,
         ReadStorage<'a, Components>,
         ReadStorage<'a, Size>
     );
 
-    fn run(&mut self, (entities, paused, mut pos, mut rot, mut commands, mut storages, tag, components, size): Self::SystemData) {
+    fn run(&mut self, (entities, paused, mut pos, mut rot, mut commands, mut fuel, tag, components, size): Self::SystemData) {
         if paused.0 {
             return;
         }
 
         for (entity, rot, commands, tag, components) in (&entities, &mut rot, &mut commands, &tag, &components).join() {
-            let finished = commands.0.first()
-                .map(|command| handle_command(command, entity, &mut rot.0, &mut pos, components, tag, &mut storages, &size).unwrap_or(true))
+            let finished = commands.first()
+                .map(|command| handle_command(command, entity, rot, &mut pos, components, tag, &mut fuel, &size).unwrap_or(true))
                 .unwrap_or(false);
             
             if finished {
-                commands.0.remove(0);
+                commands.remove(0);
             }
         }
     }
@@ -103,49 +103,55 @@ enum MovementStatus {
     OutOfFuel
 }
 
-fn move_ship(position: &mut Vector3<f32>, rotation: &mut Quaternion<f32>, storage: &mut ShipStorage, tag: &ShipType, components: &Components, point: Vector3<f32>) -> MovementStatus {
-    if storage.fuel.is_empty() {
-        return MovementStatus::OutOfFuel;
+fn move_ship(entity: Entity, pos: &mut WriteStorage<Position>, fuel: &mut WriteStorage<Fuel>, rotation: &mut Quaternion<f32>, tag: &ShipType, components: &Components, point: Vector3<f32>) -> Option<MovementStatus> {
+    let pos = &mut pos.get_mut(entity)?.0;
+    let fuel = fuel.get_mut(entity)?;
+
+    if fuel.is_empty() {
+        return Some(MovementStatus::OutOfFuel);
     }
     
-    storage.fuel.reduce(0.01);
+    fuel.reduce(0.01);
 
     let speed = components.thrust() / tag.mass();
-    *position = move_towards(*position, point, speed);
+    *pos = move_towards(*pos, point, speed);
 
-    if *position == point {
-        MovementStatus::Reached
+    if *pos == point {
+        Some(MovementStatus::Reached)
     } else {
-        *rotation = look_at(point - *position);
-        MovementStatus::Moving
+        *rotation = look_at(point - *pos);
+        Some(MovementStatus::Moving)
     }
 }
 
-fn transfer_fuel(storage: &mut WriteStorage<ShipStorage>, ship_a: Entity, ship_b: Entity, amount: f32) -> Option<bool> {
+fn transfer_fuel(fuel: &mut WriteStorage<Fuel>, ship_a: Entity, ship_b: Entity, amount: f32) -> Option<bool> {
     let can_transfer = {
-        let storage_a = storage.get(ship_a)?;
-        let storage_b = storage.get(ship_b)?;
+        let fuel_a = fuel.get(ship_a)?;
+        let fuel_b = fuel.get(ship_b)?;
 
-        storage_a.fuel.transfer_amount(&storage_b.fuel, amount)
+        fuel_a.transfer_amount(&fuel_b, amount)
     };
 
     if can_transfer == 0.0 {
         Some(true)
     } else {
-        storage.get_mut(ship_a)?.fuel.reduce(can_transfer);
-        storage.get_mut(ship_b)?.fuel.increase(can_transfer);
+        fuel.get_mut(ship_a)?.reduce(can_transfer);
+        fuel.get_mut(ship_b)?.increase(can_transfer);
 
         Some(false)
     }
 } 
 
-fn handle_command(command: &Command, entity: Entity, rot: &mut Quaternion<f32>, pos: &mut WriteStorage<Position>, components: &Components, tag: &ShipType, storages: &mut WriteStorage<ShipStorage>, size: &ReadStorage<Size>) -> Option<bool> {
+fn handle_command(
+    command: &Command,
+    entity: Entity, rot: &mut Quaternion<f32>, pos: &mut WriteStorage<Position>,
+    components: &Components, tag: &ShipType,
+    fuel: &mut WriteStorage<Fuel>, size: &ReadStorage<Size>
+) -> Option<bool> {
+    
     match command {
         Command::MoveTo(position) => {
-            let pos = pos.get_mut(entity)?;
-            let storage = storages.get_mut(entity)?;
-
-            Some(move_ship(&mut pos.0, rot, storage, tag, components, *position) == MovementStatus::Reached)
+            Some(move_ship(entity, pos, fuel, rot, tag, components, *position)? == MovementStatus::Reached)
         },
         Command::GoToAnd(target, interaction) => {
             let position = pos.get(entity)?.0;
@@ -156,15 +162,12 @@ fn handle_command(command: &Command, entity: Entity, rot: &mut Quaternion<f32>, 
             if position.distance(&target_position) < distance {
                 match interaction {
                     Interaction::Follow => Some(false),
-                    Interaction::Refuel => transfer_fuel(storages, entity, *target, 0.1),
-                    Interaction::RefuelFrom => transfer_fuel(storages, *target, entity, 0.1),
+                    Interaction::Refuel => transfer_fuel(fuel, entity, *target, 0.1),
+                    Interaction::RefuelFrom => transfer_fuel(fuel, *target, entity, 0.1),
                     Interaction::Mine => Some(false)
                 }
             } else {
-                let pos = pos.get_mut(entity)?;
-                let storage = storages.get_mut(entity)?;
-
-                Some(move_ship(&mut pos.0, rot, storage, tag, components, target_position) == MovementStatus::OutOfFuel)
+                Some(move_ship(entity, pos, fuel, rot, tag, components, target_position)? == MovementStatus::OutOfFuel)
             }
         }
     }
@@ -191,11 +194,11 @@ impl<'a> System<'a> for RightClickSystem<'a> {
             if let Some((entity, interaction)) = interaction.0 {
                 for (selectable, commands) in (&selectable, &mut commands).join() {
                     if selectable.selected {
-                        if !shift.0 {
-                            commands.0.clear();
+                        if !shift.pressed() {
+                            commands.clear();
                         }
 
-                        commands.0.push(Command::GoToAnd(entity, interaction));
+                        commands.push(Command::GoToAnd(entity, interaction));
                     }
                 }
             } else {
@@ -211,11 +214,11 @@ impl<'a> System<'a> for RightClickSystem<'a> {
                             .map(|(_, commands)| commands)
                             .zip(positions)
                             .for_each(|(commands, position)| {
-                                if !shift.0 {
-                                    commands.0.clear();
+                                if !shift.pressed() {
+                                    commands.clear();
                                 }
 
-                                commands.0.push(Command::MoveTo(position));
+                                commands.push(Command::MoveTo(position));
                             });
                     }
                 }
@@ -343,16 +346,16 @@ impl<'a> System<'a> for RightClickInteractionSystem<'a> {
         Read<'a, Camera>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Size>,
-        ReadStorage<'a, ShipStorage>,
+        ReadStorage<'a, Fuel>,
         ReadStorage<'a, MineableMaterials>
     );
 
-    fn run(&mut self, (entities, mut interaction, mouse, camera, pos, size, storage, mineable): Self::SystemData) {
+    fn run(&mut self, (entities, mut interaction, mouse, camera, pos, size, fuel, mineable): Self::SystemData) {
         let (x, y) = mouse.0;
         if let Some(entity) = entity_at(x, y, &entities, &pos, &size, &self.context, &camera) {
 
-            let possible_interaction = match (storage.get(entity), mineable.get(entity)) {
-                (Some(storage), _) if storage.fuel.is_empty() => Some(Interaction::Refuel),
+            let possible_interaction = match (fuel.get(entity), mineable.get(entity)) {
+                (Some(fuel), _) if fuel.is_empty() => Some(Interaction::Refuel),
                 (Some(_), _) => Some(Interaction::Follow),
                 (_, Some(mineable)) if mineable.0 > 0 => Some(Interaction::Mine),
                 _ => None
