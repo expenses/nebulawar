@@ -28,11 +28,11 @@ pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>) -> 
 }
 
 
-pub fn create_person(ship: Entity, world: &mut World, occupation: Occupation) {
+pub fn create_person(parent: Entity, world: &mut World, occupation: Occupation) {
     world.create_entity()
         .with(CreationTime::from_age(30))
         .with(occupation)
-        .with(Location(ship))
+        .with(Parent(parent))
         .build();
 }
 

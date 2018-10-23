@@ -35,7 +35,7 @@ impl Paused {
 }
 
 #[derive(Component, Default)]
-pub struct RightClickInteraction(pub Option<Interaction>);
+pub struct RightClickInteraction(pub Option<(Entity, Interaction)>);
 
 #[derive(Deserialize, Serialize, Component)]
 pub struct Position(pub Vector3<f32>);
@@ -76,8 +76,7 @@ impl CreationTime {
 }
 
 #[derive(Component)]
-pub struct Location(pub Entity);
-
+pub struct Parent(pub Entity);
 
 #[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Component)]
 pub enum Occupation {

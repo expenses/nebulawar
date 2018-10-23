@@ -99,11 +99,11 @@ impl<'a> System<'a> for RenderUI<'a> {
         ReadStorage<'a, ShipType>,
         ReadStorage<'a, Selectable>,
         ReadStorage<'a, Occupation>,
-        ReadStorage<'a, Location>,
+        ReadStorage<'a, Parent>,
         ReadStorage<'a, ShipStorage>
     );
 
-    fn run(&mut self, (entities, time, formation, paused, tag, selectable, occupation, location, storage): Self::SystemData) {
+    fn run(&mut self, (entities, time, formation, paused, tag, selectable, occupation, parent, storage): Self::SystemData) {
         let y = &mut 10.0;
 
         if paused.0 {
@@ -132,8 +132,8 @@ impl<'a> System<'a> for RenderUI<'a> {
             self.render_text(&format!("Food: {}", storage.food), y);
             self.render_text(&format!("Waste: {}", storage.waste), y);
 
-            let people = (&occupation, &location).join()
-                .filter(|(_, location)| location.0 == entity)
+            let people = (&occupation, &parent).join()
+                .filter(|(_, parent)| parent.0 == entity)
                 .map(|(occupation, _)| occupation);
 
             let (people, total) = summarize(people);
@@ -155,22 +155,15 @@ pub struct RenderMouse<'a> {
 
 impl<'a> System<'a> for RenderMouse<'a> {
     type SystemData = (
-        Entities<'a>,
-        Read<'a, Mouse>,
-        Read<'a, Camera>,
-        ReadStorage<'a, Position>,
-        ReadStorage<'a, Size>,
-        ReadStorage<'a, ShipStorage>,
-        ReadStorage<'a, MineableMaterials>
+        Read<'a, RightClickInteraction>,
+        Read<'a, Mouse>
     );
 
-    fn run(&mut self, (entities, mouse, camera, pos, sizes, storage, mineable): Self::SystemData) {
+    fn run(&mut self, (interaction, mouse): Self::SystemData) {
         let (x, y) = mouse.0;
 
-        if let Some(entity) = entity_at(x, y, &entities, &pos, &sizes, &self.context, &camera) {
-            if let Some(interaction) = right_click_interaction(entity, &storage, &mineable) {
-                self.context.render_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4]);
-            }
+        if let Some((_, interaction)) = interaction.0 {
+            self.context.render_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4]);
         }
     }
 }

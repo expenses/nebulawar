@@ -176,31 +176,26 @@ pub struct RightClickSystem<'a> {
 
 impl<'a> System<'a> for RightClickSystem<'a> {
     type SystemData = (
-        Entities<'a>,
+        Read<'a, RightClickInteraction>,
         Read<'a, RightClick>,
         Read<'a, ShiftPressed>,
         Read<'a, Formation>,
         Read<'a, Camera>,
         WriteStorage<'a, Commands>,
         ReadStorage<'a, Selectable>,
-        ReadStorage<'a, Position>,
-        ReadStorage<'a, ShipStorage>,
-        ReadStorage<'a, MineableMaterials>,
-        ReadStorage<'a, Size>
+        ReadStorage<'a, Position>
     );
 
-    fn run(&mut self, (entities, click, shift, formation, camera, mut commands, selectable, pos, storage, mineable, sizes): Self::SystemData) {
+    fn run(&mut self, (interaction, click, shift, formation, camera, mut commands, selectable, pos): Self::SystemData) {
         if let Some((x, y)) = click.0 {
-            if let Some(entity) = entity_at(x, y, &entities, &pos, &sizes, &self.context, &camera) {
-                if let Some(interaction) = right_click_interaction(entity, &storage, &mineable) {
-                    for (selectable, commands) in (&selectable, &mut commands).join() {
-                        if selectable.selected {
-                            if !shift.0 {
-                                commands.0.clear();
-                            }
-
-                            commands.0.push(Command::GoToAnd(entity, interaction));
+            if let Some((entity, interaction)) = interaction.0 {
+                for (selectable, commands) in (&selectable, &mut commands).join() {
+                    if selectable.selected {
+                        if !shift.0 {
+                            commands.0.clear();
                         }
+
+                        commands.0.push(Command::GoToAnd(entity, interaction));
                     }
                 }
             } else {
@@ -241,15 +236,6 @@ fn entity_at(mouse_x: f32, mouse_y: f32, entities: &Entities, positions: &ReadSt
         })
         .min_by(|(_, z_a), (_, z_b)| z_a.partial_cmp(z_b).unwrap_or(::std::cmp::Ordering::Less))
         .map(|(entity, _)| entity)
-}
-
-fn right_click_interaction(entity: Entity, storage: &ReadStorage<ShipStorage>, mineable: &ReadStorage<MineableMaterials>) -> Option<Interaction> {
-    match (storage.get(entity), mineable.get(entity)) {
-        (Some(storage), _) if storage.fuel.is_empty() => Some(Interaction::Refuel),
-        (Some(_), _) => Some(Interaction::Follow),
-        (_, Some(mineable)) if mineable.0 > 0 => Some(Interaction::Mine),
-        _ => None
-    }
 }
 
 pub fn clear_focus(world: &mut World) {
@@ -345,6 +331,36 @@ impl<'a> System<'a> for LeftClickSystem<'a> {
     }
 }
 
-// todo: write a system that stores whats under the cursor
+pub struct RightClickInteractionSystem<'a> {
+    pub context: &'a Context
+}
 
-pub struct RightClickInteractionSystem;
+impl<'a> System<'a> for RightClickInteractionSystem<'a> {
+    type SystemData = (
+        Entities<'a>,
+        Write<'a, RightClickInteraction>,
+        Read<'a, Mouse>,
+        Read<'a, Camera>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, Size>,
+        ReadStorage<'a, ShipStorage>,
+        ReadStorage<'a, MineableMaterials>
+    );
+
+    fn run(&mut self, (entities, mut interaction, mouse, camera, pos, size, storage, mineable): Self::SystemData) {
+        let (x, y) = mouse.0;
+        if let Some(entity) = entity_at(x, y, &entities, &pos, &size, &self.context, &camera) {
+
+            let possible_interaction = match (storage.get(entity), mineable.get(entity)) {
+                (Some(storage), _) if storage.fuel.is_empty() => Some(Interaction::Refuel),
+                (Some(_), _) => Some(Interaction::Follow),
+                (_, Some(mineable)) if mineable.0 > 0 => Some(Interaction::Mine),
+                _ => None
+            };
+
+            interaction.0 = possible_interaction.map(|interaction| (entity, interaction));
+        } else {
+            interaction.0 = None;
+        }
+    }
+}

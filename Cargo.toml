@@ -9,7 +9,7 @@ glium = "*"
 # model/uv loading
 obj = {version = "*", features = ["genmesh"]}
 genmesh = "*"
-# image loading
+# image loading (we only need pngs)
 image = {version = "*", default-features = false, features = ["png_codec"]}
 # Useful wrapper around arrays
 arrayvec = "*"
@@ -19,7 +19,7 @@ cgmath = "*"
 collision = "*"
 # 2d ui rendering (circles etc)
 lyon = "*"
-# text rendering
+# text rendering (waiting on: me being lazy)
 runic = {git = "https://github.com/expenses/runic"}
 # lazy derive
 derive_is_enum_variant = "*"
@@ -29,18 +29,22 @@ rand = "0.5"
 serde = "*"
 serde_derive = "*"
 bincode = "*"
-# UI
+# UI (waiting on: me adding features)
 pedot = {git = "https://github.com/expenses/pedot"}
 # error handling
 failure = "*"
-# logging
+# logging (dont need extra stuff)
 env_logger = {version = "*", default-features = false}
 log = "*"
 # 'retain_mut'
 odds = {version = "*", features = ["std-vec"]}
-# ECS
+# ECS (waiting on: saveload stuff)
 specs = {git = "https://github.com/slide-rs/specs", default-features = false, features = ["serde"]}
 specs-derive = {git = "https://github.com/slide-rs/specs"}
+# Triangulation
+spade = "*"
+# Noise (waiting on: image being optional)
+noise = {git = "https://github.com/Razaekel/noise-rs", branch = "develop", default-features = false}
 
 [features]
 embed_resources = []

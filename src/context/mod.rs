@@ -39,7 +39,8 @@ const DEFAULT_HEIGHT: f32 = 800.0;
 pub enum Mode {
     Normal = 1,
     Shadeless = 2,
-    Stars = 3
+    Stars = 3,
+    Background = 4
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize)]
@@ -107,9 +108,8 @@ impl Context {
         self.gui.update(event);
     }
 
-    pub fn clear(&mut self, system: &System) {
-        let (r, g, b) = system.background_color;
-        self.target.clear_color_srgb_and_depth((r, g, b, 1.0), 1.0);
+    pub fn clear(&mut self) {
+        self.target.clear_color_srgb_and_depth((0.0, 0.0, 0.0, 1.0), 1.0);
     }
 
     pub fn flush_ui(&mut self, camera: &Camera, system: &System) {
@@ -154,13 +154,19 @@ impl Context {
     }
 
     pub fn render_system(&mut self, system: &System, camera: &Camera) {
-        let uniforms = uniform!{
-            model: matrix_to_array(Matrix4::identity()),
-            view: matrix_to_array(camera.view_matrix_only_direction()),
-            perspective: matrix_to_array(self.perspective_matrix()),
-            light_direction: vector_to_array(system.light),
-            mode: Mode::Stars as i32
-        };
+        let uniforms = self.background_uniforms(camera, system, Mode::Background);
+
+        let vertices = VertexBuffer::new(&self.display, &system.background).unwrap();
+        let indices = NoIndices(PrimitiveType::TrianglesList);
+
+        let params = self.draw_params();
+
+        self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
+
+
+
+
+        let uniforms = self.background_uniforms(camera, system, Mode::Stars);
 
         let vertices = VertexBuffer::new(&self.display, &system.stars).unwrap();
         let indices = NoIndices(PrimitiveType::Points);
@@ -173,12 +179,25 @@ impl Context {
 
         self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
 
+
+
+
         let offset = system.light * BACKGROUND_DISTANCE;
 
         let rotation: Matrix4<f32> = look_at(offset).into();
         let matrix = Matrix4::from_translation(camera.position() + offset) * rotation * Matrix4::from_scale(BACKGROUND_DISTANCE / 10.0);
 
         self.render_billboard(matrix, Image::Star, camera, system);
+    }
+
+    pub fn background_uniforms<'a>(&self, camera: &Camera, system: &System, mode: Mode) -> impl Uniforms + 'a {
+        uniform! {
+            model: matrix_to_array(Matrix4::identity()),
+            view: matrix_to_array(camera.view_matrix_only_direction()),
+            perspective: matrix_to_array(self.perspective_matrix()),
+            light_direction: vector_to_array(system.light),
+            mode: mode as i32
+        }
     }
 
     pub fn uniforms<'a>(&self, position: Matrix4<f32>, camera: &Camera, system: &System, texture: &'a SrgbTexture2d, mode: Mode) -> impl Uniforms + 'a {

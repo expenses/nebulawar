@@ -20,10 +20,11 @@ extern crate failure;
 extern crate log;
 extern crate env_logger;
 extern crate odds;
-
 extern crate specs;
 #[macro_use]
 extern crate specs_derive;
+extern crate spade;
+extern crate noise;
 
 use rand::*;
 use glium::*;
@@ -155,6 +156,10 @@ impl Game {
         *self.world.write_resource() = RightClick(Some(self.controls.mouse()).filter(|_| self.controls.right_clicked()));
         *self.world.write_resource() = Mouse(self.controls.mouse());
 
+        RightClickInteractionSystem {
+            context: &self.context
+        }.run_now(&self.world.res);
+
         SpinSystem.run_now(&self.world.res);
 
         if self.controls.middle_clicked() {
@@ -202,7 +207,7 @@ impl Game {
     }
 
     fn render(&mut self) {
-        self.context.clear(&self.world.read_resource());
+        self.context.clear();
         self.context.render_system(&self.world.read_resource(), &self.world.read_resource());
 
         RenderCommandPaths {
@@ -309,7 +314,7 @@ fn main() {
     world.register::<ships::ShipType>();
     world.register::<Selectable>();
     world.register::<CreationTime>();
-    world.register::<Location>();
+    world.register::<Parent>();
     world.register::<Occupation>();
 
     let mut events_loop = EventsLoop::new();

@@ -8,7 +8,7 @@ use rand::distributions::*;
 
 pub const BACKGROUND_DISTANCE: f32 = 10000.0;
 pub const FOV: f32 = FRAC_PI_3;
-pub const FAR: f32 = BACKGROUND_DISTANCE + 1000.0;
+pub const FAR: f32 = BACKGROUND_DISTANCE + 5000.0;
 pub const NEAR: f32 = 0.1;
 pub const UP: Vector3<f32> = Vector3 {
     x: 0.0,
@@ -132,3 +132,4 @@ pub fn uniform_sphere_distribution(rng: &mut ThreadRng) -> Vector3<f32> {
         phi.cos() as f32
     )
 }
+
