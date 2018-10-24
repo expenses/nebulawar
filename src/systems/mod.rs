@@ -541,3 +541,16 @@ impl<'a> System<'a> for EventHandlerSystem {
         })
     }
 }
+
+pub struct StepLogSystem;
+
+impl<'a> System<'a> for StepLogSystem {
+    type SystemData = (
+        Read<'a, Secs>,
+        Write<'a, Log>
+    );
+
+    fn run(&mut self, (secs, mut log): Self::SystemData) {
+        log.step(secs.0);
+    }
+}

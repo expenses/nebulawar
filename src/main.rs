@@ -42,14 +42,12 @@ mod util;
 mod context;
 mod ships;
 mod controls;
-mod ui;
 mod state;
 mod common_components;
 mod systems;
 mod entities;
 
 use state::*;
-use ui::*;
 use controls::*;
 use common_components::*;
 use systems::*;
@@ -61,7 +59,6 @@ use entities::*;
 struct Game {
     context: context::Context,
     rng: ThreadRng,
-    ui: UI,
     world: specs::World
 }
 
@@ -78,7 +75,6 @@ impl Game {
         Self {
             context: context::Context::new(events_loop),
             rng,
-            ui: UI::new(),
             world
         }
     }
@@ -108,6 +104,8 @@ impl Game {
     }
 
     fn handle_keypress(&mut self, key: VirtualKeyCode, pressed: bool) {
+        // todo: move this stuff into ecs
+
 
         match key {
             VirtualKeyCode::C => focus_on_selected(&mut self.world),
@@ -177,10 +175,9 @@ impl Game {
         }.run_now(&self.world.res);
 
         UpdateControlsSystem.run_now(&self.world.res);
-        
         TimeStepSystem.run_now(&self.world.res);
         StepCameraSystem.run_now(&self.world.res);
-        self.ui.step(secs);
+        StepLogSystem.run_now(&self.world.res);
     }
 
     fn render(&mut self) {
@@ -210,28 +207,26 @@ impl Game {
             context: &mut self.context
         }.run_now(&self.world.res);
 
-        self.render_2d_components();
-
-        self.context.finish();
-    }
-
-    fn render_2d_components(&mut self) {
         RenderUI {
             context: &mut self.context
         }.run_now(&self.world.res);
-        self.ui.render(&mut self.context);
+
+        RenderLogSystem {
+            context: &mut self.context
+        }.run_now(&self.world.res);
         
         RenderDragSelection {
             context: &mut self.context
         }.run_now(&self.world.res);
 
         // actually draw ui components onto the screen
-        let camera = self.world.read_resource();
-        self.context.flush_ui(&camera, &self.world.read_resource());
+        self.context.flush_ui(&self.world.read_resource(), &self.world.read_resource());
 
         RenderMouse {
             context: &mut self.context
         }.run_now(&self.world.res);
+
+        self.context.finish();
     }
 
     fn print_error<E: failure::Fail>(&mut self, error: &E) {
@@ -240,7 +235,7 @@ impl Game {
             error!("Cause: {}", cause);
         }
 
-        self.ui.append_to_log(error.to_string());
+        self.world.write_resource::<Log>().append(error.to_string());
     }
 
     fn print_potential_error<E: failure::Fail>(&mut self, result: Result<(), E>) {
@@ -266,6 +261,7 @@ fn main() {
     world.add_resource(MoveOrder(None));
     world.add_resource(AveragePosition(None));
     world.add_resource(Events(Vec::new()));
+    world.add_resource(Log(Vec::new()));
 
     world.register::<context::Model>();
     world.register::<Position>();

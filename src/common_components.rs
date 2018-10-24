@@ -3,7 +3,9 @@ use cgmath::*;
 use util::*;
 use rand::*;
 use ships::*;
-use glium::glutin::WindowEvent;
+use glium::glutin::*;
+use odds::vec::*;
+use context;
 
 #[derive(Component, Default, NewtypeProxy)]
 pub struct Secs(pub f32);
@@ -135,4 +137,36 @@ impl Side {
             Side::Enemy => [0.9, 0.0, 0.0, 1.0]
         }
     }
+}
+
+#[derive(Component, NewtypeProxy, Default)]
+pub struct Log(pub Vec<LogItem>);
+
+impl Log {
+    pub fn append(&mut self, text: String) {
+        self.push(LogItem {
+            age: 0.0,
+            content: text
+        })
+    }
+
+    pub fn step(&mut self, secs: f32) {
+        self.retain_mut(|item| {
+            item.age += secs;
+            item.age < 5.0
+        });
+    }
+
+    pub fn render(&self, context: &mut context::Context) {
+        let (_, height) = context.screen_dimensions();
+
+        for (i, item) in self.iter().enumerate() {
+            context.render_text(&item.content, 10.0, height - 30.0 - i as f32 * 20.0);
+        }
+    }
+}
+
+pub struct LogItem {
+    age: f32,
+    content: String
 }

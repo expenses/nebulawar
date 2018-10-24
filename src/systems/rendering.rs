@@ -266,3 +266,15 @@ impl<'a> System<'a> for RenderMovementOrder<'a> {
         }
     }
 }
+
+pub struct RenderLogSystem<'a> {
+    pub context: &'a mut Context
+}
+
+impl<'a> System<'a> for RenderLogSystem<'a>  {
+    type SystemData = Read<'a, Log>;
+
+    fn run(&mut self, log: Self::SystemData) {
+        log.render(&mut self.context);
+    }
+}
