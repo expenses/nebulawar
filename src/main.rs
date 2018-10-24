@@ -177,8 +177,6 @@ impl Game {
 
         MiddleClickSystem.run_now(&self.world.res);
 
-        // todo: make context a resource
-
         LeftClickSystem {
             context: &self.context
         }.run_now(&self.world.res);
@@ -298,6 +296,7 @@ fn main() {
     world.register::<CreationTime>();
     world.register::<Parent>();
     world.register::<Occupation>();
+    world.register::<Side>();
 
     let mut events_loop = EventsLoop::new();
     

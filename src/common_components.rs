@@ -109,3 +109,20 @@ impl ObjectSpin {
 
 #[derive(Component, NewtypeProxy)]
 pub struct Fuel(pub StoredResource);
+
+#[derive(Component, PartialEq)]
+pub enum Side {
+    Friendly,
+    Neutral,
+    Enemy
+}
+
+impl Side {
+    pub fn color(&self) -> [f32; 4] {
+        match *self {
+            Side::Friendly => [0.0, 0.8, 0.0, 1.0],
+            Side::Neutral => [1.0, 0.8, 0.2, 1.0],
+            Side::Enemy => [0.9, 0.0, 0.0, 1.0]
+        }
+    }
+}

@@ -5,7 +5,7 @@ use cgmath::{Vector3, Quaternion, Zero};
 use rand::*;
 use context::*;
 
-pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>) -> Entity {
+pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, side: Side) -> Entity {
     let components = tag.default_components(0);
 
     world.create_entity()
@@ -23,6 +23,7 @@ pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>) -> 
         .with(Fuel(StoredResource::full(components.fuel_capacity())))
         .with(components)
         .with(Selectable::new(false))
+        .with(side)
         .build()
 
 }
@@ -56,11 +57,12 @@ pub fn add_asteroid(rng: &mut ThreadRng, world: &mut World) {
         .with(MineableMaterials(resources))
         .with(Size(size))
         .with(Selectable::new(false))
+        .with(Side::Neutral)
         .build();
 }
 
 pub fn add_starting_entities(world: &mut World) {
-    let carrier = create_ship(world, ShipType::Carrier, Vector3::new(0.0, 0.0, 1.0));
+    let carrier = create_ship(world, ShipType::Carrier, Vector3::new(0.0, 0.0, 1.0), Side::Friendly);
 
     for _ in 0 .. 45 {
         create_person(carrier, world, Occupation::Worker);
@@ -78,7 +80,7 @@ pub fn add_starting_entities(world: &mut World) {
         create_person(carrier, world, Occupation::Government);
     }
 
-    let tanker = create_ship(world, ShipType::Tanker, Vector3::new(0.0, 0.0, -20.0));
+    let tanker = create_ship(world, ShipType::Tanker, Vector3::new(0.0, 0.0, -20.0), Side::Friendly);
 
     for _ in 0 .. 10 {
         create_person(tanker, world, Occupation::Worker);
@@ -86,11 +88,13 @@ pub fn add_starting_entities(world: &mut World) {
     
     for i in 0 .. 20 {
         let x = (50.0 - i as f32) * 3.0;
-        let fighter = create_ship(world, ShipType::Fighter, Vector3::new(x, 5.0, 0.0));
+        let fighter = create_ship(world, ShipType::Fighter, Vector3::new(x, 5.0, 0.0), Side::Friendly);
         create_person(fighter, world, Occupation::Pilot);
     }
 
     for i in 0 .. 2 {
-        create_ship(world, ShipType::Miner, Vector3::new(0.0, 2.5 - i as f32 * 5.0, 30.0));
+        create_ship(world, ShipType::Miner, Vector3::new(0.0, 2.5 - i as f32 * 5.0, 30.0), Side::Friendly);
     }
+
+    create_ship(world, ShipType::Fighter, Vector3::new(100.0, 0.0, 100.0), Side::Enemy);
 }

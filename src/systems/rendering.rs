@@ -38,15 +38,16 @@ impl<'a> System<'a> for RenderSelected<'a> {
         Read<'a, Camera>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Selectable>,
-        ReadStorage<'a, Size>
+        ReadStorage<'a, Size>,
+        ReadStorage<'a, Side>
     );
 
-    fn run(&mut self, (entities, camera, pos, selectable, size): Self::SystemData) {
-        for (entity, pos, selectable) in (&entities, &pos, &selectable).join() {
+    fn run(&mut self, (entities, camera, pos, selectable, size, side): Self::SystemData) {
+        for (entity, pos, selectable, side) in (&entities, &pos, &selectable, &side).join() {
             if selectable.selected {
                 if let Some((x, y, z)) = self.context.screen_position(pos.0, &camera) {
                     let size = size.get(entity).map(|size| size.0).unwrap_or(1.0);
-                    self.context.render_circle(x, y, circle_size(z) * size, [1.0; 4]);
+                    self.context.render_circle(x, y, circle_size(z) * size, side.color());
                 }
             }
         }

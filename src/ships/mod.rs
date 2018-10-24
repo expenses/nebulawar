@@ -16,7 +16,8 @@ pub enum Interaction {
     Follow,
     Refuel,
     RefuelFrom,
-    Mine
+    Mine,
+    Attack
 }
 
 impl Interaction {
@@ -25,7 +26,8 @@ impl Interaction {
             Interaction::Follow => Image::Move,
             Interaction::RefuelFrom => Image::RefuelFrom,
             Interaction::Refuel => Image::Refuel,
-            Interaction::Mine => Image::Mine
+            Interaction::Mine => Image::Mine,
+            Interaction::Attack => Image::Mine
         }
     }
 }

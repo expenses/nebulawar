@@ -87,7 +87,7 @@ impl Default for System {
 // https://www.redblobgames.com/x/1842-delaunay-voronoi-sphere/#delaunay
 fn make_background(rng: &mut ThreadRng) -> Vec<context::Vertex> {
     let nebula_color = Color::new(rng.gen_range(0.0, 360.0), 1.0, 1.0, 1.0).from_hsv();
-    let nebula_color = [nebula_color.red as f32, nebula_color.green as f32, nebula_color.blue as f32];
+    let nebula_color = Vector3::new(nebula_color.red as f32, nebula_color.green as f32, nebula_color.blue as f32);
 
     let mut dlt = FloatDelaunayTriangulation::with_walk_locate();
 
@@ -136,22 +136,19 @@ struct ColouredVertex {
 }
 
 impl ColouredVertex {
-    fn rand(rng: &mut ThreadRng, rotation_quat: Quaternion<f32>, color: [f32; 3]) -> Self {
+    fn rand(rng: &mut ThreadRng, rotation_quat: Quaternion<f32>, color: Vector3<f32>) -> Self {
         use noise::{self, NoiseFn, Seedable};
 
         let vector = uniform_sphere_distribution(rng);
-        
-        let value = noise::Perlin::new().set_seed(rng.gen()).get([vector.x as f64, vector.y as f64, vector.z as f64]) as f32;
-
-
-        //let brightness = 1.0 - (vector.y).abs() * 2.0;
-
-        let color = [color[0] * value, color[1] * value, color[2] * value];
-
         let rotated_vector = rotation_quat * vector;
 
+        let value = noise::Perlin::new()
+            .set_seed(rng.gen())
+            .get([vector.x as f64, vector.y as f64, vector.z as f64]);
+
         Self {
-            vector, color,
+            vector,
+            color: (color * value as f32).into(),
             // calculate points stereographically projected
             projected_x: rotated_vector.x / (1.0 - rotated_vector.z),
             projected_y: rotated_vector.y / (1.0 - rotated_vector.z)

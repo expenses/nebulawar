@@ -163,14 +163,15 @@ fn handle_command(
             let position = pos.get(entity)?.0;
             let target_position = pos.get(*target)?.0;
 
-            let distance = (size.get(*target)?.0) * 2.0;
+            let distance = size.get(*target)?.0 + size.get(entity)?.0;
 
             if position.distance(&target_position) < distance {
                 match interaction {
                     Interaction::Follow => Some(false),
                     Interaction::Refuel => transfer_fuel(fuel, entity, *target, 0.1),
                     Interaction::RefuelFrom => transfer_fuel(fuel, *target, entity, 0.1),
-                    Interaction::Mine => Some(false)
+                    Interaction::Mine => Some(false),
+                    Interaction::Attack => Some(true)
                 }
             } else {
                 Some(move_ship(entity, pos, fuel, rot, tag, components, target_position)? == MovementStatus::OutOfFuel)
@@ -191,34 +192,38 @@ impl<'a> System<'a> for RightClickSystem<'a> {
         Read<'a, Camera>,
         WriteStorage<'a, Commands>,
         ReadStorage<'a, Selectable>,
-        ReadStorage<'a, Position>
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, Side>
     );
 
-    fn run(&mut self, (interaction, controls, formation, camera, mut commands, selectable, pos): Self::SystemData) {
+    fn run(&mut self, (interaction, controls, formation, camera, mut commands, selectable, pos, side): Self::SystemData) {
         if controls.right_clicked() {
             let (x, y) = controls.mouse();
 
             if let Some((entity, interaction)) = interaction.0 {
-                for (selectable, commands) in (&selectable, &mut commands).join() {
-                    if selectable.selected {
+                (&selectable, &side, &mut commands).join()
+                    .filter(|(selectable, side, _)| selectable.selected && **side == Side::Friendly)
+                    .for_each(|(_, _, commands)| {
                         if !controls.shift {
                             commands.clear();
                         }
 
                         commands.push(Command::GoToAnd(entity, interaction));
-                    }
-                }
+                    });
+
             } else {
                 let ray = self.context.ray(&camera, (x, y));
                 if let Some(target) = Plane::new(UP, 0.0).intersection(&ray).map(point_to_vector) {
                     if let Some(avg) = avg_position((&pos, &selectable).join(), |s| s.selected) {
-                        let len = (&selectable, &commands).join().filter(|(selectable, _)| selectable.selected).count();
+                        let len = (&selectable, &side, &commands).join()
+                            .filter(|(selectable, side, _)| selectable.selected && **side == Side::Friendly)
+                            .count();
 
                         let positions = formation.arrange(len, avg, target, 2.5);
 
-                        (&selectable, &mut commands).join()
-                            .filter(|(selectable, _)| selectable.selected)
-                            .map(|(_, commands)| commands)
+                        (&selectable, &side, &mut commands).join()
+                            .filter(|(selectable, side, _)| selectable.selected && **side == Side::Friendly)
+                            .map(|(_, _, commands)| commands)
                             .zip(positions)
                             .for_each(|(commands, position)| {
                                 if !controls.shift {
@@ -360,11 +365,17 @@ impl<'a> System<'a> for RightClickInteractionSystem<'a> {
         Write<'a, RightClickInteraction>,
         Read<'a, EntityUnderMouse>,
         ReadStorage<'a, Fuel>,
-        ReadStorage<'a, MineableMaterials>
+        ReadStorage<'a, MineableMaterials>,
+        ReadStorage<'a, Side>
     );
 
-    fn run(&mut self, (mut interaction, entity, fuel, mineable): Self::SystemData) {
+    fn run(&mut self, (mut interaction, entity, fuel, mineable, side): Self::SystemData) {
         if let Some((entity, _)) = entity.0 {
+            if side.get(entity) == Some(&Side::Enemy) {
+                interaction.0 = Some((entity, Interaction::Attack));
+                return;
+            }
+
 
             let possible_interaction = match (fuel.get(entity), mineable.get(entity)) {
                 (Some(fuel), _) if fuel.is_empty() => Some(Interaction::Refuel),
