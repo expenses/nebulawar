@@ -3,6 +3,7 @@
 // dragging -> dragged -> up
 
 use std::mem::swap;
+use specs::*;
 
 #[derive(is_enum_variant, Debug)]
 enum MouseState {
@@ -53,7 +54,7 @@ impl Default for MouseState {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Component)]
 pub struct Controls {
     mouse: (f32, f32),
 

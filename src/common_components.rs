@@ -4,32 +4,11 @@ use util::*;
 use rand::*;
 use ships::*;
 
-#[derive(Component, Default)]
-pub struct Drag(pub Option<(f32, f32, f32, f32)>);
-
 #[derive(Component, Default, NewtypeProxy)]
 pub struct Secs(pub f32);
 
 #[derive(Component, Default)]
 pub struct Time(pub f32);
-
-#[derive(Component, Default)]
-pub struct ShiftPressed(pub bool);
-
-impl ShiftPressed {
-    pub fn pressed(&self) -> bool {
-        self.0
-    }
-}
-
-#[derive(Component, Default)]
-pub struct LeftClick(pub Option<(f32, f32)>);
-
-#[derive(Component, Default)]
-pub struct RightClick(pub Option<(f32, f32)>);
-
-#[derive(Component, Default)]
-pub struct Mouse(pub (f32, f32));
 
 #[derive(Component, Default)]
 pub struct Paused(pub bool);

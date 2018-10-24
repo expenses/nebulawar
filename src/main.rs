@@ -57,10 +57,10 @@ use util::*;
 use ships::*;
 use systems::focus_on_selected;
 use entities::*;
+use camera::*;
 
 struct Game {
     context: context::Context,
-    controls: Controls,
     rng: ThreadRng,
     ui: UI,
     world: specs::World
@@ -78,7 +78,6 @@ impl Game {
 
         Self {
             context: context::Context::new(events_loop),
-            controls: Controls::default(),
             rng,
             ui: UI::new(),
             world
@@ -86,32 +85,52 @@ impl Game {
     }
 
     fn handle_mouse_movement(&mut self, x: f32, y: f32) {
-        let (mouse_x, mouse_y) = self.controls.mouse();
-        let (delta_x, delta_y) = (x - mouse_x, y - mouse_y);
-        self.controls.set_mouse(x, y);
+        let (delta_x, delta_y, dragging) = {
+            let mut controls: FetchMut<Controls> = self.world.write_resource();
 
-        if self.controls.right_dragging() {
-            self.camera_mut().rotate_longitude(delta_x / 200.0);
-            self.camera_mut().rotate_latitude(delta_y / 200.0);
+            let (mouse_x, mouse_y) = controls.mouse();
+            let (delta_x, delta_y) = (x - mouse_x, y - mouse_y);
+            
+            controls.set_mouse(x, y);
+
+            (delta_x, delta_y, controls.right_dragging())
+        };
+
+        if dragging {
+            let mut camera: FetchMut<Camera> = self.world.write_resource();
+
+            camera.rotate_longitude(delta_x / 200.0);
+            camera.rotate_latitude(delta_y / 200.0);
         }
     }
 
     fn handle_mouse_button(&mut self, button: MouseButton, pressed: bool) {
+        let mut controls: FetchMut<Controls> = self.world.write_resource();
+
         match button {
-            MouseButton::Left => self.controls.handle_left(pressed),
-            MouseButton::Right => self.controls.handle_right(pressed),
-            MouseButton::Middle => self.controls.handle_middle(pressed),
+            MouseButton::Left => controls.handle_left(pressed),
+            MouseButton::Right => controls.handle_right(pressed),
+            MouseButton::Middle => controls.handle_middle(pressed),
+            _ => {}
+        }
+    }
+
+    fn handle_kp2(&mut self, key: VirtualKeyCode, pressed: bool) {
+        let mut controls: FetchMut<Controls> = self.world.write_resource();
+
+        match key {
+            VirtualKeyCode::Left   | VirtualKeyCode::A => controls.left     = pressed,
+            VirtualKeyCode::Right  | VirtualKeyCode::D => controls.right    = pressed,
+            VirtualKeyCode::Up     | VirtualKeyCode::W => controls.forwards = pressed,
+            VirtualKeyCode::Down   | VirtualKeyCode::S => controls.back     = pressed,
+            VirtualKeyCode::LShift | VirtualKeyCode::T => controls.shift = pressed,
             _ => {}
         }
     }
 
     fn handle_keypress(&mut self, key: VirtualKeyCode, pressed: bool) {
+
         match key {
-            VirtualKeyCode::Left  | VirtualKeyCode::A => self.controls.left     = pressed,
-            VirtualKeyCode::Right | VirtualKeyCode::D => self.controls.right    = pressed,
-            VirtualKeyCode::Up    | VirtualKeyCode::W => self.controls.forwards = pressed,
-            VirtualKeyCode::Down  | VirtualKeyCode::S => self.controls.back     = pressed,
-            VirtualKeyCode::T => self.controls.shift = pressed,
             VirtualKeyCode::C => focus_on_selected(&mut self.world),
             VirtualKeyCode::Z if pressed => {
                 // todo: saving etc
@@ -122,7 +141,6 @@ impl Game {
                 //let result = self.state.load("game.sav");
                 //self.print_potential_error(result);
             },
-            VirtualKeyCode::LShift => self.controls.shift = pressed,
             VirtualKeyCode::P if pressed => self.world.write_resource::<Paused>().switch(),
             VirtualKeyCode::Slash if pressed => self.context.toggle_debug(),
             VirtualKeyCode::Comma if pressed => self.world.write_resource::<Formation>().rotate_left(),
@@ -139,17 +157,12 @@ impl Game {
 
                 self.world.delete_entities(&to_delete).unwrap();
             }
-            _ => {}
+            _ => self.handle_kp2(key, pressed)
         }
     }
 
     fn update(&mut self, secs: f32) {
         *self.world.write_resource() = Secs(secs);
-        *self.world.write_resource() = Drag(self.controls.left_drag_rect());
-        *self.world.write_resource() = ShiftPressed(self.controls.shift);
-        *self.world.write_resource() = LeftClick(Some(self.controls.mouse()).filter(|_| self.controls.left_clicked()));
-        *self.world.write_resource() = RightClick(Some(self.controls.mouse()).filter(|_| self.controls.right_clicked()));
-        *self.world.write_resource() = Mouse(self.controls.mouse());
 
         SpinSystem.run_now(&self.world.res);
         ShipMovementSystem.run_now(&self.world.res);
@@ -162,9 +175,7 @@ impl Game {
             context: &self.context
         }.run_now(&self.world.res);
 
-        if self.controls.middle_clicked() {
-            focus_on_selected(&mut self.world);
-        }
+        MiddleClickSystem.run_now(&self.world.res);
 
         // todo: make context a resource
 
@@ -180,27 +191,7 @@ impl Game {
             context: &self.context
         }.run_now(&self.world.res);
 
-        self.controls.update();
-
-        if self.controls.left {
-            self.camera_mut().move_sideways(-0.5);
-            clear_focus(&mut self.world);
-        }
-
-        if self.controls.right {
-            self.camera_mut().move_sideways(0.5);
-            clear_focus(&mut self.world);
-        }
-
-        if self.controls.forwards {
-            self.camera_mut().move_forwards(0.5);
-            clear_focus(&mut self.world);
-        }
-
-        if self.controls.back {
-            self.camera_mut().move_forwards(-0.5);
-            clear_focus(&mut self.world);
-        }
+        UpdateControlsSystem.run_now(&self.world.res);
         
         TimeStepSystem.run_now(&self.world.res);
         StepCameraSystem.run_now(&self.world.res);
@@ -241,9 +232,9 @@ impl Game {
         }.run_now(&self.world.res);
         self.ui.render(&mut self.context);
         
-        if let Some(top_left) = self.controls.left_dragging() {
-            self.context.render_rect(top_left, self.controls.mouse());
-        }
+        RenderDragSelection {
+            context: &mut self.context
+        }.run_now(&self.world.res);
 
         // actually draw ui components onto the screen
         let camera = self.world.read_resource();
@@ -285,16 +276,12 @@ fn main() {
     
     world.add_resource(Time(0.0));
     world.add_resource(Secs(0.0));
-    world.add_resource(Drag(None));
-    world.add_resource(ShiftPressed(false));
-    world.add_resource(RightClick(None));
     world.add_resource(Formation::default());
     world.add_resource(camera::Camera::default());
     world.add_resource(Paused(false));
-    world.add_resource(LeftClick(None));
-    world.add_resource(Mouse((0.0, 0.0)));
     world.add_resource(RightClickInteraction(None));
     world.add_resource(EntityUnderMouse(None));
+    world.add_resource(Controls::default());
 
     world.register::<context::Model>();
     world.register::<Position>();

@@ -150,11 +150,11 @@ pub struct RenderMouse<'a> {
 impl<'a> System<'a> for RenderMouse<'a> {
     type SystemData = (
         Read<'a, RightClickInteraction>,
-        Read<'a, Mouse>
+        Read<'a, Controls>
     );
 
-    fn run(&mut self, (interaction, mouse): Self::SystemData) {
-        let (x, y) = mouse.0;
+    fn run(&mut self, (interaction, controls): Self::SystemData) {
+        let (x, y) = controls.mouse();
 
         if let Some((_, interaction)) = interaction.0 {
             self.context.render_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4]);
@@ -168,13 +168,13 @@ pub struct RenderDebug<'a> {
 
 impl<'a> System<'a> for RenderDebug<'a> {
     type SystemData = (
-        Read<'a, Mouse>,
+        Read<'a, Controls>,
         Read<'a, Camera>,
         Read<'a, EntityUnderMouse>,
         Read<'a, state::System>
     );
 
-    fn run(&mut self, (mouse, camera, entity, system): Self::SystemData) {
+    fn run(&mut self, (controls, camera, entity, system): Self::SystemData) {
         if !self.context.is_debugging() {
             return;
         }
@@ -183,7 +183,7 @@ impl<'a> System<'a> for RenderDebug<'a> {
             self.context.render_model(Model::Asteroid, point, Quaternion::zero(), 1.0, &camera, &system);
         }
 
-        let ray = self.context.ray(&camera, mouse.0);
+        let ray = self.context.ray(&camera, controls.mouse());
         if let Some(point) = Plane::new(UP, 0.0).intersection(&ray).map(point_to_vector) {
             self.context.render_model(Model::Asteroid, point, Quaternion::zero(), 1.0, &camera, &system);
         }
@@ -210,5 +210,19 @@ impl<'a> System<'a> for RenderSystem<'a> {
         let matrix = Matrix4::from_translation(camera.position() + offset) * rotation * Matrix4::from_scale(BACKGROUND_DISTANCE / 10.0);
 
         self.context.render_billboard(matrix, Image::Star, &camera, &system);
+    }
+}
+
+pub struct RenderDragSelection<'a> {
+    pub context: &'a mut Context
+}
+
+impl<'a> System<'a> for RenderDragSelection<'a> {
+    type SystemData = Read<'a, Controls>;
+
+    fn run(&mut self, controls: Self::SystemData) {
+        if let Some(origin) = controls.left_dragging() {
+            self.context.render_rect(origin, controls.mouse());
+        }
     }
 }

@@ -6,6 +6,7 @@ use ships::*;
 use cgmath::{Vector3, Quaternion, Zero};
 use util::*;
 use collision::*;
+use controls::Controls;
 
 mod rendering;
 
@@ -44,25 +45,24 @@ pub struct DragSelectSystem<'a> {
 
 impl<'a> System<'a> for DragSelectSystem<'a> {
     type SystemData = (
-        Read<'a, Drag>,
-        Read<'a, ShiftPressed>,
+        Read<'a, Controls>,
         Read<'a, Camera>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Selectable>
     );
 
-    fn run(&mut self, (drag, shift, camera, pos, mut selectable): Self::SystemData) {
-        if let Some((left, top, right, bottom)) = drag.0 {
+    fn run(&mut self, (controls, camera, pos, mut selectable): Self::SystemData) {
+        if let Some((left, top, right, bottom)) = controls.left_drag_rect() {
             for (pos, selectable) in (&pos, &mut selectable).join() {
                 if let Some((x, y, _)) = self.context.screen_position(pos.0, &camera) {
                     let selected = x >= left && x <= right && y >= top && y <= bottom;
                     
-                    if !shift.0 {
+                    if !controls.shift {
                         selectable.selected = selected;
                     } else if selected {
                         selectable.selected = !selectable.selected;
                     }
-                } else if !shift.0 {
+                } else if !controls.shift {
                     selectable.selected = false;
                 }
             }
@@ -186,8 +186,7 @@ pub struct RightClickSystem<'a> {
 impl<'a> System<'a> for RightClickSystem<'a> {
     type SystemData = (
         Read<'a, RightClickInteraction>,
-        Read<'a, RightClick>,
-        Read<'a, ShiftPressed>,
+        Read<'a, Controls>,
         Read<'a, Formation>,
         Read<'a, Camera>,
         WriteStorage<'a, Commands>,
@@ -195,12 +194,14 @@ impl<'a> System<'a> for RightClickSystem<'a> {
         ReadStorage<'a, Position>
     );
 
-    fn run(&mut self, (interaction, click, shift, formation, camera, mut commands, selectable, pos): Self::SystemData) {
-        if let Some((x, y)) = click.0 {
+    fn run(&mut self, (interaction, controls, formation, camera, mut commands, selectable, pos): Self::SystemData) {
+        if controls.right_clicked() {
+            let (x, y) = controls.mouse();
+
             if let Some((entity, interaction)) = interaction.0 {
                 for (selectable, commands) in (&selectable, &mut commands).join() {
                     if selectable.selected {
-                        if !shift.pressed() {
+                        if !controls.shift {
                             commands.clear();
                         }
 
@@ -210,7 +211,7 @@ impl<'a> System<'a> for RightClickSystem<'a> {
             } else {
                 let ray = self.context.ray(&camera, (x, y));
                 if let Some(target) = Plane::new(UP, 0.0).intersection(&ray).map(point_to_vector) {
-                    if let Some(avg) = avg_position(&pos, &selectable, |s| s.selected) {
+                    if let Some(avg) = avg_position((&pos, &selectable).join(), |s| s.selected) {
                         let len = (&selectable, &commands).join().filter(|(selectable, _)| selectable.selected).count();
 
                         let positions = formation.arrange(len, avg, target, 2.5);
@@ -220,7 +221,7 @@ impl<'a> System<'a> for RightClickSystem<'a> {
                             .map(|(_, commands)| commands)
                             .zip(positions)
                             .for_each(|(commands, position)| {
-                                if !shift.pressed() {
+                                if !controls.shift {
                                     commands.clear();
                                 }
 
@@ -245,8 +246,8 @@ pub fn focus_on_selected(world: &mut World) {
     });
 }
 
-pub fn avg_position<P: Fn(&Selectable) -> bool>(pos: &ReadStorage<Position>, selectable: &ReadStorage<Selectable>, predicate: P) -> Option<Vector3<f32>> {
-    let (len, sum) = (pos, selectable).join()
+pub fn avg_position<'a, P: Fn(&Selectable) -> bool, I: Iterator<Item=(&'a Position, &'a Selectable)>>(iterator: I, predicate: P) -> Option<Vector3<f32>> {
+    let (len, sum) = iterator
         .filter(|(_, selectable)| predicate(selectable))
         .map(|(pos, _)| pos.0)
         .fold((0, Vector3::zero()), |(len, sum), position| {
@@ -265,14 +266,42 @@ pub struct StepCameraSystem;
 impl<'a> System<'a> for StepCameraSystem {
     type SystemData = (
         Write<'a, Camera>,
+        Read<'a, Controls>,
         ReadStorage<'a, Position>,
-        ReadStorage<'a, Selectable>
+        WriteStorage<'a, Selectable>,
     );
 
-    fn run(&mut self, (mut camera, pos, selectable): Self::SystemData) {
+    fn run(&mut self, (mut camera, controls, pos, mut selectable): Self::SystemData) {
+        let mut clear = false;
+        
+        if controls.left {
+            camera.move_sideways(-0.5);
+            clear = true;
+        }
+
+        if controls.right {
+            camera.move_sideways(0.5);
+            clear = true;
+        }
+
+        if controls.forwards {
+            camera.move_forwards(0.5);
+            clear = true;
+        }
+
+        if controls.back {
+            camera.move_forwards(-0.5);
+            clear = true;
+        }
+
+        if clear {
+            (&mut selectable).join()
+                .for_each(|selectable| selectable.camera_following = false);
+        }
+
         camera.step();
 
-        if let Some(position) = avg_position(&pos, &selectable, |s| s.camera_following) {
+        if let Some(position) = avg_position((&pos, &selectable).join(), |s| s.camera_following) {
             camera.move_towards(position);
         }
     }
@@ -302,15 +331,14 @@ pub struct LeftClickSystem<'a> {
 
 impl<'a> System<'a> for LeftClickSystem<'a> {
     type SystemData = (
-        Read<'a, LeftClick>,
-        Read<'a, ShiftPressed>,
+        Read<'a, Controls>,
         Read<'a, EntityUnderMouse>,
         WriteStorage<'a, Selectable>
     );
 
-    fn run(&mut self, (click, shift, entity, mut selectable): Self::SystemData) {
-        if let Some(_) = click.0 {
-            if !shift.0 {
+    fn run(&mut self, (controls, entity, mut selectable): Self::SystemData) {
+        if controls.left_clicked() {
+            if !controls.shift {
                 (&mut selectable).join().for_each(|selectable| selectable.selected = false);
             }
 
@@ -360,7 +388,7 @@ impl<'a> System<'a> for EntityUnderMouseSystem<'a> {
     type SystemData = (
         Entities<'a>,
         Read<'a, Camera>,
-        Read<'a, Mouse>,
+        Read<'a, Controls>,
         Write<'a, EntityUnderMouse>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, common_components::Rotation>,
@@ -368,11 +396,11 @@ impl<'a> System<'a> for EntityUnderMouseSystem<'a> {
         ReadStorage<'a, Model>
     );
 
-    fn run(&mut self, (entities, camera, mouse, mut entity, pos, rot, size, model): Self::SystemData) {
+    fn run(&mut self, (entities, camera, controls, mut entity, pos, rot, size, model): Self::SystemData) {
         use collision::Continuous;
 
         use cgmath::MetricSpace;
-        let ray = self.context.ray(&camera, mouse.0);
+        let ray = self.context.ray(&camera, controls.mouse());
 
         entity.0 = (&entities, &pos, &rot, &size, &model).join()
             .filter_map(|(entity, pos, rot, size, model)| {
@@ -411,4 +439,29 @@ impl<'a> System<'a> for EntityUnderMouseSystem<'a> {
 // todo: mining
 // todo: combat
 // todo:recyc
-// todo: move eveyrthing into ecs
+
+pub struct UpdateControlsSystem;
+
+impl<'a> System<'a> for UpdateControlsSystem {
+    type SystemData = Write<'a, Controls>;
+
+    fn run(&mut self, mut controls: Self::SystemData) {
+        controls.update();
+    }
+}
+
+pub struct MiddleClickSystem;
+
+impl<'a> System<'a> for MiddleClickSystem {
+    type SystemData = (
+        Read<'a, Controls>,
+        WriteStorage<'a, Selectable>
+    );
+
+    fn run(&mut self, (controls, mut selectable): Self::SystemData) {
+        if controls.middle_clicked() {
+            (&mut selectable).join()
+                .for_each(|selectable| selectable.camera_following = selectable.selected);
+        }
+    }
+}
