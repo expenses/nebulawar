@@ -503,7 +503,7 @@ impl<'a> System<'a> for AveragePositionSystem {
     }
 }
 
-use glium::glutin::{WindowEvent, dpi::LogicalPosition};
+use glium::glutin::{WindowEvent, MouseScrollDelta, dpi::LogicalPosition};
 
 pub struct EventHandlerSystem;
 
@@ -532,6 +532,10 @@ impl<'a> System<'a> for EventHandlerSystem {
                         order.y -= delta_y / 10.0;
                     }
                 }
+            },
+            WindowEvent::MouseWheel {delta, ..} => match delta {
+                MouseScrollDelta::PixelDelta(LogicalPosition {y, ..}) => camera.change_distance(y as f32 / 20.0),
+                MouseScrollDelta::LineDelta(_, y) => camera.change_distance(-y * 2.0)
             },
             _ => {}
         })

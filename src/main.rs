@@ -57,7 +57,6 @@ use util::*;
 use ships::*;
 use systems::focus_on_selected;
 use entities::*;
-use camera::*;
 
 struct Game {
     context: context::Context,
@@ -235,14 +234,6 @@ impl Game {
         }.run_now(&self.world.res);
     }
 
-    fn change_distance(&mut self, delta: f32) {
-        self.camera_mut().change_distance(delta)
-    }
-
-    fn camera_mut(&mut self) -> FetchMut<camera::Camera> {
-        self.world.write_resource()
-    }
-
     fn print_error<E: failure::Fail>(&mut self, error: &E) {
         error!("{}", error);
         if let Some(cause) = error.cause() {
@@ -311,10 +302,6 @@ fn main() {
                 },
                 glutin::WindowEvent::KeyboardInput {input: KeyboardInput {state, virtual_keycode: Some(key), ..}, ..} => {
                     game.handle_keypress(key, state == ElementState::Pressed);
-                },
-                glutin::WindowEvent::MouseWheel {delta, ..} => match delta {
-                    MouseScrollDelta::PixelDelta(LogicalPosition {y, ..}) => game.change_distance(y as f32 / 20.0),
-                    MouseScrollDelta::LineDelta(_, y) => game.change_distance(-y * 2.0)
                 },
                 event @ _ => game.world.write_resource::<Events>().push(event)
             }
