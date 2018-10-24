@@ -410,8 +410,7 @@ impl<'a> System<'a> for EntityUnderMouseSystem<'a> {
                     return None;
                 }
 
-                self.context.collision_mesh(*model)
-                    .intersection_transformed(&ray, &transform)
+                mesh.intersection_transformed(&ray, &transform)
                     .map(point_to_vector)
                     .map(|intersection| (entity, intersection, camera.position().distance2(intersection)))
             })
