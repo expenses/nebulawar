@@ -3,6 +3,7 @@ use cgmath::*;
 use util::*;
 use rand::*;
 use ships::*;
+use glium::glutin::WindowEvent;
 
 #[derive(Component, Default, NewtypeProxy)]
 pub struct Secs(pub f32);
@@ -24,6 +25,15 @@ pub struct EntityUnderMouse(pub Option<(Entity, Vector3<f32>)>);
 
 #[derive(Component, Default)]
 pub struct RightClickInteraction(pub Option<(Entity, Interaction)>);
+
+#[derive(Component, Default)]
+pub struct MoveOrder(pub Option<Vector3<f32>>);
+
+#[derive(Component, Default)]
+pub struct AveragePosition(pub Option<Vector3<f32>>);
+
+#[derive(Component, Default, NewtypeProxy)]
+pub struct Events(pub Vec<WindowEvent>);
 
 #[derive(Deserialize, Serialize, Component, NewtypeProxy)]
 pub struct Position(pub Vector3<f32>);

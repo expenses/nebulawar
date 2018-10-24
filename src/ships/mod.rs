@@ -128,6 +128,16 @@ pub struct ShipStorage {
 #[derive(Component, NewtypeProxy)]
 pub struct Commands(pub Vec<Command>);
 
+impl Commands {
+    pub fn order(&mut self, shift: bool, command: Command) {
+        if !shift {
+            self.0.clear();
+        }
+
+        self.0.push(command);
+    }
+}
+
 /*
         let converters: Vec<_> = iter_owned([Converter::new(Resource::Food, Resource::Waste, num_people as f32 / 3600.0)])
             .chain(self.components.converters())

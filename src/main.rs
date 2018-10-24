@@ -84,26 +84,6 @@ impl Game {
         }
     }
 
-    fn handle_mouse_movement(&mut self, x: f32, y: f32) {
-        let (delta_x, delta_y, dragging) = {
-            let mut controls: FetchMut<Controls> = self.world.write_resource();
-
-            let (mouse_x, mouse_y) = controls.mouse();
-            let (delta_x, delta_y) = (x - mouse_x, y - mouse_y);
-            
-            controls.set_mouse(x, y);
-
-            (delta_x, delta_y, controls.right_dragging())
-        };
-
-        if dragging {
-            let mut camera: FetchMut<Camera> = self.world.write_resource();
-
-            camera.rotate_longitude(delta_x / 200.0);
-            camera.rotate_latitude(delta_y / 200.0);
-        }
-    }
-
     fn handle_mouse_button(&mut self, button: MouseButton, pressed: bool) {
         let mut controls: FetchMut<Controls> = self.world.write_resource();
 
@@ -164,6 +144,8 @@ impl Game {
     fn update(&mut self, secs: f32) {
         *self.world.write_resource() = Secs(secs);
 
+        EventHandlerSystem.run_now(&self.world.res);
+
         SpinSystem.run_now(&self.world.res);
         ShipMovementSystem.run_now(&self.world.res);
 
@@ -171,7 +153,13 @@ impl Game {
             context: &self.context
         }.run_now(&self.world.res);
 
+        AveragePositionSystem.run_now(&self.world.res);
+
         RightClickInteractionSystem {
+            context: &self.context
+        }.run_now(&self.world.res);
+
+        MoveOrderSystem {
             context: &self.context
         }.run_now(&self.world.res);
 
@@ -216,6 +204,10 @@ impl Game {
         }.run_now(&self.world.res);
 
         RenderSelected {
+            context: &mut self.context
+        }.run_now(&self.world.res);
+
+        RenderMovementOrder {
             context: &mut self.context
         }.run_now(&self.world.res);
 
@@ -280,6 +272,9 @@ fn main() {
     world.add_resource(RightClickInteraction(None));
     world.add_resource(EntityUnderMouse(None));
     world.add_resource(Controls::default());
+    world.add_resource(MoveOrder(None));
+    world.add_resource(AveragePosition(None));
+    world.add_resource(Events(Vec::new()));
 
     world.register::<context::Model>();
     world.register::<Position>();
@@ -311,7 +306,6 @@ fn main() {
 
             match event {
                 glutin::WindowEvent::CloseRequested => closed = true,
-                glutin::WindowEvent::CursorMoved {position: LogicalPosition {x, y}, ..} => game.handle_mouse_movement(x as f32, y as f32),
                 glutin::WindowEvent::MouseInput {state, button, ..} => {
                     game.handle_mouse_button(button, state == ElementState::Pressed);
                 },
@@ -322,7 +316,7 @@ fn main() {
                     MouseScrollDelta::PixelDelta(LogicalPosition {y, ..}) => game.change_distance(y as f32 / 20.0),
                     MouseScrollDelta::LineDelta(_, y) => game.change_distance(-y * 2.0)
                 },
-                _ => ()
+                event @ _ => game.world.write_resource::<Events>().push(event)
             }
         });
 

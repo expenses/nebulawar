@@ -189,60 +189,44 @@ impl<'a> System<'a> for RightClickSystem<'a> {
         Read<'a, RightClickInteraction>,
         Read<'a, Controls>,
         Read<'a, Formation>,
-        Read<'a, Camera>,
+        Read<'a, AveragePosition>,
+        Write<'a, MoveOrder>,
         WriteStorage<'a, Commands>,
         ReadStorage<'a, Selectable>,
-        ReadStorage<'a, Position>,
         ReadStorage<'a, Side>
     );
 
-    fn run(&mut self, (interaction, controls, formation, camera, mut commands, selectable, pos, side): Self::SystemData) {
+    fn run(&mut self, (interaction, controls, formation, avg_pos, mut order, mut commands, selectable, side): Self::SystemData) {
         if controls.right_clicked() {
-            let (x, y) = controls.mouse();
-
             if let Some((entity, interaction)) = interaction.0 {
                 (&selectable, &side, &mut commands).join()
                     .filter(|(selectable, side, _)| selectable.selected && **side == Side::Friendly)
                     .for_each(|(_, _, commands)| {
-                        if !controls.shift {
-                            commands.clear();
-                        }
-
-                        commands.push(Command::GoToAnd(entity, interaction));
+                        commands.order(controls.shift, Command::GoToAnd(entity, interaction));
                     });
 
-            } else {
-                let ray = self.context.ray(&camera, (x, y));
-                if let Some(target) = Plane::new(UP, 0.0).intersection(&ray).map(point_to_vector) {
-                    if let Some(avg) = avg_position((&pos, &selectable).join(), |s| s.selected) {
-                        let len = (&selectable, &side, &commands).join()
-                            .filter(|(selectable, side, _)| selectable.selected && **side == Side::Friendly)
-                            .count();
+                order.0 = None;
+            } else if let Some(avg) = avg_pos.0 {
+                if let Some(target) = order.0 {
+                    let len = (&selectable, &side, &commands).join()
+                        .filter(|(selectable, side, _)| selectable.selected && **side == Side::Friendly)
+                        .count();
 
-                        let positions = formation.arrange(len, avg, target, 2.5);
+                    let positions = formation.arrange(len, avg, target, 2.5);
 
-                        (&selectable, &side, &mut commands).join()
-                            .filter(|(selectable, side, _)| selectable.selected && **side == Side::Friendly)
-                            .map(|(_, _, commands)| commands)
-                            .zip(positions)
-                            .for_each(|(commands, position)| {
-                                if !controls.shift {
-                                    commands.clear();
-                                }
+                    (&selectable, &side, &mut commands).join()
+                        .filter(|(selectable, side, _)| selectable.selected && **side == Side::Friendly)
+                        .map(|(_, _, commands)| commands)
+                        .zip(positions)
+                        .for_each(|(commands, position)| commands.order(controls.shift, Command::MoveTo(position)));
 
-                                commands.push(Command::MoveTo(position));
-                            });
-                    }
+                    order.0 = None;
+                } else {
+                    order.0 = Some(avg);
                 }
             }
         }
     }
-}
-
-pub fn clear_focus(world: &mut World) {
-    world.exec(|mut selectable: WriteStorage<Selectable>| {
-        (&mut selectable).join().for_each(|selectable| selectable.camera_following = false)
-    });
 }
 
 pub fn focus_on_selected(world: &mut World) {
@@ -251,13 +235,10 @@ pub fn focus_on_selected(world: &mut World) {
     });
 }
 
-pub fn avg_position<'a, P: Fn(&Selectable) -> bool, I: Iterator<Item=(&'a Position, &'a Selectable)>>(iterator: I, predicate: P) -> Option<Vector3<f32>> {
-    let (len, sum) = iterator
-        .filter(|(_, selectable)| predicate(selectable))
-        .map(|(pos, _)| pos.0)
-        .fold((0, Vector3::zero()), |(len, sum), position| {
-            (len + 1, sum + position)
-        });
+pub fn avg_position<I: Iterator<Item = Vector3<f32>>>(iterator: I) -> Option<Vector3<f32>> {
+    let (len, sum) = iterator.fold((0, Vector3::zero()), |(len, sum), position| {
+        (len + 1, sum + position)
+    });
 
     if len > 0 {
         Some(sum / len as f32)
@@ -306,7 +287,11 @@ impl<'a> System<'a> for StepCameraSystem {
 
         camera.step();
 
-        if let Some(position) = avg_position((&pos, &selectable).join(), |s| s.camera_following) {
+        let iterator = (&pos, &selectable).join()
+            .filter(|(_, selectable)| selectable.camera_following)
+            .map(|(pos, _)| pos.0);
+
+        if let Some(position) = avg_position(iterator) {
             camera.move_towards(position);
         }
     }
@@ -474,5 +459,81 @@ impl<'a> System<'a> for MiddleClickSystem {
             (&mut selectable).join()
                 .for_each(|selectable| selectable.camera_following = selectable.selected);
         }
+    }
+}
+
+pub struct MoveOrderSystem<'a> {
+    pub context: &'a Context
+}
+
+impl<'a> System<'a> for MoveOrderSystem<'a> {
+    type SystemData = (
+        Write<'a, MoveOrder>,
+        Read<'a, Camera>,
+        Read<'a, Controls>
+    );
+
+    fn run(&mut self, (mut order, camera, controls): Self::SystemData) {
+        if let Some(prev) = order.0 {
+            let ray = self.context.ray(&camera, controls.mouse());
+
+            if let Some(point) = Plane::new(UP, -prev.y).intersection(&ray) {
+                order.0 = Some(point_to_vector(point));
+            }
+        }
+    }
+}
+
+pub struct AveragePositionSystem;
+
+impl<'a> System<'a> for AveragePositionSystem {
+    type SystemData = (
+        Write<'a, AveragePosition>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, Selectable>,
+        ReadStorage<'a, Side>
+    );
+
+    fn run(&mut self, (mut avg_pos, pos, selectable, side): Self::SystemData) {
+        let iterator = (&pos, &selectable, &side).join()
+            .filter(|(_, selectable, side)| selectable.selected && **side == Side::Friendly)
+            .map(|(pos, _, _)| pos.0);
+
+        avg_pos.0 = avg_position(iterator);
+    }
+}
+
+use glium::glutin::{WindowEvent, dpi::LogicalPosition};
+
+pub struct EventHandlerSystem;
+
+impl<'a> System<'a> for EventHandlerSystem {
+    type SystemData = (
+        Write<'a, Events>,
+        Write<'a, Camera>,
+        Write<'a, MoveOrder>,
+        Write<'a, Controls>
+    );
+
+    fn run(&mut self, (mut events, mut camera, mut moveorder, mut controls): Self::SystemData) {
+        events.drain(..).for_each(|event| match event {
+            WindowEvent::CursorMoved {position: LogicalPosition {x, y}, ..} => {
+                let (x, y) = (x as f32, y as f32);
+                let (mouse_x, mouse_y) = controls.mouse();
+                let (delta_x, delta_y) = (x - mouse_x, y - mouse_y);
+                
+                controls.set_mouse(x, y);
+
+                if controls.right_dragging() {
+                    camera.rotate_longitude(delta_x / 200.0);
+                    camera.rotate_latitude(delta_y / 200.0);
+                } else if let Some(ref mut order) = moveorder.0 {
+                    if controls.shift {
+                        order.y -= delta_y / 10.0;
+                    }
+                }
+            },
+            _ => {}
+        })
     }
 }

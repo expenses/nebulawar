@@ -227,3 +227,42 @@ impl<'a> System<'a> for RenderDragSelection<'a> {
         }
     }
 }
+
+pub struct RenderMovementOrder<'a> {
+    pub context: &'a mut Context
+}
+
+impl<'a> System<'a> for RenderMovementOrder<'a> {
+    type SystemData = (
+        Read<'a, MoveOrder>,
+        Read<'a, AveragePosition>
+    );
+
+    fn run(&mut self, (order, pos): Self::SystemData) {
+        if let Some(order) = order.0 {
+            if let Some(mut pos) = pos.0 {
+                self.context.render_3d_lines(iter_owned([order, pos]));
+
+                let y = order.y;
+
+                let points = 100;
+
+                let radius = 1000.0;
+
+                for i in 0 .. points + 1 {
+                    let i = i as f32 * 20.0 - radius;
+
+                    self.context.render_3d_lines(iter_owned([
+                        Vector3::new(i, y, -radius),
+                        Vector3::new(i, y, radius)
+                    ]));
+
+                    self.context.render_3d_lines(iter_owned([
+                        Vector3::new(-radius, y, i),
+                        Vector3::new(radius, y, i)
+                    ]));
+                }
+            }
+        }
+    }
+}

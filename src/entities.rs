@@ -93,7 +93,7 @@ pub fn add_starting_entities(world: &mut World) {
     }
 
     for i in 0 .. 2 {
-        create_ship(world, ShipType::Miner, Vector3::new(0.0, 2.5 - i as f32 * 5.0, 30.0), Side::Friendly);
+        create_ship(world, ShipType::Miner, Vector3::new(0.0, 2.5 - i as f32 * 15.0, 30.0), Side::Friendly);
     }
 
     create_ship(world, ShipType::Fighter, Vector3::new(100.0, 0.0, 100.0), Side::Enemy);
