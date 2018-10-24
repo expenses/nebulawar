@@ -3,10 +3,11 @@ use common_components::{self, *};
 use context::*;
 use camera::*;
 use ships::*;
-use cgmath::{Vector3, Quaternion, Zero};
+use cgmath::{Vector3, Quaternion, Zero, Matrix4, MetricSpace};
 use util::*;
 use collision::*;
 use controls::Controls;
+use glium::glutin::{WindowEvent, MouseScrollDelta, dpi::LogicalPosition};
 
 mod rendering;
 
@@ -165,7 +166,7 @@ fn handle_command(
 
             let distance = size.get(*target)?.0 + size.get(entity)?.0;
 
-            if position.distance(&target_position) < distance {
+            if position.distance(target_position) < distance {
                 match interaction {
                     Interaction::Follow => Some(false),
                     Interaction::Refuel => transfer_fuel(fuel, entity, *target, 0.1),
@@ -393,41 +394,28 @@ impl<'a> System<'a> for EntityUnderMouseSystem<'a> {
     );
 
     fn run(&mut self, (entities, camera, controls, mut entity, pos, rot, size, model): Self::SystemData) {
-        use collision::Continuous;
-
-        use cgmath::MetricSpace;
         let ray = self.context.ray(&camera, controls.mouse());
 
         entity.0 = (&entities, &pos, &rot, &size, &model).join()
             .filter_map(|(entity, pos, rot, size, model)| {
-                use cgmath::{self, Rotation};
+                let rotation: Matrix4<f32> = rot.0.into();
 
-                // we need to transform the ray around the mesh so we can keep the mesh constant
-
-                let r: cgmath::Matrix4<f32> = if rot.0 == Quaternion::zero() {
-                    Quaternion::zero().into()
-                } else {
-                    rot.0.invert().into()
-                };
-
-                let ray = ray.transform(r * cgmath::Matrix4::from_scale(1.0 / size.0) * cgmath::Matrix4::from_translation(-pos.0));
+                let transform = Matrix4::from_translation(pos.0) * rotation * Matrix4::from_scale(size.0);
 
                 let mesh = self.context.collision_mesh(*model);
                 
                 let bound: Aabb3<f32> = mesh.compute_bound();
 
-                if !bound.intersects(&ray) {
+                if !bound.intersects_transformed(&ray, &transform) {
                     return None;
                 }
 
                 self.context.collision_mesh(*model)
-                    .intersection(&ray)
+                    .intersection_transformed(&ray, &transform)
                     .map(point_to_vector)
-                    // transform the point back
-                    .map(|intersection| (rot.0 * intersection) * size.0 + pos.0)
                     .map(|intersection| (entity, intersection, camera.position().distance2(intersection)))
             })
-            .min_by(|(_, _, a), (_, _, b)| cmp_floats(*a, *b))
+            .min_by(|(_, _, distance_a), (_, _, distance_b)| cmp_floats(*distance_a, *distance_b))
             .map(|(entity, intersection, _)| (entity, intersection));
     }
 }
@@ -502,8 +490,6 @@ impl<'a> System<'a> for AveragePositionSystem {
         avg_pos.0 = avg_position(iterator);
     }
 }
-
-use glium::glutin::{WindowEvent, MouseScrollDelta, dpi::LogicalPosition};
 
 pub struct EventHandlerSystem;
 
