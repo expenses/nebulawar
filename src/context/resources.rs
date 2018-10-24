@@ -10,6 +10,8 @@ use glium::texture::*;
 use std::io;
 use failure;
 use specs::*;
+use collision::primitive::ConvexPolyhedron;
+
 
 #[cfg(feature = "embed_resources")]
 macro_rules! load_resource {
@@ -63,13 +65,13 @@ pub fn load_image(display: &Display, data: &[u8]) -> SrgbTexture2d {
 }
 
 // Returns a vertex buffer that should be rendered as `TrianglesList`.
-pub fn load_wavefront(display: &Display, data: &[u8]) -> VertexBuffer<Vertex> {
+pub fn load_wavefront(data: &[u8]) ->  Vec<Vertex> {
     let mut data = io::BufReader::new(data);
     let data = Obj::load_buf(&mut data).unwrap();
 
     let Obj {texture, normal, position, objects, ..} = data;
 
-    let vertices: Vec<Vertex> = objects.into_iter()
+    objects.into_iter()
         .flat_map(|object| object.groups)
         .flat_map(|group| group.polys)
         .flat_map(|polygon| {
@@ -85,9 +87,7 @@ pub fn load_wavefront(display: &Display, data: &[u8]) -> VertexBuffer<Vertex> {
                 texture: v.1.map(|index| texture[index]).unwrap_or([0.0, 0.0]),
             }
         })
-        .collect();
-
-    VertexBuffer::new(display, &vertices).unwrap()
+        .collect()
 }
 
 #[derive(Copy, Clone)]
@@ -111,13 +111,25 @@ pub enum Model {
 
 pub struct ObjModel {
     pub vertices: VertexBuffer<Vertex>,
+    pub collision_mesh: ConvexPolyhedron<f32>,
     pub texture: SrgbTexture2d
 }
 
 impl ObjModel {
     fn new(display: &Display, model: &[u8], image: &[u8]) -> io::Result<Self> {
+        let vertices = load_wavefront(model);
+
+        let points: Vec<_> = vertices.iter()
+            .map(|vertex| vector_to_point(vertex.position.into()))
+            .collect();
+
+        let faces = (0 .. vertices.len() / 3)
+            .map(|i| (i * 3, i * 3 + 1, i * 3 + 2))
+            .collect();
+
         Ok(Self {
-            vertices: load_wavefront(display, model),
+            vertices: VertexBuffer::new(display, &vertices).unwrap(),
+            collision_mesh: ConvexPolyhedron::new_with_faces(points, faces),
             texture: load_image(display, image)
         })
     }

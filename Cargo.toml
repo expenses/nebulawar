@@ -45,8 +45,13 @@ specs-derive = {git = "https://github.com/slide-rs/specs"}
 spade = "*"
 # Noise (waiting on: image being optional)
 noise = {git = "https://github.com/Razaekel/noise-rs", branch = "develop", default-features = false}
-# easier newtype structs
+# easier newtype structs (waiting on: deref mut)
 newtype-proxy = {git = "https://github.com/expenses/newtype-proxy", branch = "deref_mut"}
+# HSV
+tint = "*"
+
+# Incase I need to debug an uninitialized component
+shred = {version = "*", features = ["nightly"], optional = true}
 
 [features]
 embed_resources = []

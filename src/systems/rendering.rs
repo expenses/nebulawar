@@ -13,24 +13,17 @@ pub struct ObjectRenderer<'a> {
 
 impl<'a> System<'a> for ObjectRenderer<'a> {
     type SystemData = (
-        Entities<'a>,
         Read<'a, Camera>,
         Read<'a, state::System>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, common_components::Rotation>,
-        ReadStorage<'a, ObjectSpin>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, Model>
     );
 
-    fn run(&mut self, (entities, camera, system, pos, rot, spin, size, model): Self::SystemData) {
-        for (entity, pos, size, model) in (&entities, &pos, &size, &model).join() {
-            let rotation = rot.get(entity).map(|rot| rot.0)
-                .or(spin.get(entity).map(|spin| spin.to_quat()));
-
-            if let Some(rotation) = rotation {
-                self.context.render_model(*model, pos.0, rotation, size.0, &camera, &system);
-            }
+    fn run(&mut self, (camera, system, pos, rot, size, model): Self::SystemData) {
+        for (pos, rot, size, model) in (&pos, &rot, &size, &model).join() {
+            self.context.render_model(*model, pos.0, rot.0, size.0, &camera, &system);
         }
     }
 }
@@ -177,12 +170,17 @@ impl<'a> System<'a> for RenderDebug<'a> {
     type SystemData = (
         Read<'a, Mouse>,
         Read<'a, Camera>,
+        Read<'a, EntityUnderMouse>,
         Read<'a, state::System>
     );
 
-    fn run(&mut self, (mouse, camera, system): Self::SystemData) {
+    fn run(&mut self, (mouse, camera, entity, system): Self::SystemData) {
         if !self.context.is_debugging() {
             return;
+        }
+
+        if let Some((_, point)) = entity.0 {
+            self.context.render_model(Model::Asteroid, point, Quaternion::zero(), 1.0, &camera, &system);
         }
 
         let ray = self.context.ray(&camera, mouse.0);

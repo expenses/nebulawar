@@ -5,6 +5,7 @@ use std::ops::*;
 use std::collections::*;
 use rand::*;
 use rand::distributions::*;
+use std::cmp::*;
 
 pub const BACKGROUND_DISTANCE: f32 = 10000.0;
 pub const FOV: f32 = FRAC_PI_3;
@@ -133,3 +134,6 @@ pub fn uniform_sphere_distribution(rng: &mut ThreadRng) -> Vector3<f32> {
     )
 }
 
+pub fn cmp_floats(a: f32, b: f32) -> Ordering {
+    a.partial_cmp(&b).unwrap_or(Ordering::Less)
+}

@@ -3,7 +3,6 @@ use cgmath::*;
 use util::*;
 use rand::*;
 use ships::*;
-use std::ops::*;
 
 #[derive(Component, Default)]
 pub struct Drag(pub Option<(f32, f32, f32, f32)>);
@@ -40,6 +39,9 @@ impl Paused {
         self.0 = !self.0;
     }
 }
+
+#[derive(Component, Default)]
+pub struct EntityUnderMouse(pub Option<(Entity, Vector3<f32>)>);
 
 #[derive(Component, Default)]
 pub struct RightClickInteraction(pub Option<(Entity, Interaction)>);

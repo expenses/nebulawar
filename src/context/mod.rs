@@ -22,6 +22,7 @@ use *;
 
 use runic;
 use pedot::*;
+use collision::primitive::ConvexPolyhedron;
 
 // ** Line Rendering Woes **
 // rendering in 2d: doesnt work with rest of scene, rendering lines that go behind the camera is hard
@@ -328,6 +329,10 @@ impl Context {
 
     pub fn render_image(&mut self, image: Image, x: f32, y: f32, width: f32, height: f32, overlay: [f32; 4]) {
         self.lines.render_image(image, x, y, width, height, overlay, &mut self.target, &self.display, &self.resources)
+    }
+
+    pub fn collision_mesh(&self, model: Model) -> &ConvexPolyhedron<f32> {
+        &self.resources.models[model as usize].collision_mesh
     }
 }
 

@@ -27,6 +27,7 @@ extern crate spade;
 extern crate noise;
 #[macro_use]
 extern crate newtype_proxy;
+extern crate tint;
 
 use rand::*;
 use glium::*;
@@ -150,11 +151,16 @@ impl Game {
         *self.world.write_resource() = RightClick(Some(self.controls.mouse()).filter(|_| self.controls.right_clicked()));
         *self.world.write_resource() = Mouse(self.controls.mouse());
 
-        RightClickInteractionSystem {
+        SpinSystem.run_now(&self.world.res);
+        ShipMovementSystem.run_now(&self.world.res);
+
+        EntityUnderMouseSystem {
             context: &self.context
         }.run_now(&self.world.res);
 
-        SpinSystem.run_now(&self.world.res);
+        RightClickInteractionSystem {
+            context: &self.context
+        }.run_now(&self.world.res);
 
         if self.controls.middle_clicked() {
             focus_on_selected(&mut self.world);
@@ -197,7 +203,6 @@ impl Game {
         }
         
         TimeStepSystem.run_now(&self.world.res);
-        ShipMovementSystem.run_now(&self.world.res);
         StepCameraSystem.run_now(&self.world.res);
         self.ui.step(secs);
     }
@@ -289,13 +294,15 @@ fn main() {
     world.add_resource(LeftClick(None));
     world.add_resource(Mouse((0.0, 0.0)));
     world.add_resource(RightClickInteraction(None));
+    world.add_resource(EntityUnderMouse(None));
 
     world.register::<context::Model>();
     world.register::<Position>();
     world.register::<ObjectSpin>();
     world.register::<MineableMaterials>();
     world.register::<Size>();
-    world.register::<ShipStorage>();
+    world.register::<Fuel>();
+    world.register::<ships::ShipStorage>();
     world.register::<Commands>();
     world.register::<common_components::Rotation>();
     world.register::<ships::components::Components>();
@@ -347,5 +354,3 @@ fn main() {
 fn circle_size(z: f32) -> f32 {
     FAR / 2.0 * (1.0 - z)
 }
-
-// todo: proper model intersections

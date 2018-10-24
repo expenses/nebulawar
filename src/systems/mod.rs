@@ -2,7 +2,6 @@ use specs::*;
 use common_components::{self, *};
 use context::*;
 use camera::*;
-use circle_size;
 use ships::*;
 use cgmath::{Vector3, Quaternion, Zero};
 use util::*;
@@ -16,18 +15,25 @@ pub struct SpinSystem;
 
 impl<'a> System<'a> for SpinSystem {
     type SystemData = (
+        Entities<'a>,
         Read<'a, Secs>,
         Read<'a, Paused>,
-        WriteStorage<'a, ObjectSpin>
+        WriteStorage<'a, ObjectSpin>,
+        WriteStorage<'a, common_components::Rotation>
     );
 
-    fn run(&mut self, (secs, paused, mut spins): Self::SystemData) {
+    fn run(&mut self, (entities, secs, paused, mut spins, mut rotations): Self::SystemData) {
         if paused.0 {
             return;
         }
 
-        for spin in (&mut spins).join() {
+        for (entity, spin) in (&entities, &mut spins).join() {
             spin.turn(secs.0);
+
+            rotations.insert(
+                entity,
+                common_components::Rotation(spin.to_quat())
+            ).unwrap();
         }
     }
 }
@@ -227,20 +233,6 @@ impl<'a> System<'a> for RightClickSystem<'a> {
     }
 }
 
-fn entity_at(mouse_x: f32, mouse_y: f32, entities: &Entities, positions: &ReadStorage<Position>, sizes: &ReadStorage<Size>, context: &Context, camera: &Camera) -> Option<Entity> {
-    entities.join()
-        .filter_map(|entity| positions.get(entity).map(|position| (entity, position)))
-        .filter_map(|(entity, position)| {
-            context.screen_position(position.0, camera)
-                .filter(|(x, y, z)| {
-                    (mouse_x - x).hypot(mouse_y - y) < circle_size(*z) * sizes.get(entity).map(|size| size.0).unwrap_or(1.0)
-                })
-                .map(|(_, _, z)| (entity, z))
-        })
-        .min_by(|(_, z_a), (_, z_b)| z_a.partial_cmp(z_b).unwrap_or(::std::cmp::Ordering::Less))
-        .map(|(entity, _)| entity)
-}
-
 pub fn clear_focus(world: &mut World) {
     world.exec(|mut selectable: WriteStorage<Selectable>| {
         (&mut selectable).join().for_each(|selectable| selectable.camera_following = false)
@@ -310,22 +302,19 @@ pub struct LeftClickSystem<'a> {
 
 impl<'a> System<'a> for LeftClickSystem<'a> {
     type SystemData = (
-        Entities<'a>,
         Read<'a, LeftClick>,
         Read<'a, ShiftPressed>,
-        Read<'a, Camera>,
-        ReadStorage<'a, Position>,
-        ReadStorage<'a, Size>,
+        Read<'a, EntityUnderMouse>,
         WriteStorage<'a, Selectable>
     );
 
-    fn run(&mut self, (entities, click, shift, camera, position, size, mut selectable): Self::SystemData) {
-        if let Some((x, y)) = click.0 {
+    fn run(&mut self, (click, shift, entity, mut selectable): Self::SystemData) {
+        if let Some(_) = click.0 {
             if !shift.0 {
                 (&mut selectable).join().for_each(|selectable| selectable.selected = false);
             }
 
-            if let Some(entity) = entity_at(x, y, &entities, &position, &size, &self.context, &camera) {
+            if let Some((entity, _)) = entity.0 {
                 if let Some(selectable) = selectable.get_mut(entity) {
                     selectable.selected = !selectable.selected;
                 }
@@ -340,19 +329,14 @@ pub struct RightClickInteractionSystem<'a> {
 
 impl<'a> System<'a> for RightClickInteractionSystem<'a> {
     type SystemData = (
-        Entities<'a>,
         Write<'a, RightClickInteraction>,
-        Read<'a, Mouse>,
-        Read<'a, Camera>,
-        ReadStorage<'a, Position>,
-        ReadStorage<'a, Size>,
+        Read<'a, EntityUnderMouse>,
         ReadStorage<'a, Fuel>,
         ReadStorage<'a, MineableMaterials>
     );
 
-    fn run(&mut self, (entities, mut interaction, mouse, camera, pos, size, fuel, mineable): Self::SystemData) {
-        let (x, y) = mouse.0;
-        if let Some(entity) = entity_at(x, y, &entities, &pos, &size, &self.context, &camera) {
+    fn run(&mut self, (mut interaction, entity, fuel, mineable): Self::SystemData) {
+        if let Some((entity, _)) = entity.0 {
 
             let possible_interaction = match (fuel.get(entity), mineable.get(entity)) {
                 (Some(fuel), _) if fuel.is_empty() => Some(Interaction::Refuel),
@@ -367,3 +351,64 @@ impl<'a> System<'a> for RightClickInteractionSystem<'a> {
         }
     }
 }
+
+pub struct EntityUnderMouseSystem<'a> {
+    pub context: &'a Context
+}
+
+impl<'a> System<'a> for EntityUnderMouseSystem<'a> {
+    type SystemData = (
+        Entities<'a>,
+        Read<'a, Camera>,
+        Read<'a, Mouse>,
+        Write<'a, EntityUnderMouse>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, common_components::Rotation>,
+        ReadStorage<'a, Size>,
+        ReadStorage<'a, Model>
+    );
+
+    fn run(&mut self, (entities, camera, mouse, mut entity, pos, rot, size, model): Self::SystemData) {
+        use collision::Continuous;
+
+        use cgmath::MetricSpace;
+        let ray = self.context.ray(&camera, mouse.0);
+
+        entity.0 = (&entities, &pos, &rot, &size, &model).join()
+            .filter_map(|(entity, pos, rot, size, model)| {
+                use cgmath::{self, Rotation};
+
+                // we need to transform the ray around the mesh so we can keep the mesh constant
+
+                let r: cgmath::Matrix4<f32> = if rot.0 == Quaternion::zero() {
+                    Quaternion::zero().into()
+                } else {
+                    rot.0.invert().into()
+                };
+
+                let ray = ray.transform(r * cgmath::Matrix4::from_scale(1.0 / size.0) * cgmath::Matrix4::from_translation(-pos.0));
+
+                let mesh = self.context.collision_mesh(*model);
+                
+                let bound: Aabb3<f32> = mesh.compute_bound();
+
+                if !bound.intersects(&ray) {
+                    return None;
+                }
+
+                self.context.collision_mesh(*model)
+                    .intersection(&ray)
+                    .map(point_to_vector)
+                    // transform the point back
+                    .map(|intersection| (rot.0 * intersection) * size.0 + pos.0)
+                    .map(|intersection| (entity, intersection, camera.position().distance2(intersection)))
+            })
+            .min_by(|(_, _, a), (_, _, b)| cmp_floats(*a, *b))
+            .map(|(entity, intersection, _)| (entity, intersection));
+    }
+}
+
+// todo: mining
+// todo: combat
+// todo:recyc
+// todo: move eveyrthing into ecs

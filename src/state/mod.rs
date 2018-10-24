@@ -6,6 +6,7 @@ use util::*;
 use entities::*;
 use spade;
 use spade::delaunay::FloatDelaunayTriangulation;
+use tint::Color;
 
 #[derive(Debug)]
 enum SystemType {
@@ -85,16 +86,19 @@ impl Default for System {
 
 // https://www.redblobgames.com/x/1842-delaunay-voronoi-sphere/#delaunay
 fn make_background(rng: &mut ThreadRng) -> Vec<context::Vertex> {
+    let nebula_color = Color::new(rng.gen_range(0.0, 360.0), 1.0, 1.0, 1.0).from_hsv();
+    let nebula_color = [nebula_color.red as f32, nebula_color.green as f32, nebula_color.blue as f32];
+
     let mut dlt = FloatDelaunayTriangulation::with_walk_locate();
 
     // Get the point to rotate the sphere around
-    let target_point = ColouredVertex::rand(rng, Quaternion::zero());
+    let target_point = ColouredVertex::rand(rng, Quaternion::zero(), nebula_color);
 
     // Get the rotation to that point
     let rotation_quat = Quaternion::look_at(target_point.vector, UP);
 
     for _ in 0 .. 100 {
-        dlt.insert(ColouredVertex::rand(rng, rotation_quat));
+        dlt.insert(ColouredVertex::rand(rng, rotation_quat, nebula_color));
     }
 
     let triangles_to_fill_gap = dlt.edges()
@@ -132,17 +136,17 @@ struct ColouredVertex {
 }
 
 impl ColouredVertex {
-    fn rand(rng: &mut ThreadRng, rotation_quat: Quaternion<f32>) -> Self {
-        use noise::{self, NoiseFn};
-        
+    fn rand(rng: &mut ThreadRng, rotation_quat: Quaternion<f32>, color: [f32; 3]) -> Self {
+        use noise::{self, NoiseFn, Seedable};
+
         let vector = uniform_sphere_distribution(rng);
         
-        let b = noise::Perlin::new().get([vector.x as f64, vector.y as f64, vector.z as f64]);
+        let value = noise::Perlin::new().set_seed(rng.gen()).get([vector.x as f64, vector.y as f64, vector.z as f64]) as f32;
 
 
         //let brightness = 1.0 - (vector.y).abs() * 2.0;
 
-        let color = [(b / 4.0) as f32, (b / 8.0) as f32, 0.0];
+        let color = [color[0] * value, color[1] * value, color[2] * value];
 
         let rotated_vector = rotation_quat * vector;
 
@@ -162,13 +166,8 @@ impl spade::PointN for ColouredVertex {
         2
     }
 
-    fn from_value(value: Self::Scalar) -> Self {
-        Self {
-            vector: Vector3::zero(),
-            color: [0.0; 3],
-            projected_x: 0.0,
-            projected_y: 0.0
-        }
+    fn from_value(_: Self::Scalar) -> Self {
+        unimplemented!()
     }
 
     fn nth(&self, index: usize) -> &Self::Scalar {
