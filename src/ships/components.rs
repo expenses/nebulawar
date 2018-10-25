@@ -128,5 +128,3 @@ impl Components {
         Some(speed).filter(|speed| *speed > 0.0)
     }
 }
-
-// todo: move ui stuff to systems
