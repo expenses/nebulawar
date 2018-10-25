@@ -40,7 +40,7 @@ const DEFAULT_HEIGHT: f32 = 800.0;
 pub enum Mode {
     Normal = 1,
     Shadeless = 2,
-    Stars = 3,
+    White = 3,
     Background = 4
 }
 
@@ -123,8 +123,7 @@ impl Context {
             view: matrix_to_array(camera.view_matrix()),
             perspective: matrix_to_array(self.perspective_matrix()),
             light_direction: vector_to_array(system.light),
-            // todo: this is kinda lazy, so maybe change the name of the mode
-            mode: Mode::Stars as i32
+            mode: Mode::White as i32
         };
 
         let vertices = VertexBuffer::new(&self.display, &self.lines_3d).unwrap();
@@ -160,7 +159,7 @@ impl Context {
     }
 
     pub fn render_stars(&mut self, system: &System, camera: &Camera) {
-        let uniforms = self.background_uniforms(camera, system, Mode::Stars);
+        let uniforms = self.background_uniforms(camera, system, Mode::White);
 
         let vertices = VertexBuffer::new(&self.display, &system.stars).unwrap();
         let indices = NoIndices(PrimitiveType::Points);
@@ -262,7 +261,7 @@ impl Context {
 
         let (width, height) = self.screen_dimensions();
         let (x, y) = opengl_pos_to_screen_pos(x, y, width, height);
-        // todo: this may be dpi dependent
+        // this may be dpi dependent, not sure
         let (x, y) = (x * 2.0, y * 2.0);
 
         if z < 1.0 {

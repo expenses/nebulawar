@@ -142,8 +142,6 @@ impl<'a> System<'a> for RenderUI<'a> {
     }
 }
 
-//todo: get runic to batch rendering
-
 pub struct RenderMouse<'a> {
     pub context: &'a mut Context
 }

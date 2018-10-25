@@ -15,10 +15,9 @@ float map(float min, float max, float value) {
 
 const int NORMAL = 1;
 const int SHADELESS = 2;
-const int STARS = 3;
+const int WHITE = 3;
 const int BACKGROUND = 4;
 
-const vec3 WHITE = vec3(1.0);
 const float MIN_LIGHT = 0.1;
 
 void main() {
@@ -28,8 +27,8 @@ void main() {
         color = vec4(o_normal, 1.0);
     } else if (mode == SHADELESS) {
         color = texture_color;
-    } else if (mode == STARS) {
-        color = vec4(WHITE, v_texture.x);
+    } else if (mode == WHITE) {
+        color = vec4(vec3(1.0), v_texture.x);
     } else {
         vec3 light_dir = normalize(light_direction);  
 
