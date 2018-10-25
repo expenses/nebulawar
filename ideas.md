@@ -17,3 +17,7 @@ fighters cant jump (unless upgraded)
 various sources of resources, planets, asteroids, abandoned space stations
 
 various random events
+
+warp was created by a dead race, kinda spooky graveyard
+
+
