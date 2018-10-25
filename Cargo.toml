@@ -2,6 +2,7 @@
 name = "fleet_commander"
 version = "0.1.0"
 authors = ["Expenses <expenses@airmail.cc>"]
+description = "A game"
 
 [dependencies]
 # OpenGL
@@ -54,4 +55,11 @@ tint = "*"
 shred = {version = "*", features = ["nightly"], optional = true}
 
 [features]
+default = ['embed_resources']
+
 embed_resources = []
+
+[package.metadata.bundle]
+name = "Fleet Commander"
+identifier = "io.github.expenses.fleet_commander"
+icon = ["resources/ui/mine.png"]

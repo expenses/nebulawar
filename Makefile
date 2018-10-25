@@ -1,6 +1,7 @@
-fleet_commander: target/release/fleet_commander
-	cp target/release/fleet_commander .
-	strip fleet_commander
+.PHONY: app
 
-target/release/fleet_commander: src resources Cargo.lock Cargo.toml
-	cargo build --release --features embed_resources
+app: Fleet\ Commander.app
+
+Fleet\ Commander.app: src resources Cargo.*
+	cargo bundle --release --format osx
+	cp -r target/release/bundle/osx/Fleet\ Commander.app .

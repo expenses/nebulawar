@@ -132,7 +132,7 @@ impl Context {
         let params = self.draw_params();
         self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
 
-        self.resources.font.render_vertices(&self.text, [1.0; 4], &mut self.target, &self.display, &self.text_program, true);
+        self.resources.font.render_vertices(&self.text, [1.0; 4], &mut self.target, &self.display, &self.text_program, true).unwrap();
 
         self.lines_3d.clear();
         self.text.clear();
