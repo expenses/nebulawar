@@ -71,7 +71,7 @@ impl ShipComponentType {
 
     pub fn drill_speed(self) -> f32 {
         match self {
-            ShipComponentType::MiningDrill => 10.0,
+            ShipComponentType::MiningDrill => 0.01,
             _ => 0.0
         }
     }

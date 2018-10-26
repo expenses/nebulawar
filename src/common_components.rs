@@ -25,11 +25,13 @@ impl Paused {
 #[derive(Component, Default)]
 pub struct EntityUnderMouse(pub Option<(Entity, Vector3<f32>)>);
 
-#[derive(Component, Default)]
-pub struct RightClickInteraction(pub Option<(Entity, Interaction)>);
+// todo: have this on a per-entity basis
 
 #[derive(Component, Default)]
-pub struct MoveOrder(pub Option<Vector3<f32>>);
+pub struct RightClickOrder {
+    pub to_move: Vec<Entity>,
+    pub command: Option<Command>
+}
 
 #[derive(Component, Default)]
 pub struct AveragePosition(pub Option<Vector3<f32>>);
@@ -40,8 +42,11 @@ pub struct Events(pub Vec<WindowEvent>);
 #[derive(Deserialize, Serialize, Component, NewtypeProxy)]
 pub struct Position(pub Vector3<f32>);
 
-#[derive(Deserialize, Serialize, Component)]
-pub struct MineableMaterials(pub u32);
+#[derive(Deserialize, Serialize, Component, NewtypeProxy)]
+pub struct Materials(pub StoredResource);
+
+#[derive(Deserialize, Serialize, Component, NewtypeProxy)]
+pub struct MineableMaterials(pub StoredResource);
 
 #[derive(Deserialize, Serialize, Component, NewtypeProxy)]
 pub struct Size(pub f32);
@@ -170,3 +175,9 @@ pub struct LogItem {
     age: f32,
     content: String
 }
+
+#[derive(Component)]
+pub struct DrillSpeed(pub f32);
+
+#[derive(Component, Default)]
+pub struct MovementPlane(pub f32);

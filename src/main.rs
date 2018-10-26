@@ -156,10 +156,6 @@ impl Game {
             context: &self.context
         }.run_now(&self.world.res);
 
-        MoveOrderSystem {
-            context: &self.context
-        }.run_now(&self.world.res);
-
         MiddleClickSystem.run_now(&self.world.res);
 
         LeftClickSystem {
@@ -203,7 +199,7 @@ impl Game {
             context: &mut self.context
         }.run_now(&self.world.res);
 
-        RenderMovementOrder {
+        RenderMovementPlane {
             context: &mut self.context
         }.run_now(&self.world.res);
 
@@ -255,18 +251,18 @@ fn main() {
     world.add_resource(Formation::default());
     world.add_resource(camera::Camera::default());
     world.add_resource(Paused(false));
-    world.add_resource(RightClickInteraction(None));
+    world.add_resource(RightClickOrder::default());
     world.add_resource(EntityUnderMouse(None));
     world.add_resource(Controls::default());
-    world.add_resource(MoveOrder(None));
     world.add_resource(AveragePosition(None));
     world.add_resource(Events(Vec::new()));
     world.add_resource(Log(Vec::new()));
+    world.add_resource(MovementPlane(0.0));
 
     world.register::<context::Model>();
     world.register::<Position>();
     world.register::<ObjectSpin>();
-    world.register::<MineableMaterials>();
+    world.register::<Materials>();
     world.register::<Size>();
     world.register::<Fuel>();
     world.register::<ships::ShipStorage>();
@@ -279,6 +275,8 @@ fn main() {
     world.register::<Parent>();
     world.register::<Occupation>();
     world.register::<Side>();
+    world.register::<DrillSpeed>();
+    world.register::<MineableMaterials>();
 
     let mut events_loop = EventsLoop::new();
     

@@ -53,12 +53,12 @@ impl StoredResource {
         self.capacity
     }
 
-    /*pub fn transfer_to(&mut self, other: &mut Self, amount: f32) -> f32 {
+    pub fn transfer_to(&mut self, other: &mut Self, amount: f32) -> f32 {
         let amount = self.transfer_amount(other, amount);
         self.reduce(amount);
         other.increase(amount);
         amount
-    }*/
+    }
 
     pub fn transfer_amount(&self, other: &Self, amount: f32) -> f32 {
         self.amount_can_transfer(other).min(amount)

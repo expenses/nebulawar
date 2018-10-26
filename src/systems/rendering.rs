@@ -95,10 +95,11 @@ impl<'a> System<'a> for RenderUI<'a> {
         ReadStorage<'a, Selectable>,
         ReadStorage<'a, Occupation>,
         ReadStorage<'a, Parent>,
-        ReadStorage<'a, Fuel>
+        ReadStorage<'a, Fuel>,
+        ReadStorage<'a, Materials>
     );
 
-    fn run(&mut self, (entities, time, formation, paused, tag, selectable, occupation, parent, fuel): Self::SystemData) {
+    fn run(&mut self, (entities, time, formation, paused, tag, selectable, occupation, parent, fuel, materials): Self::SystemData) {
         let y = &mut 10.0;
 
         if paused.0 {
@@ -116,15 +117,15 @@ impl<'a> System<'a> for RenderUI<'a> {
             self.render_text(&format!("{:?}: {}", tag, num), y);
         }
 
-        let selected = (&entities, &fuel, &selectable).join()
-            .filter(|(_, _, selectable)| selectable.selected)
-            .map(|(entity, fuel, _)| (entity, fuel))
+        let selected = (&entities, &fuel, &materials, &selectable).join()
+            .filter(|(_, _, _, selectable)| selectable.selected)
+            .map(|(entity, fuel, materials, _)| (entity, fuel, materials))
             .next();
 
-        if let Some((entity, fuel)) = selected {
+        if let Some((entity, fuel, materials)) = selected {
             self.render_text("---------------------", y);
             self.render_text(&format!("Fuel: {:.2}%", fuel.percentage() * 100.0), y);
-            //self.render_text(&format!("Food: {}", storage.food), y);
+            self.render_text(&format!("Materials: {:?}", **materials), y);
             //self.render_text(&format!("Waste: {}", storage.waste), y);
 
             let people = (&occupation, &parent).join()
@@ -148,14 +149,14 @@ pub struct RenderMouse<'a> {
 
 impl<'a> System<'a> for RenderMouse<'a> {
     type SystemData = (
-        Read<'a, RightClickInteraction>,
+        Read<'a, RightClickOrder>,
         Read<'a, Controls>
     );
 
-    fn run(&mut self, (interaction, controls): Self::SystemData) {
+    fn run(&mut self, (order, controls): Self::SystemData) {
         let (x, y) = controls.mouse();
 
-        if let Some((_, interaction)) = interaction.0 {
+        if let Some(Command::GoToAnd(_, interaction)) = order.command {
             self.context.render_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4]);
         }
     }
@@ -226,41 +227,33 @@ impl<'a> System<'a> for RenderDragSelection<'a> {
     }
 }
 
-pub struct RenderMovementOrder<'a> {
+pub struct RenderMovementPlane<'a> {
     pub context: &'a mut Context
 }
 
-impl<'a> System<'a> for RenderMovementOrder<'a> {
-    type SystemData = (
-        Read<'a, MoveOrder>,
-        Read<'a, AveragePosition>
-    );
+impl<'a> System<'a> for RenderMovementPlane<'a> {
+    type SystemData = Read<'a, MovementPlane>;
 
-    fn run(&mut self, (order, pos): Self::SystemData) {
-        if let Some(order) = order.0 {
-            if let Some(mut pos) = pos.0 {
-                self.context.render_3d_lines(iter_owned([order, pos]));
+    fn run(&mut self, plane: Self::SystemData) {
+    
+        let y = plane.0;
 
-                let y = order.y;
+        let points = 100;
 
-                let points = 100;
+        let radius = 1000.0;
 
-                let radius = 1000.0;
+        for i in 0 .. points + 1 {
+            let i = i as f32 * 20.0 - radius;
 
-                for i in 0 .. points + 1 {
-                    let i = i as f32 * 20.0 - radius;
+            self.context.render_3d_lines(iter_owned([
+                Vector3::new(i, y, -radius),
+                Vector3::new(i, y, radius)
+            ]));
 
-                    self.context.render_3d_lines(iter_owned([
-                        Vector3::new(i, y, -radius),
-                        Vector3::new(i, y, radius)
-                    ]));
-
-                    self.context.render_3d_lines(iter_owned([
-                        Vector3::new(-radius, y, i),
-                        Vector3::new(radius, y, i)
-                    ]));
-                }
-            }
+            self.context.render_3d_lines(iter_owned([
+                Vector3::new(-radius, y, i),
+                Vector3::new(radius, y, i)
+            ]));
         }
     }
 }

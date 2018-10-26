@@ -10,8 +10,10 @@ use controls::Controls;
 use glium::glutin::{WindowEvent, MouseScrollDelta, dpi::LogicalPosition};
 
 mod rendering;
+mod storage;
 
 pub use self::rendering::*;
+use self::storage::*;
 
 pub struct SpinSystem;
 
@@ -81,19 +83,22 @@ impl<'a> System<'a> for ShipMovementSystem {
         WriteStorage<'a, common_components::Rotation>,
         WriteStorage<'a, Commands>,
         WriteStorage<'a, Fuel>,
+        WriteStorage<'a, Materials>,
+        WriteStorage<'a, MineableMaterials>,
         ReadStorage<'a, ShipType>,
         ReadStorage<'a, Components>,
-        ReadStorage<'a, Size>
+        ReadStorage<'a, Size>,
+        ReadStorage<'a, DrillSpeed>
     );
 
-    fn run(&mut self, (entities, paused, mut pos, mut rot, mut commands, mut fuel, tag, components, size): Self::SystemData) {
+    fn run(&mut self, (entities, paused, mut pos, mut rot, mut commands, mut fuel, mut materials, mut mineable, tag, components, size, drill_speed): Self::SystemData) {
         if paused.0 {
             return;
         }
 
         for (entity, rot, commands, tag, components) in (&entities, &mut rot, &mut commands, &tag, &components).join() {
             let finished = commands.first()
-                .map(|command| handle_command(command, entity, rot, &mut pos, components, tag, &mut fuel, &size).unwrap_or(true))
+                .map(|command| handle_command(command, entity, rot, &mut pos, components, tag, &mut fuel, &mut materials, &mut mineable, &size, &drill_speed).unwrap_or(true))
                 .unwrap_or(false);
             
             if finished {
@@ -131,29 +136,12 @@ fn move_ship(entity: Entity, pos: &mut WriteStorage<Position>, fuel: &mut WriteS
     }
 }
 
-fn transfer_fuel(fuel: &mut WriteStorage<Fuel>, ship_a: Entity, ship_b: Entity, amount: f32) -> Option<bool> {
-    let can_transfer = {
-        let fuel_a = fuel.get(ship_a)?;
-        let fuel_b = fuel.get(ship_b)?;
-
-        fuel_a.transfer_amount(&fuel_b, amount)
-    };
-
-    if can_transfer == 0.0 {
-        Some(true)
-    } else {
-        fuel.get_mut(ship_a)?.reduce(can_transfer);
-        fuel.get_mut(ship_b)?.increase(can_transfer);
-
-        Some(false)
-    }
-} 
-
 fn handle_command(
     command: &Command,
     entity: Entity, rot: &mut Quaternion<f32>, pos: &mut WriteStorage<Position>,
     components: &Components, tag: &ShipType,
-    fuel: &mut WriteStorage<Fuel>, size: &ReadStorage<Size>
+    fuel: &mut WriteStorage<Fuel>, materials: &mut WriteStorage<Materials>, mineable_materials: &mut WriteStorage<MineableMaterials>,
+    size: &ReadStorage<Size>, drill_speed: &ReadStorage<DrillSpeed>
 ) -> Option<bool> {
     
     match command {
@@ -169,10 +157,12 @@ fn handle_command(
             if position.distance(target_position) < distance {
                 match interaction {
                     Interaction::Follow => Some(false),
-                    Interaction::Refuel => transfer_fuel(fuel, entity, *target, 0.1),
-                    Interaction::RefuelFrom => transfer_fuel(fuel, *target, entity, 0.1),
-                    Interaction::Mine => Some(false),
-                    Interaction::Attack => Some(true)
+                    Interaction::Refuel => transfer_from_storages(fuel, entity, *target, 0.1),
+                    Interaction::RefuelFrom => transfer_from_storages(fuel, *target, entity, 0.1),
+                    Interaction::Mine => {
+                        transfer_between_different(mineable_materials, materials, *target, entity, drill_speed.get(entity).unwrap().0)
+                    },
+                    Interaction::Attack => Some(true),
                 }
             } else {
                 Some(move_ship(entity, pos, fuel, rot, tag, components, target_position)? == MovementStatus::OutOfFuel)
@@ -187,43 +177,30 @@ pub struct RightClickSystem<'a> {
 
 impl<'a> System<'a> for RightClickSystem<'a> {
     type SystemData = (
-        Read<'a, RightClickInteraction>,
+        Read<'a, RightClickOrder>,
         Read<'a, Controls>,
         Read<'a, Formation>,
         Read<'a, AveragePosition>,
-        Write<'a, MoveOrder>,
-        WriteStorage<'a, Commands>,
-        ReadStorage<'a, Selectable>,
-        ReadStorage<'a, Side>
+        WriteStorage<'a, Commands>
     );
 
-    fn run(&mut self, (interaction, controls, formation, avg_pos, mut order, mut commands, selectable, side): Self::SystemData) {
+    fn run(&mut self, (order, controls, formation, avg_pos, mut commands): Self::SystemData) {
         if controls.right_clicked() {
-            if let Some((entity, interaction)) = interaction.0 {
-                (&selectable, &side, &mut commands).join()
-                    .filter(|(selectable, side, _)| selectable.selected && **side == Side::Friendly)
-                    .for_each(|(_, _, commands)| {
-                        commands.order(controls.shift, Command::GoToAnd(entity, interaction));
-                    });
+            if let Some(ref command) = order.command {
+                match command {
+                    &Command::GoToAnd(entity, interaction) => {
+                        order.to_move.iter()
+                            .for_each(|e| commands.get_mut(*e).unwrap().order(controls.shift, Command::GoToAnd(entity, interaction)));
+                    },
+                    &Command::MoveTo(target) => {
+                        if let Some(avg) = avg_pos.0 {
+                            let positions = formation.arrange(order.to_move.len(), avg, target, 2.5);
 
-                order.0 = None;
-            } else if let Some(avg) = avg_pos.0 {
-                if let Some(target) = order.0 {
-                    let len = (&selectable, &side, &commands).join()
-                        .filter(|(selectable, side, _)| selectable.selected && **side == Side::Friendly)
-                        .count();
-
-                    let positions = formation.arrange(len, avg, target, 2.5);
-
-                    (&selectable, &side, &mut commands).join()
-                        .filter(|(selectable, side, _)| selectable.selected && **side == Side::Friendly)
-                        .map(|(_, _, commands)| commands)
-                        .zip(positions)
-                        .for_each(|(commands, position)| commands.order(controls.shift, Command::MoveTo(position)));
-
-                    order.0 = None;
-                } else {
-                    order.0 = Some(avg);
+                            order.to_move.iter()
+                                .zip(positions)
+                                .for_each(|(entity, position)| commands.get_mut(*entity).unwrap().order(controls.shift, Command::MoveTo(position)));
+                        }
+                    }
                 }
             }
         }
@@ -348,31 +325,49 @@ pub struct RightClickInteractionSystem<'a> {
 
 impl<'a> System<'a> for RightClickInteractionSystem<'a> {
     type SystemData = (
-        Write<'a, RightClickInteraction>,
+        Entities<'a>,
+        Write<'a, RightClickOrder>,
         Read<'a, EntityUnderMouse>,
+        Read<'a, Camera>,
+        Read<'a, Controls>,
+        Read<'a, MovementPlane>,
         ReadStorage<'a, Fuel>,
         ReadStorage<'a, MineableMaterials>,
-        ReadStorage<'a, Side>
+        ReadStorage<'a, Side>,
+        ReadStorage<'a, Selectable>,
+        ReadStorage<'a, DrillSpeed>
     );
 
-    fn run(&mut self, (mut interaction, entity, fuel, mineable, side): Self::SystemData) {
+    fn run(&mut self, (entities, mut order, entity, camera, controls, plane, fuel, mineable, side, selectable, drill): Self::SystemData) {
+        let ordering = (&entities, &selectable, &side).join()
+            .filter(|(_, selectable, side)| selectable.selected && **side == Side::Friendly)
+            .map(|(entity, _, _)| entity);
+
         if let Some((entity, _)) = entity.0 {
-            if side.get(entity) == Some(&Side::Enemy) {
-                interaction.0 = Some((entity, Interaction::Attack));
-                return;
-            }
+            let interaction = if side.get(entity) == Some(&Side::Enemy) {
+                order.to_move = ordering.collect();
 
+                Interaction::Attack
+            } else if fuel.get(entity).filter(|fuel| fuel.is_empty()).is_some() {
+                order.to_move = ordering.collect();
 
-            let possible_interaction = match (fuel.get(entity), mineable.get(entity)) {
-                (Some(fuel), _) if fuel.is_empty() => Some(Interaction::Refuel),
-                (Some(_), _) => Some(Interaction::Follow),
-                (_, Some(mineable)) if mineable.0 > 0 => Some(Interaction::Mine),
-                _ => None
+                Interaction::Refuel
+            } else if mineable.get(entity).filter(|mineable| !mineable.is_empty()).is_some() {
+                order.to_move = ordering.filter(|entity| drill.get(*entity).is_some()).collect();
+
+                Interaction::Mine
+            } else {
+                Interaction::Follow
             };
 
-            interaction.0 = possible_interaction.map(|interaction| (entity, interaction));
+            order.command = Some(Command::GoToAnd(entity, interaction));
         } else {
-            interaction.0 = None;
+            let ray = self.context.ray(&camera, controls.mouse());
+
+            order.command = Plane::new(UP, -plane.0).intersection(&ray)
+                .map(|point| Command::MoveTo(point_to_vector(point)));
+
+            order.to_move = ordering.collect();
         }
     }
 }
@@ -419,7 +414,6 @@ impl<'a> System<'a> for EntityUnderMouseSystem<'a> {
     }
 }
 
-// todo: mining
 // todo: combat
 // todo:recyc
 
@@ -449,28 +443,6 @@ impl<'a> System<'a> for MiddleClickSystem {
     }
 }
 
-pub struct MoveOrderSystem<'a> {
-    pub context: &'a Context
-}
-
-impl<'a> System<'a> for MoveOrderSystem<'a> {
-    type SystemData = (
-        Write<'a, MoveOrder>,
-        Read<'a, Camera>,
-        Read<'a, Controls>
-    );
-
-    fn run(&mut self, (mut order, camera, controls): Self::SystemData) {
-        if let Some(prev) = order.0 {
-            let ray = self.context.ray(&camera, controls.mouse());
-
-            if let Some(point) = Plane::new(UP, -prev.y).intersection(&ray) {
-                order.0 = Some(point_to_vector(point));
-            }
-        }
-    }
-}
-
 pub struct AveragePositionSystem;
 
 impl<'a> System<'a> for AveragePositionSystem {
@@ -496,11 +468,11 @@ impl<'a> System<'a> for EventHandlerSystem {
     type SystemData = (
         Write<'a, Events>,
         Write<'a, Camera>,
-        Write<'a, MoveOrder>,
+        Write<'a, MovementPlane>,
         Write<'a, Controls>
     );
 
-    fn run(&mut self, (mut events, mut camera, mut moveorder, mut controls): Self::SystemData) {
+    fn run(&mut self, (mut events, mut camera, mut plane, mut controls): Self::SystemData) {
         events.drain(..).for_each(|event| match event {
             WindowEvent::CursorMoved {position: LogicalPosition {x, y}, ..} => {
                 let (x, y) = (x as f32, y as f32);
@@ -512,10 +484,8 @@ impl<'a> System<'a> for EventHandlerSystem {
                 if controls.right_dragging() {
                     camera.rotate_longitude(delta_x / 200.0);
                     camera.rotate_latitude(delta_y / 200.0);
-                } else if let Some(ref mut order) = moveorder.0 {
-                    if controls.shift {
-                        order.y -= delta_y / 10.0;
-                    }
+                } else if controls.shift {
+                    plane.0 -= delta_y / 10.0;
                 }
             },
             WindowEvent::MouseWheel {delta, ..} => match delta {

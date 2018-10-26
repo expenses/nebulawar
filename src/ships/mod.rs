@@ -1,4 +1,4 @@
-use cgmath::{Vector3};
+use cgmath::Vector3;
 use context::*;
 use specs::{DenseVecStorage, Component, Entity, ReadStorage};
 use common_components::*;
@@ -11,7 +11,7 @@ pub use self::components::*;
 pub use self::storage::*;
 pub use self::formations::*;
 
-#[derive(Deserialize, Serialize, Clone, Copy, Debug)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, PartialEq)]
 pub enum Interaction {
     Follow,
     Refuel,
@@ -94,6 +94,7 @@ impl ShipType {
                 ShipType::Miner => vec![
                     ShipComponent::new(ShipComponentType::HG900Drive, age),
                     ShipComponent::new(ShipComponentType::HG43WarpDrive, age),
+                    ShipComponent::new(ShipComponentType::MiningDrill, age),
                 ]
             }
         )
@@ -120,7 +121,6 @@ impl ShipType {
 
 #[derive(Component, Debug)]
 pub struct ShipStorage {
-    pub materials: StoredResource,
     pub food: StoredResource,
     pub waste: StoredResource
 }

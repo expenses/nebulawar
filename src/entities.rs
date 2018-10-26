@@ -8,7 +8,9 @@ use context::*;
 pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, side: Side) -> Entity {
     let components = tag.default_components(0);
 
-    world.create_entity()
+    let drill_speed = components.drill_speed();
+
+    let mut entity = world.create_entity()
         .with(Position(position))
         .with(Size(tag.size()))
         .with(tag.model())
@@ -17,14 +19,19 @@ pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, sid
         .with(Commands(Vec::new()))
         .with(ShipStorage {
             food: StoredResource::empty(500.0),
-            materials: StoredResource::empty(500.0),
             waste: StoredResource::full(1000.0)
         })
+        .with(Materials(StoredResource::empty(500.0)))
         .with(Fuel(StoredResource::full(components.fuel_capacity())))
         .with(components)
         .with(Selectable::new(false))
-        .with(side)
-        .build()
+        .with(side);
+
+    if let Some(speed) = drill_speed {
+        entity = entity.with(DrillSpeed(speed));
+    }
+
+    entity.build()
 
 }
 
@@ -46,7 +53,7 @@ pub fn add_asteroid(rng: &mut ThreadRng, world: &mut World) {
 
     let location = Vector3::new(x, y, z);
 
-    let resources = (size.powi(3) * rng.gen_range(0.1, 1.0)) as u32;
+    let resources = size.powi(3) * rng.gen_range(0.1, 1.0);
 
     let spin = ObjectSpin::random(rng);
 
@@ -54,7 +61,7 @@ pub fn add_asteroid(rng: &mut ThreadRng, world: &mut World) {
         .with(Model::Asteroid)
         .with(spin)
         .with(Position(location))
-        .with(MineableMaterials(resources))
+        .with(MineableMaterials(StoredResource::full(resources)))
         .with(Size(size))
         .with(Selectable::new(false))
         .with(Side::Neutral)

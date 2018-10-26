@@ -3,7 +3,6 @@ use genmesh;
 use obj::*;
 use context::Vertex;
 use image;
-use std::fs;
 use runic;
 use util::*;
 use glium::texture::*;
