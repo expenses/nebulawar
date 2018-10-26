@@ -145,6 +145,12 @@ impl Context {
         self.target = self.display.draw();
     }
 
+    pub fn render_billboard_facing_camera(&mut self, position: Vector3<f32>, size: f32, image: Image, camera: &Camera, system: &System) {
+        let rotation: Matrix4<f32> = look_at(-camera.direction()).into();
+
+        self.render_billboard(Matrix4::from_translation(position) * rotation * Matrix4::from_scale(size), image, camera, system);
+    }
+
     pub fn render_billboard(&mut self, matrix: Matrix4<f32>, image: Image, camera: &Camera, system: &System) {
         let uniforms = self.uniforms(matrix, camera, system, &self.resources.images[image as usize], Mode::Shadeless);
         let params = self.draw_params();

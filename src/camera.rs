@@ -44,7 +44,7 @@ impl Camera {
         self.center.z -= amount * self.longitude.cos();
     }
 
-    fn direction(&self) -> Vector3<f32> {
+    pub fn direction(&self) -> Vector3<f32> {
         Vector3::new(
             self.longitude.sin() * self.latitude.cos(),
             self.latitude.sin(),

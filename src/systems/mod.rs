@@ -42,9 +42,7 @@ impl<'a> System<'a> for SpinSystem {
     }
 }
 
-pub struct DragSelectSystem<'a> {
-    pub context: &'a Context,
-}
+pub struct DragSelectSystem<'a>(pub &'a Context);
 
 impl<'a> System<'a> for DragSelectSystem<'a> {
     type SystemData = (
@@ -57,7 +55,7 @@ impl<'a> System<'a> for DragSelectSystem<'a> {
     fn run(&mut self, (controls, camera, pos, mut selectable): Self::SystemData) {
         if let Some((left, top, right, bottom)) = controls.left_drag_rect() {
             for (pos, selectable) in (&pos, &mut selectable).join() {
-                if let Some((x, y, _)) = self.context.screen_position(pos.0, &camera) {
+                if let Some((x, y, _)) = self.0.screen_position(pos.0, &camera) {
                     let selected = x >= left && x <= right && y >= top && y <= bottom;
                     
                     if !controls.shift {
@@ -171,9 +169,7 @@ fn handle_command(
     }
 }
 
-pub struct RightClickSystem<'a> {
-    pub context: &'a Context,
-}
+pub struct RightClickSystem<'a>(pub &'a Context);
 
 impl<'a> System<'a> for RightClickSystem<'a> {
     type SystemData = (
@@ -293,9 +289,7 @@ impl<'a> System<'a> for TimeStepSystem {
     }
 }
 
-pub struct LeftClickSystem<'a> {
-    pub context: &'a Context
-}
+pub struct LeftClickSystem<'a>(pub &'a Context);
 
 impl<'a> System<'a> for LeftClickSystem<'a> {
     type SystemData = (
@@ -319,9 +313,7 @@ impl<'a> System<'a> for LeftClickSystem<'a> {
     }
 }
 
-pub struct RightClickInteractionSystem<'a> {
-    pub context: &'a Context
-}
+pub struct RightClickInteractionSystem<'a>(pub &'a Context);
 
 impl<'a> System<'a> for RightClickInteractionSystem<'a> {
     type SystemData = (
@@ -362,7 +354,7 @@ impl<'a> System<'a> for RightClickInteractionSystem<'a> {
 
             order.command = Some(Command::GoToAnd(entity, interaction));
         } else {
-            let ray = self.context.ray(&camera, controls.mouse());
+            let ray = self.0.ray(&camera, controls.mouse());
 
             order.command = Plane::new(UP, -plane.0).intersection(&ray)
                 .map(|point| Command::MoveTo(point_to_vector(point)));
@@ -372,9 +364,7 @@ impl<'a> System<'a> for RightClickInteractionSystem<'a> {
     }
 }
 
-pub struct EntityUnderMouseSystem<'a> {
-    pub context: &'a Context
-}
+pub struct EntityUnderMouseSystem<'a>(pub &'a Context);
 
 impl<'a> System<'a> for EntityUnderMouseSystem<'a> {
     type SystemData = (
@@ -389,7 +379,7 @@ impl<'a> System<'a> for EntityUnderMouseSystem<'a> {
     );
 
     fn run(&mut self, (entities, camera, controls, mut entity, pos, rot, size, model): Self::SystemData) {
-        let ray = self.context.ray(&camera, controls.mouse());
+        let ray = self.0.ray(&camera, controls.mouse());
 
         entity.0 = (&entities, &pos, &rot, &size, &model).join()
             .filter_map(|(entity, pos, rot, size, model)| {
@@ -397,7 +387,7 @@ impl<'a> System<'a> for EntityUnderMouseSystem<'a> {
 
                 let transform = Matrix4::from_translation(pos.0) * rotation * Matrix4::from_scale(size.0);
 
-                let mesh = self.context.collision_mesh(*model);
+                let mesh = self.0.collision_mesh(*model);
                 
                 let bound: Aabb3<f32> = mesh.compute_bound();
 
@@ -507,5 +497,58 @@ impl<'a> System<'a> for StepLogSystem {
 
     fn run(&mut self, (secs, mut log): Self::SystemData) {
         log.step(secs.0);
+    }
+}
+
+pub struct TestDeleteSystem;
+
+impl<'a> System<'a> for TestDeleteSystem {
+    type SystemData = (
+        Entities<'a>,
+        Read<'a, Controls>,
+        WriteStorage<'a, Selectable>,
+        WriteStorage<'a, Position>,
+        WriteStorage<'a, Size>,
+        WriteStorage<'a, TimeLeft>,
+        WriteStorage<'a, Image>
+    );
+
+    fn run(&mut self, (entities, controls, selectable, mut position, mut size, mut time, mut image): Self::SystemData) {
+        if controls.delete {
+            (&entities, &selectable).join()
+                .filter(|(_, selectable)| selectable.selected)
+                .for_each(|(entity, _)| {
+                    let p = *position.get(entity).unwrap();
+                    let s = *size.get(entity).unwrap();
+
+                    entities.delete(entity).unwrap();
+
+                    entities.build_entity()
+                        .with(p, &mut position)
+                        .with(s, &mut size)
+                        .with(TimeLeft(2.0), &mut time)
+                        .with(Image::Star, &mut image)
+                        .build();
+                });
+        }
+    }
+}
+
+pub struct TickTimedEntities;
+
+impl<'a> System<'a> for TickTimedEntities {
+    type SystemData = (
+        Entities<'a>,
+        Read<'a, Secs>,
+        WriteStorage<'a, TimeLeft>
+    );
+
+    fn run(&mut self, (entities, secs, mut time): Self::SystemData) {
+        for (entity, time) in (&entities, &mut time).join() {
+            time.0 -= secs.0;
+            if time.0 < 0.0 {
+                entities.delete(entity).unwrap();
+            }
+        }
     }
 }

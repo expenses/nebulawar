@@ -39,7 +39,7 @@ pub struct AveragePosition(pub Option<Vector3<f32>>);
 #[derive(Component, Default, NewtypeProxy)]
 pub struct Events(pub Vec<WindowEvent>);
 
-#[derive(Deserialize, Serialize, Component, NewtypeProxy)]
+#[derive(Deserialize, Serialize, Component, NewtypeProxy, Clone, Copy)]
 pub struct Position(pub Vector3<f32>);
 
 #[derive(Deserialize, Serialize, Component, NewtypeProxy)]
@@ -48,7 +48,7 @@ pub struct Materials(pub StoredResource);
 #[derive(Deserialize, Serialize, Component, NewtypeProxy)]
 pub struct MineableMaterials(pub StoredResource);
 
-#[derive(Deserialize, Serialize, Component, NewtypeProxy)]
+#[derive(Deserialize, Serialize, Component, NewtypeProxy, Clone, Copy)]
 pub struct Size(pub f32);
 
 #[derive(Component, NewtypeProxy)]
@@ -181,3 +181,6 @@ pub struct DrillSpeed(pub f32);
 
 #[derive(Component, Default)]
 pub struct MovementPlane(pub f32);
+
+#[derive(Component)]
+pub struct TimeLeft(pub f32);

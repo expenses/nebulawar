@@ -89,7 +89,7 @@ pub fn load_wavefront(data: &[u8]) ->  Vec<Vertex> {
         .collect()
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Component)]
 pub enum Image {
     Star = 0,
     Button = 1,

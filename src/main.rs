@@ -34,7 +34,7 @@ use glium::*;
 use glutin::*;
 use glutin::dpi::*;
 use std::time::*;
-use specs::{World, RunNow, Entities, ReadStorage, Join};
+use specs::{World, RunNow};
 use specs::shred::FetchMut;
 
 mod camera;
@@ -94,11 +94,12 @@ impl Game {
         let mut controls: FetchMut<Controls> = self.world.write_resource();
 
         match key {
-            VirtualKeyCode::Left   | VirtualKeyCode::A => controls.left     = pressed,
-            VirtualKeyCode::Right  | VirtualKeyCode::D => controls.right    = pressed,
-            VirtualKeyCode::Up     | VirtualKeyCode::W => controls.forwards = pressed,
-            VirtualKeyCode::Down   | VirtualKeyCode::S => controls.back     = pressed,
-            VirtualKeyCode::LShift | VirtualKeyCode::T => controls.shift = pressed,
+            VirtualKeyCode::Left   | VirtualKeyCode::A      => controls.left     = pressed,
+            VirtualKeyCode::Right  | VirtualKeyCode::D      => controls.right    = pressed,
+            VirtualKeyCode::Up     | VirtualKeyCode::W      => controls.forwards = pressed,
+            VirtualKeyCode::Down   | VirtualKeyCode::S      => controls.back     = pressed,
+            VirtualKeyCode::LShift | VirtualKeyCode::T      => controls.shift    = pressed,
+            VirtualKeyCode::Back   | VirtualKeyCode::Delete => controls.delete   = pressed,
             _ => {}
         }
     }
@@ -122,18 +123,6 @@ impl Game {
             VirtualKeyCode::Slash if pressed => self.context.toggle_debug(),
             VirtualKeyCode::Comma if pressed => self.world.write_resource::<Formation>().rotate_left(),
             VirtualKeyCode::Period if pressed => self.world.write_resource::<Formation>().rotate_right(),
-            VirtualKeyCode::Back if pressed => {
-                let to_delete: Vec<_> = {
-                    let (entities, selectable): (Entities, ReadStorage<Selectable>) = self.world.system_data();
-
-                    (&entities, &selectable).join()
-                        .filter(|(_, selectable)| selectable.selected)
-                        .map(|(entity, _)| entity)
-                        .collect()
-                };
-
-                self.world.delete_entities(&to_delete).unwrap();
-            }
             _ => self.handle_kp2(key, pressed)
         }
     }
@@ -141,86 +130,44 @@ impl Game {
     fn update(&mut self, secs: f32) {
         *self.world.write_resource() = Secs(secs);
 
-        EventHandlerSystem.run_now(&self.world.res);
+        EventHandlerSystem                         .run_now(&self.world.res);
+        TestDeleteSystem                           .run_now(&self.world.res);
+        SpinSystem                                 .run_now(&self.world.res);
+        ShipMovementSystem                         .run_now(&self.world.res);
+        EntityUnderMouseSystem      (&self.context).run_now(&self.world.res);
+        AveragePositionSystem                      .run_now(&self.world.res);
+        RightClickInteractionSystem (&self.context).run_now(&self.world.res);
+        MiddleClickSystem                          .run_now(&self.world.res);
+        LeftClickSystem             (&self.context).run_now(&self.world.res);
+        DragSelectSystem            (&self.context).run_now(&self.world.res);
+        RightClickSystem            (&self.context).run_now(&self.world.res);
+        UpdateControlsSystem                       .run_now(&self.world.res);
+        TimeStepSystem                             .run_now(&self.world.res);
+        StepCameraSystem                           .run_now(&self.world.res);
+        StepLogSystem                              .run_now(&self.world.res);
+        TickTimedEntities                          .run_now(&self.world.res);
 
-        SpinSystem.run_now(&self.world.res);
-        ShipMovementSystem.run_now(&self.world.res);
-
-        EntityUnderMouseSystem {
-            context: &self.context
-        }.run_now(&self.world.res);
-
-        AveragePositionSystem.run_now(&self.world.res);
-
-        RightClickInteractionSystem {
-            context: &self.context
-        }.run_now(&self.world.res);
-
-        MiddleClickSystem.run_now(&self.world.res);
-
-        LeftClickSystem {
-            context: &self.context
-        }.run_now(&self.world.res);
-
-        DragSelectSystem {
-            context: &self.context
-        }.run_now(&self.world.res);
-
-        RightClickSystem {
-            context: &self.context
-        }.run_now(&self.world.res);
-
-        UpdateControlsSystem.run_now(&self.world.res);
-        TimeStepSystem.run_now(&self.world.res);
-        StepCameraSystem.run_now(&self.world.res);
-        StepLogSystem.run_now(&self.world.res);
+        self.world.maintain();
     }
 
     fn render(&mut self) {
         self.context.clear();
 
-        RenderSystem {
-            context: &mut self.context
-        }.run_now(&self.world.res);
-
-        RenderCommandPaths {
-            context: &mut self.context
-        }.run_now(&self.world.res);
-
-        ObjectRenderer {
-            context: &mut self.context
-        }.run_now(&self.world.res);
-
-        RenderDebug {
-            context: &mut self.context
-        }.run_now(&self.world.res);
-
-        RenderSelected {
-            context: &mut self.context
-        }.run_now(&self.world.res);
-
-        RenderMovementPlane {
-            context: &mut self.context
-        }.run_now(&self.world.res);
-
-        RenderUI {
-            context: &mut self.context
-        }.run_now(&self.world.res);
-
-        RenderLogSystem {
-            context: &mut self.context
-        }.run_now(&self.world.res);
-        
-        RenderDragSelection {
-            context: &mut self.context
-        }.run_now(&self.world.res);
+        RenderSystem        (&mut self.context).run_now(&self.world.res);
+        RenderCommandPaths  (&mut self.context).run_now(&self.world.res);
+        ObjectRenderer      (&mut self.context).run_now(&self.world.res);
+        RenderDebug         (&mut self.context).run_now(&self.world.res);
+        RenderSelected      (&mut self.context).run_now(&self.world.res);
+        RenderMovementPlane (&mut self.context).run_now(&self.world.res);
+        RenderUI            (&mut self.context).run_now(&self.world.res);
+        RenderLogSystem     (&mut self.context).run_now(&self.world.res);
+        RenderDragSelection (&mut self.context).run_now(&self.world.res);
 
         // actually draw ui components onto the screen
         self.context.flush_ui(&self.world.read_resource(), &self.world.read_resource());
 
-        RenderMouse {
-            context: &mut self.context
-        }.run_now(&self.world.res);
+        RenderBillboards (&mut self.context).run_now(&self.world.res);
+        RenderMouse      (&mut self.context).run_now(&self.world.res);
 
         self.context.finish();
     }
@@ -277,6 +224,8 @@ fn main() {
     world.register::<Side>();
     world.register::<DrillSpeed>();
     world.register::<MineableMaterials>();
+    world.register::<TimeLeft>();
+    world.register::<context::Image>();
 
     let mut events_loop = EventsLoop::new();
     

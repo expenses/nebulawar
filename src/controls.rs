@@ -66,7 +66,8 @@ pub struct Controls {
     pub right: bool,
     pub forwards: bool,
     pub back: bool,
-    pub shift: bool
+    pub shift: bool,
+    pub delete: bool
 }
 
 impl Controls {

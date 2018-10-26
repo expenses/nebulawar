@@ -7,9 +7,7 @@ use state;
 use super::*;
 use cgmath::Matrix4;
 
-pub struct ObjectRenderer<'a> {
-    pub context: &'a mut Context
-}
+pub struct ObjectRenderer<'a>(pub &'a mut Context);
 
 impl<'a> System<'a> for ObjectRenderer<'a> {
     type SystemData = (
@@ -23,14 +21,12 @@ impl<'a> System<'a> for ObjectRenderer<'a> {
 
     fn run(&mut self, (camera, system, pos, rot, size, model): Self::SystemData) {
         for (pos, rot, size, model) in (&pos, &rot, &size, &model).join() {
-            self.context.render_model(*model, pos.0, rot.0, size.0, &camera, &system);
+            self.0.render_model(*model, pos.0, rot.0, size.0, &camera, &system);
         }
     }
 }
 
-pub struct RenderSelected<'a> {
-    pub context: &'a mut Context
-}
+pub struct RenderSelected<'a>(pub &'a mut Context);
 
 impl<'a> System<'a> for RenderSelected<'a> {
     type SystemData = (
@@ -45,18 +41,16 @@ impl<'a> System<'a> for RenderSelected<'a> {
     fn run(&mut self, (entities, camera, pos, selectable, size, side): Self::SystemData) {
         for (entity, pos, selectable, side) in (&entities, &pos, &selectable, &side).join() {
             if selectable.selected {
-                if let Some((x, y, z)) = self.context.screen_position(pos.0, &camera) {
+                if let Some((x, y, z)) = self.0.screen_position(pos.0, &camera) {
                     let size = size.get(entity).map(|size| size.0).unwrap_or(1.0);
-                    self.context.render_circle(x, y, circle_size(z) * size, side.color());
+                    self.0.render_circle(x, y, circle_size(z) * size, side.color());
                 }
             }
         }
     }
 }
 
-pub struct RenderCommandPaths<'a> {
-    pub context: &'a mut Context
-}
+pub struct RenderCommandPaths<'a>(pub &'a mut Context);
 
 impl<'a> System<'a> for RenderCommandPaths<'a> {
     type SystemData = (
@@ -69,18 +63,16 @@ impl<'a> System<'a> for RenderCommandPaths<'a> {
             let points = iter_owned([pos.0])
                 .chain(commands.iter().map(|command| command.point(&positions)));
 
-            self.context.render_3d_lines(points);
+            self.0.render_3d_lines(points);
         }
     }
 }
 
-pub struct RenderUI<'a> {
-    pub context: &'a mut Context
-}
+pub struct RenderUI<'a>(pub &'a mut Context);
 
 impl<'a> RenderUI<'a> {
     fn render_text(&mut self, text: &str, y: &mut f32) {
-        self.context.render_text(text, 10.0, *y);
+        self.0.render_text(text, 10.0, *y);
         *y += 30.0;
     }
 }
@@ -143,9 +135,7 @@ impl<'a> System<'a> for RenderUI<'a> {
     }
 }
 
-pub struct RenderMouse<'a> {
-    pub context: &'a mut Context
-}
+pub struct RenderMouse<'a>(pub &'a mut Context);
 
 impl<'a> System<'a> for RenderMouse<'a> {
     type SystemData = (
@@ -157,14 +147,12 @@ impl<'a> System<'a> for RenderMouse<'a> {
         let (x, y) = controls.mouse();
 
         if let Some(Command::GoToAnd(_, interaction)) = order.command {
-            self.context.render_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4]);
+            self.0.render_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4]);
         }
     }
 }
 
-pub struct RenderDebug<'a> {
-    pub context: &'a mut Context
-}
+pub struct RenderDebug<'a>(pub &'a mut Context);
 
 impl<'a> System<'a> for RenderDebug<'a> {
     type SystemData = (
@@ -175,24 +163,22 @@ impl<'a> System<'a> for RenderDebug<'a> {
     );
 
     fn run(&mut self, (controls, camera, entity, system): Self::SystemData) {
-        if !self.context.is_debugging() {
+        if !self.0.is_debugging() {
             return;
         }
 
         if let Some((_, point)) = entity.0 {
-            self.context.render_model(Model::Asteroid, point, Quaternion::zero(), 1.0, &camera, &system);
+            self.0.render_model(Model::Asteroid, point, Quaternion::zero(), 1.0, &camera, &system);
         }
 
-        let ray = self.context.ray(&camera, controls.mouse());
+        let ray = self.0.ray(&camera, controls.mouse());
         if let Some(point) = Plane::new(UP, 0.0).intersection(&ray).map(point_to_vector) {
-            self.context.render_model(Model::Asteroid, point, Quaternion::zero(), 1.0, &camera, &system);
+            self.0.render_model(Model::Asteroid, point, Quaternion::zero(), 1.0, &camera, &system);
         }
     }
 }
 
-pub struct RenderSystem<'a> {
-    pub context: &'a mut Context
-}
+pub struct RenderSystem<'a>(pub &'a mut Context);
 
 impl<'a> System<'a> for RenderSystem<'a> {
     type SystemData = (
@@ -201,35 +187,31 @@ impl<'a> System<'a> for RenderSystem<'a> {
     );
 
     fn run(&mut self, (camera, system): Self::SystemData) {
-        self.context.render_skybox(&system, &camera);
-        self.context.render_stars(&system, &camera);
+        self.0.render_skybox(&system, &camera);
+        self.0.render_stars(&system, &camera);
 
         let offset = system.light * BACKGROUND_DISTANCE;
 
         let rotation: Matrix4<f32> = look_at(offset).into();
         let matrix = Matrix4::from_translation(camera.position() + offset) * rotation * Matrix4::from_scale(BACKGROUND_DISTANCE / 10.0);
 
-        self.context.render_billboard(matrix, Image::Star, &camera, &system);
+        self.0.render_billboard(matrix, Image::Star, &camera, &system);
     }
 }
 
-pub struct RenderDragSelection<'a> {
-    pub context: &'a mut Context
-}
+pub struct RenderDragSelection<'a>(pub &'a mut Context);
 
 impl<'a> System<'a> for RenderDragSelection<'a> {
     type SystemData = Read<'a, Controls>;
 
     fn run(&mut self, controls: Self::SystemData) {
         if let Some(origin) = controls.left_dragging() {
-            self.context.render_rect(origin, controls.mouse());
+            self.0.render_rect(origin, controls.mouse());
         }
     }
 }
 
-pub struct RenderMovementPlane<'a> {
-    pub context: &'a mut Context
-}
+pub struct RenderMovementPlane<'a>(pub &'a mut Context);
 
 impl<'a> System<'a> for RenderMovementPlane<'a> {
     type SystemData = Read<'a, MovementPlane>;
@@ -245,12 +227,12 @@ impl<'a> System<'a> for RenderMovementPlane<'a> {
         for i in 0 .. points + 1 {
             let i = i as f32 * 20.0 - radius;
 
-            self.context.render_3d_lines(iter_owned([
+            self.0.render_3d_lines(iter_owned([
                 Vector3::new(i, y, -radius),
                 Vector3::new(i, y, radius)
             ]));
 
-            self.context.render_3d_lines(iter_owned([
+            self.0.render_3d_lines(iter_owned([
                 Vector3::new(-radius, y, i),
                 Vector3::new(radius, y, i)
             ]));
@@ -258,14 +240,30 @@ impl<'a> System<'a> for RenderMovementPlane<'a> {
     }
 }
 
-pub struct RenderLogSystem<'a> {
-    pub context: &'a mut Context
-}
+pub struct RenderLogSystem<'a>(pub &'a mut Context);
 
 impl<'a> System<'a> for RenderLogSystem<'a>  {
     type SystemData = Read<'a, Log>;
 
     fn run(&mut self, log: Self::SystemData) {
-        log.render(&mut self.context);
+        log.render(&mut self.0);
+    }
+}
+
+pub struct RenderBillboards<'a>(pub &'a mut Context);
+
+impl<'a> System<'a> for RenderBillboards<'a> {
+    type SystemData = (
+        Read<'a, Camera>,
+        Read<'a, state::System>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, Size>,
+        ReadStorage<'a, Image>
+    );
+
+    fn run(&mut self, (camera, system, pos, size, image): Self::SystemData) {
+        for (pos, size, image) in (&pos, &size, &image).join() {
+            self.0.render_billboard_facing_camera(pos.0, size.0, *image, &camera, &system);
+        }
     }
 }
