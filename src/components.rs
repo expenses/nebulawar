@@ -210,3 +210,12 @@ impl SeekPosition {
         close_enough(self.target_point(point), point)
     }
 }
+
+#[derive(Component)]
+pub struct SeekForce(pub Vector3<f32>);
+
+#[derive(Component)]
+pub struct AvoidanceForce(pub Vector3<f32>);
+
+#[derive(Component)]
+pub struct FrictionForce(pub Vector3<f32>);

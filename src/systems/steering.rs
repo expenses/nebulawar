@@ -40,31 +40,31 @@ pub struct SeekSystem;
 
 impl<'a> System<'a> for SeekSystem {
     type SystemData = (
-        WriteStorage<'a, Velocity>,
+        Entities<'a>,
+        WriteStorage<'a, SeekForce>,
+        ReadStorage<'a, Velocity>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, SeekPosition>,
         ReadStorage<'a, MaxSpeed>
     );
 
-    fn run(&mut self, (mut vel, pos, seek, speed): Self::SystemData) {
-        for (vel, pos, seek, speed) in (&mut vel, &pos, &seek, &speed).join() {
+    fn run(&mut self, (entities, mut seek, vel, pos, seek_pos, speed): Self::SystemData) {
+        for (entity, vel, pos, seek_pos, speed) in (&entities, &vel, &pos, &seek_pos, &speed).join() {
             let max_speed = speed.0;
             let max_acceleration = 0.01;
 
             let braking_distance = vel.0.magnitude2() / (2.0 * max_acceleration);
 
-            let delta = seek.delta(pos.0);
+            let delta = seek_pos.delta(pos.0);
 
             let desired = if delta.magnitude() < braking_distance {
                 Vector3::zero()
             } else {
-                delta * max_speed
+                delta.normalize_to(max_speed)
             };
 
-            let steering = desired - vel.0;
-            let steering = truncate_vector(steering, max_acceleration);
-
-            vel.0 = truncate_vector(vel.0 + steering, max_speed);
+            let force = calc_force(vel.0, desired, max_acceleration);
+            seek.insert(entity, SeekForce(force)).unwrap();
         }
     }
 }
@@ -74,17 +74,119 @@ pub struct FinishSeekSystem;
 impl<'a> System<'a> for FinishSeekSystem {
     type SystemData = (
         Entities<'a>,
+        WriteStorage<'a, SeekForce>,
         WriteStorage<'a, SeekPosition>,
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, Position>
     );
 
-    fn run(&mut self, (entities, mut seek, mut vel, pos): Self::SystemData) {
+    fn run(&mut self, (entities, mut seek, mut seek_pos, mut vel, pos): Self::SystemData) {
         for (entity, vel, pos) in (&entities, &mut vel, &pos).join() {
-            if seek.get(entity).map(|seek| seek.close_enough(pos.0)).unwrap_or(false) {
+            if seek_pos.get(entity).map(|seek| seek.close_enough(pos.0)).unwrap_or(false) {
                 seek.remove(entity);
+                seek_pos.remove(entity);
                 vel.0 = Vector3::zero();
             }
         }
     }
+}
+
+pub struct AvoidanceSystem;
+
+impl<'a> System<'a> for AvoidanceSystem {
+    type SystemData = (
+        Entities<'a>,
+        WriteStorage<'a, AvoidanceForce>,
+        ReadStorage<'a, Velocity>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, MaxSpeed>,
+        ReadStorage<'a, Size>
+    );
+
+    fn run(&mut self, (entities, mut avoidance, vel, positions, speed, sizes): Self::SystemData) {
+        for (entity, vel, pos, speed, size) in (&entities, &vel, &positions, &speed, &sizes).join() {
+            let max_speed = speed.0;
+            let max_acceleration = 0.01;
+
+            let mut sum = Vector3::zero();
+            let mut count = 0;
+
+            for (p, s) in (&positions, &sizes).join() {
+                let distance = pos.0.distance(&p.0);
+
+                if distance > 0.0 && distance < (size.0 + s.0) {
+                    let diff = (pos.0 - p.0).normalize_to(1.0 / distance);
+                    sum += diff;
+                    count += 1;
+                }
+            }
+
+            let force = if count > 0 {
+                let desired = sum.normalize_to(max_speed);
+                calc_force(vel.0, desired, max_acceleration)
+            } else {
+                Vector3::zero()
+            };
+
+            avoidance.insert(entity, AvoidanceForce(force)).unwrap();
+        }
+    }
+}
+
+pub struct FrictionSystem;
+
+impl<'a> System<'a> for FrictionSystem {
+    type SystemData = (
+        Entities<'a>,
+        WriteStorage<'a, FrictionForce>,
+        ReadStorage<'a, Velocity>,
+        ReadStorage<'a, SeekPosition>
+    );
+
+    /*fn run(&mut self, (entities, mut friction, vel, seek): Self::SystemData) {
+        for (entity, vel, ()) in (&entities, &vel, !&seek).join() {
+            let force = calc_force(vel.0, Vector3::zero(), 0.01);
+            friction.insert(entity, FrictionForce(force)).unwrap();
+        }
+    }*/
+
+    fn run(&mut self, (entities, mut friction, vel, seek): Self::SystemData) {
+        for (entity, vel) in (&entities, &vel).join() {
+            let force = if seek.get(entity).is_none() {
+                calc_force(vel.0, Vector3::zero(), 0.01)                
+            } else {
+                Vector3::zero()
+            };            
+
+            friction.insert(entity, FrictionForce(force)).unwrap();
+        }
+    }
+}
+
+pub struct MergeForceSystem;
+
+impl<'a> System<'a> for MergeForceSystem {
+    type SystemData = (
+        Entities<'a>,
+        WriteStorage<'a, Velocity>,
+        ReadStorage<'a, SeekForce>,
+        ReadStorage<'a, AvoidanceForce>,
+        ReadStorage<'a, FrictionForce>,
+        ReadStorage<'a, MaxSpeed>
+    );
+
+    fn run(&mut self, (entities, mut vel, seek, avoid, friction, speed): Self::SystemData) {
+        for (entity, vel, avoid, friction, speed) in (&entities, &mut vel, &avoid, &friction, &speed).join() {
+            let seek = seek.get(entity).map(|seek| seek.0).unwrap_or(Vector3::zero());
+
+            let combined = seek + avoid.0 * 10.0 + friction.0;
+            let combined = limit_vector(combined, 0.01);
+            vel.0 = limit_vector(vel.0 + combined, speed.0);
+        }
+    }
+}
+
+fn calc_force(vel: Vector3<f32>, desired: Vector3<f32>, max_force: f32) -> Vector3<f32> {
+    let steering = desired - vel;
+    limit_vector(steering, max_force)
 }

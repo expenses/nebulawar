@@ -16,14 +16,14 @@ float map(float min, float max, float value) {
 const int NORMAL = 1;
 const int SHADELESS = 2;
 const int WHITE = 3;
-const int BACKGROUND = 4;
+const int VERTEX_COLORED = 4;
 
 const float MIN_LIGHT = 0.1;
 
 void main() {
     vec4 texture_color = texture(tex, v_texture);
 
-    if (mode == BACKGROUND) {
+    if (mode == VERTEX_COLORED) {
         color = vec4(o_normal, 1.0);
     } else if (mode == SHADELESS) {
         color = texture_color;

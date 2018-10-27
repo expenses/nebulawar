@@ -142,7 +142,7 @@ pub fn round_to(value: f32, round: f32) -> f32 {
     (value / round).round() * round
 }
 
-pub fn truncate_vector(vector: Vector3<f32>, max: f32) -> Vector3<f32> {
+pub fn limit_vector(vector: Vector3<f32>, max: f32) -> Vector3<f32> {
     checked_normalize_to(vector, vector.magnitude().min(max))
 }
 

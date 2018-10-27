@@ -167,7 +167,7 @@ impl<'a> System<'a> for RightClickSystem<'a> {
                     },
                     &Command::MoveTo(target) => {
                         if let Some(avg) = avg_pos.0 {
-                            let positions = formation.arrange(order.to_move.len(), avg, target, 2.5);
+                            let positions = formation.arrange(order.to_move.len(), avg, target, 4.0);
 
                             order.to_move.iter()
                                 .zip(positions)

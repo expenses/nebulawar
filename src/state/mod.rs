@@ -46,11 +46,10 @@ impl System {
 
         let stars = (0 .. stars)
             .map(|_| {
-                context::Vertex {
-                    position: (uniform_sphere_distribution(rng) * (BACKGROUND_DISTANCE + 100.0)).into(),
-                    normal: [0.0; 3],
-                    texture: [rng.gen_range(0.0_f32, 1.0); 2]
-                }
+                context::Vertex::with_brightness(
+                    uniform_sphere_distribution(rng) * (BACKGROUND_DISTANCE + 100.0),
+                    rng.gen_range(0.0_f32, 1.0)
+                )
             })
             .collect();
 
@@ -115,11 +114,10 @@ fn make_background(rng: &mut ThreadRng) -> Vec<context::Vertex> {
         .chain(triangles_to_fill_gap)
         // map to game vertices
         .map(|vertex| {
-            context::Vertex {
-                position: (vertex.vector * (BACKGROUND_DISTANCE + 2500.0)).into(),
-                normal: vertex.color,
-                texture: [1.0; 2]
-            }
+            context::Vertex::with_color(
+                vertex.vector * (BACKGROUND_DISTANCE + 2500.0),
+                vertex.color
+            )
         })
         // collect into vec
         .collect();

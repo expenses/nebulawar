@@ -63,7 +63,7 @@ impl<'a> System<'a> for RenderCommandPaths<'a> {
             let points = iter_owned([pos.0])
                 .chain(commands.iter().map(|command| command.point(&positions)));
 
-            self.0.render_3d_lines(points);
+            self.0.render_3d_lines(points, WHITE);
         }
     }
 }
@@ -161,13 +161,19 @@ pub struct RenderDebug<'a>(pub &'a mut Context);
 
 impl<'a> System<'a> for RenderDebug<'a> {
     type SystemData = (
+        Entities<'a>,
         Read<'a, Controls>,
         Read<'a, Camera>,
         Read<'a, EntityUnderMouse>,
-        Read<'a, state::System>
+        Read<'a, state::System>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, Velocity>,
+        ReadStorage<'a, SeekForce>,
+        ReadStorage<'a, AvoidanceForce>,
+        ReadStorage<'a, FrictionForce>
     );
 
-    fn run(&mut self, (controls, camera, entity, system): Self::SystemData) {
+    fn run(&mut self, (entities, controls, camera, entity, system, pos, vel, seek, avoid, friction): Self::SystemData) {
         if !self.0.is_debugging() {
             return;
         }
@@ -179,6 +185,30 @@ impl<'a> System<'a> for RenderDebug<'a> {
         let ray = self.0.ray(&camera, controls.mouse());
         if let Some(point) = Plane::new(UP, 0.0).intersection(&ray).map(point_to_vector) {
             self.0.render_model(Model::Asteroid, point, Quaternion::zero(), 1.0, &camera, &system);
+        }
+
+        let scale = 1000.0;
+
+        for (entity, pos, vel) in (&entities, &pos, &vel).join() {
+            let step = Vector3::new(0.0, 0.05, 0.0);
+            let mut pos = pos.0 + step;
+
+            if let Some(seek) = seek.get(entity) {
+                self.0.render_3d_lines(iter_owned([pos, pos + seek.0 * scale]), [1.0, 0.0, 0.0]);
+                pos += step;
+            }
+
+            if let Some(avoid) = avoid.get(entity) {
+                self.0.render_3d_lines(iter_owned([pos, pos + avoid.0 * scale]), [0.0, 1.0, 0.0]);
+                pos += step;
+            }
+
+            if let Some(friction) = friction.get(entity) {
+                self.0.render_3d_lines(iter_owned([pos, pos + friction.0 * scale]), [0.0, 0.0, 1.0]);
+                pos += step;
+            }
+
+            self.0.render_3d_lines(iter_owned([pos, pos + vel.0 * scale / 10.0]), [0.0, 1.0, 1.0]);
         }
     }
 }
@@ -239,12 +269,12 @@ impl<'a> System<'a> for RenderMovementPlane<'a> {
                 self.0.render_3d_lines(iter_owned([
                     point + Vector3::new(i, 0.0, -radius),
                     point + Vector3::new(i, 0.0, radius)
-                ]));
+                ]), WHITE);
 
                 self.0.render_3d_lines(iter_owned([
                     point + Vector3::new(-radius, 0.0, i),
                     point + Vector3::new(radius, 0.0, i)
-                ]));
+                ]), WHITE);
             }
         }
     }

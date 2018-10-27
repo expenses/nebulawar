@@ -4,6 +4,7 @@ mod resources;
 use self::lines::*;
 
 pub use self::resources::*;
+pub const WHITE: [f32; 3] = [1.0; 3];
 
 use cgmath::*;
 
@@ -41,7 +42,7 @@ pub enum Mode {
     Normal = 1,
     Shadeless = 2,
     White = 3,
-    Background = 4
+    VertexColored = 4
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize)]
@@ -52,11 +53,19 @@ pub struct Vertex {
 }
 
 impl Vertex {
-    fn new(position: Vector3<f32>) -> Self {
+    pub fn with_brightness(position: Vector3<f32>, brightness: f32) -> Self {
         Self {
             position: position.into(),
             normal: [0.0; 3],
-            texture: [1.0; 2]
+            texture: [brightness; 2]
+        }
+    }
+
+    pub fn with_color(position: Vector3<f32>, color: [f32; 3]) -> Self {
+        Self {
+            position: position.into(),
+            normal: color,
+            texture: [0.0; 2]
         }
     }
 }
@@ -123,7 +132,7 @@ impl Context {
             view: matrix_to_array(camera.view_matrix()),
             perspective: matrix_to_array(self.perspective_matrix()),
             light_direction: vector_to_array(system.light),
-            mode: Mode::White as i32
+            mode: Mode::VertexColored as i32
         };
 
         let vertices = VertexBuffer::new(&self.display, &self.lines_3d).unwrap();
@@ -180,7 +189,7 @@ impl Context {
     }
 
     pub fn render_skybox(&mut self, system: &System, camera: &Camera) {
-         let uniforms = self.background_uniforms(camera, system, Mode::Background);
+         let uniforms = self.background_uniforms(camera, system, Mode::VertexColored);
 
         let vertices = VertexBuffer::new(&self.display, &system.background).unwrap();
         let indices = NoIndices(PrimitiveType::TrianglesList);
@@ -298,11 +307,11 @@ impl Context {
         params
     }
 
-    pub fn render_3d_lines<I: Iterator<Item=Vector3<f32>>>(&mut self, iterator: I) {
+    pub fn render_3d_lines<I: Iterator<Item=Vector3<f32>>>(&mut self, iterator: I, color: [f32; 3]) {
         let mut last = None;
 
         for vector in iterator {
-            let vertex = Vertex::new(vector);
+            let vertex = Vertex::with_color(vector, color);
 
             if let Some(last) = last {
                 self.lines_3d.push(last);
