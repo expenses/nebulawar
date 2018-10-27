@@ -24,11 +24,7 @@ impl StoredResource {
             amount, capacity
         }
     }
-
-    pub fn percentage(&self) -> f32 {
-        self.amount / self.capacity
-    }
-
+    
     pub fn reduce(&mut self, amount: f32) -> f32 {
         let reduced_by = self.amount.min(amount);
         self.amount -= reduced_by;
@@ -43,14 +39,6 @@ impl StoredResource {
 
     pub fn is_empty(&self) -> bool {
         self.amount == 0.0
-    }
-
-    pub fn amount(&self) -> f32 {
-        self.amount
-    }
-
-    pub fn capacity(&self) -> f32 {
-        self.capacity
     }
 
     pub fn transfer_to(&mut self, other: &mut Self, amount: f32) -> f32 {

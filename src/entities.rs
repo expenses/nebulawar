@@ -17,12 +17,8 @@ pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, sid
         .with(tag)
         .with(Rotation(Quaternion::zero()))
         .with(Commands(Vec::new()))
-        .with(ShipStorage {
-            food: StoredResource::empty(500.0),
-            waste: StoredResource::full(1000.0)
-        })
+        // todo: make materials optional
         .with(Materials(StoredResource::empty(500.0)))
-        .with(Fuel(StoredResource::full(components.fuel_capacity())))
         .with(components)
         .with(Selectable::new(false))
         .with(side);

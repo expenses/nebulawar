@@ -80,7 +80,6 @@ impl<'a> System<'a> for ShipMovementSystem {
         WriteStorage<'a, Position>,
         WriteStorage<'a, components::Rotation>,
         WriteStorage<'a, Commands>,
-        WriteStorage<'a, Fuel>,
         WriteStorage<'a, Materials>,
         WriteStorage<'a, MineableMaterials>,
         ReadStorage<'a, ShipType>,
@@ -89,14 +88,14 @@ impl<'a> System<'a> for ShipMovementSystem {
         ReadStorage<'a, DrillSpeed>
     );
 
-    fn run(&mut self, (entities, paused, mut pos, mut rot, mut commands, mut fuel, mut materials, mut mineable, tag, components, size, drill_speed): Self::SystemData) {
+    fn run(&mut self, (entities, paused, mut pos, mut rot, mut commands, mut materials, mut mineable, tag, components, size, drill_speed): Self::SystemData) {
         if paused.0 {
             return;
         }
 
         for (entity, rot, commands, tag, components) in (&entities, &mut rot, &mut commands, &tag, &components).join() {
             let finished = commands.first()
-                .map(|command| handle_command(command, entity, rot, &mut pos, components, tag, &mut fuel, &mut materials, &mut mineable, &size, &drill_speed).unwrap_or(true))
+                .map(|command| handle_command(command, entity, rot, &mut pos, components, tag, &mut materials, &mut mineable, &size, &drill_speed).unwrap_or(true))
                 .unwrap_or(false);
             
             if finished {
@@ -106,31 +105,17 @@ impl<'a> System<'a> for ShipMovementSystem {
     }
 }
 
-#[derive(PartialEq)]
-enum MovementStatus {
-    Moving, 
-    Reached,
-    OutOfFuel
-}
-
-fn move_ship(entity: Entity, pos: &mut WriteStorage<Position>, fuel: &mut WriteStorage<Fuel>, rotation: &mut Quaternion<f32>, tag: &ShipType, components: &Components, point: Vector3<f32>) -> Option<MovementStatus> {
+fn move_ship(entity: Entity, pos: &mut WriteStorage<Position>, rotation: &mut Quaternion<f32>, tag: &ShipType, components: &Components, point: Vector3<f32>) -> Option<bool> {
     let pos = &mut pos.get_mut(entity)?.0;
-    let fuel = fuel.get_mut(entity)?;
-
-    if fuel.is_empty() {
-        return Some(MovementStatus::OutOfFuel);
-    }
     
-    fuel.reduce(0.01);
-
     let speed = components.thrust() / tag.mass();
     *pos = move_towards(*pos, point, speed);
 
     if *pos == point {
-        Some(MovementStatus::Reached)
+        Some(true)
     } else {
         *rotation = look_at(point - *pos);
-        Some(MovementStatus::Moving)
+        Some(false)
     }
 }
 
@@ -138,14 +123,12 @@ fn handle_command(
     command: &Command,
     entity: Entity, rot: &mut Quaternion<f32>, pos: &mut WriteStorage<Position>,
     components: &Components, tag: &ShipType,
-    fuel: &mut WriteStorage<Fuel>, materials: &mut WriteStorage<Materials>, mineable_materials: &mut WriteStorage<MineableMaterials>,
+    materials: &mut WriteStorage<Materials>, mineable_materials: &mut WriteStorage<MineableMaterials>,
     size: &ReadStorage<Size>, drill_speed: &ReadStorage<DrillSpeed>
 ) -> Option<bool> {
     
     match command {
-        Command::MoveTo(position) => {
-            Some(move_ship(entity, pos, fuel, rot, tag, components, *position)? == MovementStatus::Reached)
-        },
+        Command::MoveTo(position) => move_ship(entity, pos, rot, tag, components, *position),
         Command::GoToAnd(target, interaction) => {
             let position = pos.get(entity)?.0;
             let target_position = pos.get(*target)?.0;
@@ -155,15 +138,15 @@ fn handle_command(
             if position.distance(target_position) < distance {
                 match interaction {
                     Interaction::Follow => Some(false),
-                    Interaction::Refuel => transfer_from_storages(fuel, entity, *target, 0.1),
-                    Interaction::RefuelFrom => transfer_from_storages(fuel, *target, entity, 0.1),
                     Interaction::Mine => {
                         transfer_between_different(mineable_materials, materials, *target, entity, drill_speed.get(entity).unwrap().0)
                     },
                     Interaction::Attack => Some(true),
                 }
             } else {
-                Some(move_ship(entity, pos, fuel, rot, tag, components, target_position)? == MovementStatus::OutOfFuel)
+                move_ship(entity, pos, rot, tag, components, target_position)?;
+                
+                Some(false)
             }
         }
     }
@@ -323,14 +306,13 @@ impl<'a> System<'a> for RightClickInteractionSystem<'a> {
         Read<'a, Camera>,
         Read<'a, Controls>,
         Read<'a, MovementPlane>,
-        ReadStorage<'a, Fuel>,
         ReadStorage<'a, MineableMaterials>,
         ReadStorage<'a, Side>,
         ReadStorage<'a, Selectable>,
         ReadStorage<'a, DrillSpeed>
     );
 
-    fn run(&mut self, (entities, mut order, entity, camera, controls, plane, fuel, mineable, side, selectable, drill): Self::SystemData) {
+    fn run(&mut self, (entities, mut order, entity, camera, controls, plane, mineable, side, selectable, drill): Self::SystemData) {
         let ordering = (&entities, &selectable, &side).join()
             .filter(|(_, selectable, side)| selectable.selected && **side == Side::Friendly)
             .map(|(entity, _, _)| entity);
@@ -340,10 +322,6 @@ impl<'a> System<'a> for RightClickInteractionSystem<'a> {
                 order.to_move = ordering.collect();
 
                 Interaction::Attack
-            } else if fuel.get(entity).filter(|fuel| fuel.is_empty()).is_some() {
-                order.to_move = ordering.collect();
-
-                Interaction::Refuel
             } else if mineable.get(entity).filter(|mineable| !mineable.is_empty()).is_some() {
                 order.to_move = ordering.filter(|entity| drill.get(*entity).is_some()).collect();
 

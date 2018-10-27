@@ -14,8 +14,6 @@ pub use self::formations::*;
 #[derive(Deserialize, Serialize, Clone, Copy, Debug, PartialEq)]
 pub enum Interaction {
     Follow,
-    Refuel,
-    RefuelFrom,
     Mine,
     Attack
 }
@@ -24,8 +22,6 @@ impl Interaction {
     pub fn image(&self) -> Image {
         match *self {
             Interaction::Follow => Image::Move,
-            Interaction::RefuelFrom => Image::RefuelFrom,
-            Interaction::Refuel => Image::Refuel,
             Interaction::Mine => Image::Mine,
             Interaction::Attack => Image::Mine
         }
@@ -83,8 +79,7 @@ impl ShipType {
                 ],
                 ShipType::Tanker => vec![
                     ShipComponent::new(ShipComponentType::HG900Drive, age),
-                    ShipComponent::new(ShipComponentType::HG43WarpDrive, age),
-                    ShipComponent::new(ShipComponentType::FuelDrum, age)
+                    ShipComponent::new(ShipComponentType::HG43WarpDrive, age)
                 ],
                 ShipType::Carrier => vec![
                     ShipComponent::new(ShipComponentType::AX17KXDrive, age),
@@ -117,12 +112,6 @@ impl ShipType {
             ShipType::Miner => 2.0
         }
     }
-}
-
-#[derive(Component, Debug)]
-pub struct ShipStorage {
-    pub food: StoredResource,
-    pub waste: StoredResource
 }
 
 #[derive(Component, NewtypeProxy)]

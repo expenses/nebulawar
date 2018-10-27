@@ -208,8 +208,6 @@ fn main() {
     world.register::<ObjectSpin>();
     world.register::<Materials>();
     world.register::<Size>();
-    world.register::<Fuel>();
-    world.register::<ships::ShipStorage>();
     world.register::<Commands>();
     world.register::<components::Rotation>();
     world.register::<ships::components::Components>();

@@ -124,9 +124,6 @@ impl ObjectSpin {
     }
 }
 
-#[derive(Component, NewtypeProxy)]
-pub struct Fuel(pub StoredResource);
-
 #[derive(Component, PartialEq)]
 pub enum Side {
     Friendly,
@@ -186,4 +183,4 @@ pub struct MovementPlane(pub f32);
 pub struct TimeLeft(pub f32);
 
 #[derive(Component)]
-pub struct Vecocity(pub Vector3<f32>);
+pub struct Velocity(pub Vector3<f32>);

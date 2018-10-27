@@ -87,11 +87,11 @@ impl<'a> System<'a> for RenderUI<'a> {
         ReadStorage<'a, Selectable>,
         ReadStorage<'a, Occupation>,
         ReadStorage<'a, Parent>,
-        ReadStorage<'a, Fuel>,
-        ReadStorage<'a, Materials>
+        ReadStorage<'a, Materials>,
+        ReadStorage<'a, MineableMaterials>
     );
 
-    fn run(&mut self, (entities, time, formation, paused, tag, selectable, occupation, parent, fuel, materials): Self::SystemData) {
+    fn run(&mut self, (entities, time, formation, paused, tag, selectable, occupation, parent, materials, mineable): Self::SystemData) {
         let y = &mut 10.0;
 
         if paused.0 {
@@ -109,16 +109,21 @@ impl<'a> System<'a> for RenderUI<'a> {
             self.render_text(&format!("{:?}: {}", tag, num), y);
         }
 
-        let selected = (&entities, &fuel, &materials, &selectable).join()
-            .filter(|(_, _, _, selectable)| selectable.selected)
-            .map(|(entity, fuel, materials, _)| (entity, fuel, materials))
+        let entity = (&entities, &selectable).join()
+            .filter(|(_, selectable)| selectable.selected)
+            .map(|(entity, _)| entity)
             .next();
 
-        if let Some((entity, fuel, materials)) = selected {
+        if let Some(entity) = entity {
             self.render_text("---------------------", y);
-            self.render_text(&format!("Fuel: {:.2}%", fuel.percentage() * 100.0), y);
-            self.render_text(&format!("Materials: {:?}", **materials), y);
-            //self.render_text(&format!("Waste: {}", storage.waste), y);
+
+            if let Some(materials) = materials.get(entity) {
+                self.render_text(&format!("Materials: {}", materials.0), y);
+            }
+
+            if let Some(mineable) = mineable.get(entity) {
+                self.render_text(&format!("Mineable Materials: {}", mineable.0), y);
+            }
 
             let people = (&occupation, &parent).join()
                 .filter(|(_, parent)| parent.0 == entity)
@@ -126,7 +131,7 @@ impl<'a> System<'a> for RenderUI<'a> {
 
             let (people, total) = summarize(people);
 
-            self.render_text(&format!("Ship Population: {}", total), y);
+            self.render_text(&format!("Population: {}", total), y);
             
             for (tag, num) in people {
                 self.render_text(&format!("{:?}: {}", tag, num), y);

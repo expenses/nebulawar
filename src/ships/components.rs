@@ -1,33 +1,10 @@
 use specs::{Component, DenseVecStorage};
 
-#[derive(Copy, Clone)]
-pub enum Resource {
-    Fuel,
-    Waste,
-    Food,
-    Materials
-}
-
-pub struct Converter {
-    pub from: Resource,
-    pub to: Resource,
-    pub speed: f32
-}
-
-impl Converter {
-    pub fn new(from: Resource, to: Resource, speed: f32) -> Self {
-        Self {
-            from, to, speed
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Copy)]
 pub enum ShipComponentType {
     AX2900Drive,
     HG900Drive,
     HG43WarpDrive,
-    FuelDrum,
     Boltor89Cannons,
     AX17KXDrive,
     FoodRecycler,
@@ -49,23 +26,6 @@ impl ShipComponentType {
             ShipComponentType::HG43WarpDrive => true,
             ShipComponentType::AX17KXDrive => true,
             _ => false
-        }
-    }
-
-    pub fn fuel_capacity(self) -> f32 {
-        match self {
-            ShipComponentType::AX2900Drive => 20.0,
-            ShipComponentType::HG900Drive => 100.0,
-            ShipComponentType::FuelDrum => 2000.0,
-            ShipComponentType::AX17KXDrive => 200.0,
-            _ => 0.0
-        }
-    }
-
-    pub fn converter(self) -> Option<Converter> {
-        match self {
-            ShipComponentType::FoodRecycler => Some(Converter::new(Resource::Waste, Resource::Food, 1.0)),
-            _ => None
         }
     }
 
@@ -111,16 +71,8 @@ impl Components {
         self.inner.iter().map(ShipComponent::tag)
     }
 
-    pub fn fuel_capacity(&self) -> f32 {
-        self.component_types().map(ShipComponentType::fuel_capacity).sum()
-    }
-
     pub fn thrust(&self) -> f32 {
         self.component_types().map(ShipComponentType::thrust).sum() 
-    }
-
-    pub fn converters(&self) -> impl Iterator<Item=Converter> + '_ {
-        self.component_types().filter_map(ShipComponentType::converter)
     }
 
     pub fn drill_speed(&self) -> Option<f32> {

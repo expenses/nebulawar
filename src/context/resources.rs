@@ -94,9 +94,7 @@ pub enum Image {
     Star = 0,
     Button = 1,
     Move = 2,
-    Refuel = 3,
-    RefuelFrom = 4,
-    Mine = 5
+    Mine = 3
 }
 
 #[derive(Deserialize, Serialize, Component, Copy, Clone)]
@@ -136,7 +134,7 @@ impl ObjModel {
 
 pub struct Resources {
     pub models: [ObjModel; 5],
-    pub images: [SrgbTexture2d; 6],
+    pub images: [SrgbTexture2d; 4],
     pub font: runic::CachedFont<'static>
 }
 
@@ -154,8 +152,6 @@ impl Resources {
                 load_image(display, load_resource!("resources/star.png")),
                 load_image(display, load_resource!("resources/ui/button.png")),
                 load_image(display, load_resource!("resources/ui/move.png")),
-                load_image(display, load_resource!("resources/ui/refuel.png")),
-                load_image(display, load_resource!("resources/ui/refuel_from.png")),
                 load_image(display, load_resource!("resources/ui/mine.png"))
             ],
             font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display)?
