@@ -104,6 +104,9 @@ impl<'a> System<'a> for AvoidanceSystem {
     );
 
     fn run(&mut self, (entities, mut avoidance, vel, positions, speed, sizes): Self::SystemData) {
+        // collect the entity positions into a vec to avoid having to deref the ecs storage (which can be slow)
+        let entity_positions: Vec<_> = (&positions, &sizes).join().collect();
+
         for (entity, vel, pos, speed, size) in (&entities, &vel, &positions, &speed, &sizes).join() {
             let max_speed = speed.0;
             let max_acceleration = 0.01;
@@ -111,7 +114,7 @@ impl<'a> System<'a> for AvoidanceSystem {
             let mut sum = Vector3::zero();
             let mut count = 0;
 
-            for (p, s) in (&positions, &sizes).join() {
+            for (p, s) in &entity_positions {
                 let distance = pos.0.distance(&p.0);
 
                 if distance > 0.0 && distance < (size.0 + s.0) {

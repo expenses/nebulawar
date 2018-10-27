@@ -40,6 +40,7 @@ pub struct AveragePosition(pub Option<Vector3<f32>>);
 pub struct Events(pub Vec<WindowEvent>);
 
 #[derive(Deserialize, Serialize, Component, NewtypeProxy, Clone, Copy)]
+#[storage(VecStorage)]
 pub struct Position(pub Vector3<f32>);
 
 #[derive(Deserialize, Serialize, Component, NewtypeProxy)]
@@ -49,6 +50,7 @@ pub struct Materials(pub StoredResource);
 pub struct MineableMaterials(pub StoredResource);
 
 #[derive(Deserialize, Serialize, Component, NewtypeProxy, Clone, Copy)]
+#[storage(VecStorage)]
 pub struct Size(pub f32);
 
 #[derive(Component, NewtypeProxy)]
