@@ -255,6 +255,8 @@ impl Context {
         self.display.gl_window().get_hidpi_factor() as f32
     }
 
+    // todo: move screen dims into systems so the pers matrix can be generated
+
     // Get the screen position of a point if it is in front of the camera
     pub fn screen_position(&self, point: Vector3<f32>, camera: &Camera) -> Option<(f32, f32, f32)> {
         let modelview = camera.view_matrix() * Matrix4::from_translation(point);

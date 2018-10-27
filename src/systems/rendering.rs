@@ -1,6 +1,6 @@
 use util::*;
 use specs::*;
-use common_components;
+use components;
 use context::*;
 use circle_size;
 use state;
@@ -14,7 +14,7 @@ impl<'a> System<'a> for ObjectRenderer<'a> {
         Read<'a, Camera>,
         Read<'a, state::System>,
         ReadStorage<'a, Position>,
-        ReadStorage<'a, common_components::Rotation>,
+        ReadStorage<'a, components::Rotation>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, Model>
     );
@@ -214,28 +214,33 @@ impl<'a> System<'a> for RenderDragSelection<'a> {
 pub struct RenderMovementPlane<'a>(pub &'a mut Context);
 
 impl<'a> System<'a> for RenderMovementPlane<'a> {
-    type SystemData = Read<'a, MovementPlane>;
+    type SystemData = Read<'a, RightClickOrder>;
 
-    fn run(&mut self, plane: Self::SystemData) {
-    
-        let y = plane.0;
+    fn run(&mut self, order: Self::SystemData) {
+        if let Some(Command::MoveTo(point)) = order.command {
+            let distance = 20.0;
 
-        let points = 100;
+            let point = Vector3::new(round_to(point.x, distance), point.y, round_to(point.z, distance));
 
-        let radius = 1000.0;
+           // let y = plane.0;
 
-        for i in 0 .. points + 1 {
-            let i = i as f32 * 20.0 - radius;
+            let points = 5;
 
-            self.0.render_3d_lines(iter_owned([
-                Vector3::new(i, y, -radius),
-                Vector3::new(i, y, radius)
-            ]));
+            let radius = points as f32 * distance / 2.0;
 
-            self.0.render_3d_lines(iter_owned([
-                Vector3::new(-radius, y, i),
-                Vector3::new(radius, y, i)
-            ]));
+            for i in 0 .. points + 1 {
+                let i = i as f32 * distance - radius;
+
+                self.0.render_3d_lines(iter_owned([
+                    point + Vector3::new(i, 0.0, -radius),
+                    point + Vector3::new(i, 0.0, radius)
+                ]));
+
+                self.0.render_3d_lines(iter_owned([
+                    point + Vector3::new(-radius, 0.0, i),
+                    point + Vector3::new(radius, 0.0, i)
+                ]));
+            }
         }
     }
 }
@@ -265,5 +270,18 @@ impl<'a> System<'a> for RenderBillboards<'a> {
         for (pos, size, image) in (&pos, &size, &image).join() {
             self.0.render_billboard_facing_camera(pos.0, size.0, *image, &camera, &system);
         }
+    }
+}
+
+pub struct FlushUI<'a>(pub &'a mut Context);
+
+impl<'a> System<'a> for FlushUI<'a> {
+    type SystemData = (
+        Read<'a, Camera>,
+        Read<'a, state::System>
+    );
+
+    fn run(&mut self, (camera, system): Self::SystemData) {
+        self.0.flush_ui(&camera, &system);
     }
 }

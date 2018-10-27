@@ -137,3 +137,7 @@ pub fn uniform_sphere_distribution(rng: &mut ThreadRng) -> Vector3<f32> {
 pub fn cmp_floats(a: f32, b: f32) -> Ordering {
     a.partial_cmp(&b).unwrap_or(Ordering::Less)
 }
+
+pub fn round_to(value: f32, round: f32) -> f32 {
+    (value / round).round() * round
+}

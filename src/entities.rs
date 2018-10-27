@@ -1,4 +1,4 @@
-use common_components::*;
+use components::*;
 use specs::{World, Builder, Entity};
 use ships::*;
 use cgmath::{Vector3, Quaternion, Zero};

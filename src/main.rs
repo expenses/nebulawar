@@ -43,13 +43,13 @@ mod context;
 mod ships;
 mod controls;
 mod state;
-mod common_components;
+mod components;
 mod systems;
 mod entities;
 
 use state::*;
 use controls::*;
-use common_components::*;
+use components::*;
 use systems::*;
 use util::*;
 use ships::*;
@@ -162,12 +162,9 @@ impl Game {
         RenderUI            (&mut self.context).run_now(&self.world.res);
         RenderLogSystem     (&mut self.context).run_now(&self.world.res);
         RenderDragSelection (&mut self.context).run_now(&self.world.res);
-
-        // actually draw ui components onto the screen
-        self.context.flush_ui(&self.world.read_resource(), &self.world.read_resource());
-
-        RenderBillboards (&mut self.context).run_now(&self.world.res);
-        RenderMouse      (&mut self.context).run_now(&self.world.res);
+        FlushUI             (&mut self.context).run_now(&self.world.res);
+        RenderBillboards    (&mut self.context).run_now(&self.world.res);
+        RenderMouse         (&mut self.context).run_now(&self.world.res);
 
         self.context.finish();
     }
@@ -214,7 +211,7 @@ fn main() {
     world.register::<Fuel>();
     world.register::<ships::ShipStorage>();
     world.register::<Commands>();
-    world.register::<common_components::Rotation>();
+    world.register::<components::Rotation>();
     world.register::<ships::components::Components>();
     world.register::<ships::ShipType>();
     world.register::<Selectable>();

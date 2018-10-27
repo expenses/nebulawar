@@ -184,3 +184,6 @@ pub struct MovementPlane(pub f32);
 
 #[derive(Component)]
 pub struct TimeLeft(pub f32);
+
+#[derive(Component)]
+pub struct Vecocity(pub Vector3<f32>);

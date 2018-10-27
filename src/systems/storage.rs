@@ -1,6 +1,6 @@
 use specs::*;
 use ships::StoredResource;
-use common_components::*;
+use components::*;
 
 impl<'a> StorageGetter for WriteStorage<'a, Fuel> {
     fn get(&self, entity: Entity) -> Option<&StoredResource> {

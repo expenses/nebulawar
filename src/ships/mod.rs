@@ -1,7 +1,7 @@
 use cgmath::Vector3;
 use context::*;
 use specs::{DenseVecStorage, Component, Entity, ReadStorage};
-use common_components::*;
+use components::*;
 
 pub mod components;
 mod storage;

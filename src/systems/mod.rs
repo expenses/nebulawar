@@ -1,5 +1,5 @@
 use specs::*;
-use common_components::{self, *};
+use components::{self, *};
 use context::*;
 use camera::*;
 use ships::*;
@@ -23,7 +23,7 @@ impl<'a> System<'a> for SpinSystem {
         Read<'a, Secs>,
         Read<'a, Paused>,
         WriteStorage<'a, ObjectSpin>,
-        WriteStorage<'a, common_components::Rotation>
+        WriteStorage<'a, components::Rotation>
     );
 
     fn run(&mut self, (entities, secs, paused, mut spins, mut rotations): Self::SystemData) {
@@ -36,7 +36,7 @@ impl<'a> System<'a> for SpinSystem {
 
             rotations.insert(
                 entity,
-                common_components::Rotation(spin.to_quat())
+                components::Rotation(spin.to_quat())
             ).unwrap();
         }
     }
@@ -78,7 +78,7 @@ impl<'a> System<'a> for ShipMovementSystem {
         Entities<'a>,
         Read<'a, Paused>,
         WriteStorage<'a, Position>,
-        WriteStorage<'a, common_components::Rotation>,
+        WriteStorage<'a, components::Rotation>,
         WriteStorage<'a, Commands>,
         WriteStorage<'a, Fuel>,
         WriteStorage<'a, Materials>,
@@ -373,7 +373,7 @@ impl<'a> System<'a> for EntityUnderMouseSystem<'a> {
         Read<'a, Controls>,
         Write<'a, EntityUnderMouse>,
         ReadStorage<'a, Position>,
-        ReadStorage<'a, common_components::Rotation>,
+        ReadStorage<'a, components::Rotation>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, Model>
     );

@@ -86,7 +86,7 @@ impl Default for System {
 
 // https://www.redblobgames.com/x/1842-delaunay-voronoi-sphere/#delaunay
 fn make_background(rng: &mut ThreadRng) -> Vec<context::Vertex> {
-    let nebula_color = Color::new(rng.gen_range(0.0, 360.0), 1.0, 1.0, 1.0).from_hsv();
+    let nebula_color = Color::new(rng.gen_range(0.0, 360.0), 1.0, rng.gen_range(0.5, 1.0), 1.0).from_hsv();
     let nebula_color = Vector3::new(nebula_color.red as f32, nebula_color.green as f32, nebula_color.blue as f32);
 
     let mut dlt = FloatDelaunayTriangulation::with_walk_locate();
