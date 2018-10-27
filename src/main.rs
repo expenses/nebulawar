@@ -132,6 +132,7 @@ impl Game {
 
         EventHandlerSystem                         .run_now(&self.world.res);
         TestDeleteSystem                           .run_now(&self.world.res);
+        VelocitySystem                             .run_now(&self.world.res);
         SpinSystem                                 .run_now(&self.world.res);
         ShipMovementSystem                         .run_now(&self.world.res);
         EntityUnderMouseSystem      (&self.context).run_now(&self.world.res);
@@ -221,6 +222,7 @@ fn main() {
     world.register::<MineableMaterials>();
     world.register::<TimeLeft>();
     world.register::<context::Image>();
+    world.register::<Velocity>();
 
     let mut events_loop = EventsLoop::new();
     

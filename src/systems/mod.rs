@@ -3,7 +3,7 @@ use components::{self, *};
 use context::*;
 use camera::*;
 use ships::*;
-use cgmath::{Vector3, Quaternion, Zero, Matrix4, MetricSpace};
+use cgmath::{Vector3, Quaternion, Zero, Matrix4, MetricSpace, InnerSpace};
 use util::*;
 use collision::*;
 use controls::Controls;
@@ -77,25 +77,26 @@ impl<'a> System<'a> for ShipMovementSystem {
     type SystemData = (
         Entities<'a>,
         Read<'a, Paused>,
-        WriteStorage<'a, Position>,
+        WriteStorage<'a, Velocity>,
         WriteStorage<'a, components::Rotation>,
         WriteStorage<'a, Commands>,
         WriteStorage<'a, Materials>,
         WriteStorage<'a, MineableMaterials>,
+        ReadStorage<'a, Position>,
         ReadStorage<'a, ShipType>,
         ReadStorage<'a, Components>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, DrillSpeed>
     );
 
-    fn run(&mut self, (entities, paused, mut pos, mut rot, mut commands, mut materials, mut mineable, tag, components, size, drill_speed): Self::SystemData) {
+    fn run(&mut self, (entities, paused, mut vel, mut rot, mut commands, mut materials, mut mineable, pos, tag, components, size, drill_speed): Self::SystemData) {
         if paused.0 {
             return;
         }
 
         for (entity, rot, commands, tag, components) in (&entities, &mut rot, &mut commands, &tag, &components).join() {
             let finished = commands.first()
-                .map(|command| handle_command(command, entity, rot, &mut pos, components, tag, &mut materials, &mut mineable, &size, &drill_speed).unwrap_or(true))
+                .map(|command| handle_command(command, entity, rot, &mut vel, components, tag, &mut materials, &mut mineable, &size, &drill_speed, &pos).unwrap_or(true))
                 .unwrap_or(false);
             
             if finished {
@@ -105,30 +106,32 @@ impl<'a> System<'a> for ShipMovementSystem {
     }
 }
 
-fn move_ship(entity: Entity, pos: &mut WriteStorage<Position>, rotation: &mut Quaternion<f32>, tag: &ShipType, components: &Components, point: Vector3<f32>) -> Option<bool> {
-    let pos = &mut pos.get_mut(entity)?.0;
-    
+fn move_ship(entity: Entity, vel: &mut WriteStorage<Velocity>, pos: Vector3<f32>, rotation: &mut Quaternion<f32>, tag: &ShipType, components: &Components, point: Vector3<f32>) -> Option<bool> {    
     let speed = components.thrust() / tag.mass();
-    *pos = move_towards(*pos, point, speed);
 
-    if *pos == point {
+    if pos == point {
+        vel.get_mut(entity)?.0 = Vector3::zero();
         Some(true)
     } else {
-        *rotation = look_at(point - *pos);
+        let delta = point - pos;
+
+        vel.get_mut(entity)?.0 = delta.normalize_to(speed.min(delta.magnitude()));
+
+        *rotation = look_at(delta);
         Some(false)
     }
 }
 
 fn handle_command(
     command: &Command,
-    entity: Entity, rot: &mut Quaternion<f32>, pos: &mut WriteStorage<Position>,
+    entity: Entity, rot: &mut Quaternion<f32>, vel: &mut WriteStorage<Velocity>,
     components: &Components, tag: &ShipType,
     materials: &mut WriteStorage<Materials>, mineable_materials: &mut WriteStorage<MineableMaterials>,
-    size: &ReadStorage<Size>, drill_speed: &ReadStorage<DrillSpeed>
+    size: &ReadStorage<Size>, drill_speed: &ReadStorage<DrillSpeed>, pos: &ReadStorage<Position>
 ) -> Option<bool> {
     
     match command {
-        Command::MoveTo(position) => move_ship(entity, pos, rot, tag, components, *position),
+        Command::MoveTo(position) => move_ship(entity, vel, pos.get(entity)?.0, rot, tag, components, *position),
         Command::GoToAnd(target, interaction) => {
             let position = pos.get(entity)?.0;
             let target_position = pos.get(*target)?.0;
@@ -144,8 +147,8 @@ fn handle_command(
                     Interaction::Attack => Some(true),
                 }
             } else {
-                move_ship(entity, pos, rot, tag, components, target_position)?;
-                
+                move_ship(entity, vel, pos.get(entity)?.0, rot, tag, components, target_position)?;
+
                 Some(false)
             }
         }
@@ -527,6 +530,21 @@ impl<'a> System<'a> for TickTimedEntities {
             if time.0 < 0.0 {
                 entities.delete(entity).unwrap();
             }
+        }
+    }
+}
+
+pub struct VelocitySystem;
+
+impl<'a> System<'a> for VelocitySystem {
+    type SystemData = (
+        WriteStorage<'a, Position>,
+        ReadStorage<'a, Velocity>
+    );
+
+    fn run(&mut self, (mut position, velocity): Self::SystemData) {
+        for (position, velocity) in (&mut position, &velocity).join() {
+            position.0 += velocity.0;
         }
     }
 }

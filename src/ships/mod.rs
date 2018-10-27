@@ -126,25 +126,3 @@ impl Commands {
         self.0.push(command);
     }
 }
-
-/*
-        let converters: Vec<_> = iter_owned([Converter::new(Resource::Food, Resource::Waste, num_people as f32 / 3600.0)])
-            .chain(self.components.converters())
-            .collect();
-
-        for converter in converters {
-            let amount = {
-                let from = self.get_resource(converter.from);
-                let to = self.get_resource(converter.to);
-                from.transfer_amount(to, converter.speed * secs)
-            };
-
-            self.get_resource_mut(converter.from).reduce(amount);
-            self.get_resource_mut(converter.to).increase(amount);
-        }
-
-    pub fn command_path<'a>(&'a self, ships: &'a Ships) -> impl Iterator<Item=Vector3<f32>> + 'a {
-        iter_owned([self.position()])
-            .chain(self.commands.iter().map(move |command| command.point(ships)))
-    }
-}*/

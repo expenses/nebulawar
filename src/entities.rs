@@ -21,6 +21,7 @@ pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, sid
         .with(Materials(StoredResource::empty(500.0)))
         .with(components)
         .with(Selectable::new(false))
+        .with(Velocity(Vector3::zero()))
         .with(side);
 
     if let Some(speed) = drill_speed {
