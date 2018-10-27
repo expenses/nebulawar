@@ -141,3 +141,21 @@ pub fn cmp_floats(a: f32, b: f32) -> Ordering {
 pub fn round_to(value: f32, round: f32) -> f32 {
     (value / round).round() * round
 }
+
+pub fn truncate_vector(vector: Vector3<f32>, max: f32) -> Vector3<f32> {
+    checked_normalize_to(vector, vector.magnitude().min(max))
+}
+
+pub fn checked_normalize_to(vector: Vector3<f32>, value: f32) -> Vector3<f32> {
+    if value == 0.0 {
+        Vector3::zero()
+    } else {
+        vector.normalize_to(value)
+    }
+}
+
+pub const CLOSE_ENOUGH_DISTANCE: f32 = 0.1;
+
+pub fn close_enough(a: Vector3<f32>, b: Vector3<f32>) -> bool {
+    a.distance2(b) < CLOSE_ENOUGH_DISTANCE
+}

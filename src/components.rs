@@ -184,3 +184,29 @@ pub struct TimeLeft(pub f32);
 
 #[derive(Component)]
 pub struct Velocity(pub Vector3<f32>);
+
+#[derive(Component)]
+pub struct MaxSpeed(pub f32);
+
+#[derive(Component)]
+pub enum SeekPosition {
+    Point(Vector3<f32>),
+    WithinDistance(Vector3<f32>, f32)
+}
+
+impl SeekPosition {
+    pub fn target_point(&self, from: Vector3<f32>) -> Vector3<f32> {
+        match *self {
+            SeekPosition::Point(point) => point,
+            SeekPosition::WithinDistance(point, distance) => point + (from - point).normalize_to(distance)
+        }
+    }
+
+    pub fn delta(&self, point: Vector3<f32>) -> Vector3<f32> {
+        self.target_point(point) - point
+    }
+
+    pub fn close_enough(&self, point: Vector3<f32>) -> bool {
+        close_enough(self.target_point(point), point)
+    }
+}

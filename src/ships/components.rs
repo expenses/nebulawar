@@ -1,5 +1,3 @@
-use specs::{Component, DenseVecStorage};
-
 #[derive(Debug, Clone, Serialize, Deserialize, Copy)]
 pub enum ShipComponentType {
     AX2900Drive,
@@ -55,7 +53,7 @@ impl ShipComponent {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Component)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Components {
     inner: Vec<ShipComponent>
 }

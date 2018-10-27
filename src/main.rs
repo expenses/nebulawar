@@ -132,7 +132,12 @@ impl Game {
 
         EventHandlerSystem                         .run_now(&self.world.res);
         TestDeleteSystem                           .run_now(&self.world.res);
-        VelocitySystem                             .run_now(&self.world.res);
+
+        SeekSystem                                 .run_now(&self.world.res);
+        ApplyVelocitySystem                        .run_now(&self.world.res);
+        SetRotationSystem                          .run_now(&self.world.res);
+        FinishSeekSystem                           .run_now(&self.world.res);
+        
         SpinSystem                                 .run_now(&self.world.res);
         ShipMovementSystem                         .run_now(&self.world.res);
         EntityUnderMouseSystem      (&self.context).run_now(&self.world.res);
@@ -211,7 +216,6 @@ fn main() {
     world.register::<Size>();
     world.register::<Commands>();
     world.register::<components::Rotation>();
-    world.register::<ships::components::Components>();
     world.register::<ships::ShipType>();
     world.register::<Selectable>();
     world.register::<CreationTime>();
@@ -223,6 +227,8 @@ fn main() {
     world.register::<TimeLeft>();
     world.register::<context::Image>();
     world.register::<Velocity>();
+    world.register::<MaxSpeed>();
+    world.register::<SeekPosition>();
 
     let mut events_loop = EventsLoop::new();
     

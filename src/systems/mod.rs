@@ -3,7 +3,7 @@ use components::{self, *};
 use context::*;
 use camera::*;
 use ships::*;
-use cgmath::{Vector3, Quaternion, Zero, Matrix4, MetricSpace, InnerSpace};
+use cgmath::{Vector3, Quaternion, Zero, Matrix4, MetricSpace};
 use util::*;
 use collision::*;
 use controls::Controls;
@@ -11,8 +11,10 @@ use glium::glutin::{WindowEvent, MouseScrollDelta, dpi::LogicalPosition};
 
 mod rendering;
 mod storage;
+mod steering;
 
 pub use self::rendering::*;
+pub use self::steering::*;
 use self::storage::*;
 
 pub struct SpinSystem;
@@ -77,26 +79,23 @@ impl<'a> System<'a> for ShipMovementSystem {
     type SystemData = (
         Entities<'a>,
         Read<'a, Paused>,
-        WriteStorage<'a, Velocity>,
-        WriteStorage<'a, components::Rotation>,
         WriteStorage<'a, Commands>,
         WriteStorage<'a, Materials>,
         WriteStorage<'a, MineableMaterials>,
+        WriteStorage<'a, SeekPosition>,
         ReadStorage<'a, Position>,
-        ReadStorage<'a, ShipType>,
-        ReadStorage<'a, Components>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, DrillSpeed>
     );
 
-    fn run(&mut self, (entities, paused, mut vel, mut rot, mut commands, mut materials, mut mineable, pos, tag, components, size, drill_speed): Self::SystemData) {
+    fn run(&mut self, (entities, paused, mut commands, mut materials, mut mineable, mut seek, pos, size, drill_speed): Self::SystemData) {
         if paused.0 {
             return;
         }
 
-        for (entity, rot, commands, tag, components) in (&entities, &mut rot, &mut commands, &tag, &components).join() {
+        for (entity, commands) in (&entities, &mut commands).join() {
             let finished = commands.first()
-                .map(|command| handle_command(command, entity, rot, &mut vel, components, tag, &mut materials, &mut mineable, &size, &drill_speed, &pos).unwrap_or(true))
+                .map(|command| handle_command(command, entity, &mut materials, &mut mineable, &size, &drill_speed, &pos, &mut seek).unwrap_or(true))
                 .unwrap_or(false);
             
             if finished {
@@ -106,39 +105,32 @@ impl<'a> System<'a> for ShipMovementSystem {
     }
 }
 
-fn move_ship(entity: Entity, vel: &mut WriteStorage<Velocity>, pos: Vector3<f32>, rotation: &mut Quaternion<f32>, tag: &ShipType, components: &Components, point: Vector3<f32>) -> Option<bool> {    
-    let speed = components.thrust() / tag.mass();
-
-    if pos == point {
-        vel.get_mut(entity)?.0 = Vector3::zero();
-        Some(true)
-    } else {
-        let delta = point - pos;
-
-        vel.get_mut(entity)?.0 = delta.normalize_to(speed.min(delta.magnitude()));
-
-        *rotation = look_at(delta);
-        Some(false)
-    }
-}
-
 fn handle_command(
     command: &Command,
-    entity: Entity, rot: &mut Quaternion<f32>, vel: &mut WriteStorage<Velocity>,
-    components: &Components, tag: &ShipType,
+    entity: Entity,
     materials: &mut WriteStorage<Materials>, mineable_materials: &mut WriteStorage<MineableMaterials>,
-    size: &ReadStorage<Size>, drill_speed: &ReadStorage<DrillSpeed>, pos: &ReadStorage<Position>
+    size: &ReadStorage<Size>, drill_speed: &ReadStorage<DrillSpeed>, pos: &ReadStorage<Position>,
+    seek: &mut WriteStorage<SeekPosition>
 ) -> Option<bool> {
     
+    let entity_position = pos.get(entity)?.0;
+
     match command {
-        Command::MoveTo(position) => move_ship(entity, vel, pos.get(entity)?.0, rot, tag, components, *position),
+        Command::MoveTo(position) => {
+            let reached = close_enough(entity_position, *position);
+
+            if !reached {
+                seek.insert(entity, SeekPosition::Point(*position)).unwrap();
+            }
+
+            Some(reached)
+        },
         Command::GoToAnd(target, interaction) => {
-            let position = pos.get(entity)?.0;
             let target_position = pos.get(*target)?.0;
 
             let distance = size.get(*target)?.0 + size.get(entity)?.0;
 
-            if position.distance(target_position) < distance {
+            if entity_position.distance(target_position) - CLOSE_ENOUGH_DISTANCE < distance {
                 match interaction {
                     Interaction::Follow => Some(false),
                     Interaction::Mine => {
@@ -147,8 +139,7 @@ fn handle_command(
                     Interaction::Attack => Some(true),
                 }
             } else {
-                move_ship(entity, vel, pos.get(entity)?.0, rot, tag, components, target_position)?;
-
+                seek.insert(entity, SeekPosition::WithinDistance(target_position, distance)).unwrap();
                 Some(false)
             }
         }
@@ -530,21 +521,6 @@ impl<'a> System<'a> for TickTimedEntities {
             if time.0 < 0.0 {
                 entities.delete(entity).unwrap();
             }
-        }
-    }
-}
-
-pub struct VelocitySystem;
-
-impl<'a> System<'a> for VelocitySystem {
-    type SystemData = (
-        WriteStorage<'a, Position>,
-        ReadStorage<'a, Velocity>
-    );
-
-    fn run(&mut self, (mut position, velocity): Self::SystemData) {
-        for (position, velocity) in (&mut position, &velocity).join() {
-            position.0 += velocity.0;
         }
     }
 }

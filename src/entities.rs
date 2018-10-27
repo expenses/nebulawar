@@ -8,23 +8,21 @@ use context::*;
 pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, side: Side) -> Entity {
     let components = tag.default_components(0);
 
-    let drill_speed = components.drill_speed();
-
     let mut entity = world.create_entity()
         .with(Position(position))
         .with(Size(tag.size()))
         .with(tag.model())
+        .with(MaxSpeed(components.thrust() / tag.mass()))
         .with(tag)
         .with(Rotation(Quaternion::zero()))
         .with(Commands(Vec::new()))
         // todo: make materials optional
         .with(Materials(StoredResource::empty(500.0)))
-        .with(components)
         .with(Selectable::new(false))
         .with(Velocity(Vector3::zero()))
         .with(side);
 
-    if let Some(speed) = drill_speed {
+    if let Some(speed) = components.drill_speed() {
         entity = entity.with(DrillSpeed(speed));
     }
 
