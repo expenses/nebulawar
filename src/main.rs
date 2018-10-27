@@ -46,6 +46,7 @@ mod state;
 mod components;
 mod systems;
 mod entities;
+mod tests;
 
 use state::*;
 use controls::*;
@@ -201,42 +202,7 @@ fn main() {
 
     let mut world = World::new();
     
-    world.add_resource(Time(0.0));
-    world.add_resource(Secs(0.0));
-    world.add_resource(Formation::default());
-    world.add_resource(camera::Camera::default());
-    world.add_resource(Paused(false));
-    world.add_resource(RightClickOrder::default());
-    world.add_resource(EntityUnderMouse(None));
-    world.add_resource(Controls::default());
-    world.add_resource(AveragePosition(None));
-    world.add_resource(Events(Vec::new()));
-    world.add_resource(Log(Vec::new()));
-    world.add_resource(MovementPlane(0.0));
-
-    world.register::<context::Model>();
-    world.register::<Position>();
-    world.register::<ObjectSpin>();
-    world.register::<Materials>();
-    world.register::<Size>();
-    world.register::<Commands>();
-    world.register::<components::Rotation>();
-    world.register::<ships::ShipType>();
-    world.register::<Selectable>();
-    world.register::<CreationTime>();
-    world.register::<Parent>();
-    world.register::<Occupation>();
-    world.register::<Side>();
-    world.register::<DrillSpeed>();
-    world.register::<MineableMaterials>();
-    world.register::<TimeLeft>();
-    world.register::<context::Image>();
-    world.register::<Velocity>();
-    world.register::<MaxSpeed>();
-    world.register::<SeekPosition>();
-    world.register::<SeekForce>();
-    world.register::<AvoidanceForce>();
-    world.register::<FrictionForce>();
+    setup_world(&mut world);
 
     let mut events_loop = EventsLoop::new();
     
@@ -274,4 +240,43 @@ fn main() {
 // todo: redo circle drawing
 fn circle_size(z: f32) -> f32 {
     FAR / 2.0 * (1.0 - z)
+}
+
+fn setup_world(world: &mut World) {
+    world.add_resource(Time(0.0));
+    world.add_resource(Secs(0.0));
+    world.add_resource(Formation::default());
+    world.add_resource(camera::Camera::default());
+    world.add_resource(Paused(false));
+    world.add_resource(RightClickOrder::default());
+    world.add_resource(EntityUnderMouse(None));
+    world.add_resource(Controls::default());
+    world.add_resource(AveragePosition(None));
+    world.add_resource(Events(Vec::new()));
+    world.add_resource(Log(Vec::new()));
+    world.add_resource(MovementPlane(0.0));
+
+    world.register::<context::Model>();
+    world.register::<Position>();
+    world.register::<ObjectSpin>();
+    world.register::<Materials>();
+    world.register::<Size>();
+    world.register::<Commands>();
+    world.register::<components::Rotation>();
+    world.register::<ships::ShipType>();
+    world.register::<Selectable>();
+    world.register::<CreationTime>();
+    world.register::<Parent>();
+    world.register::<Occupation>();
+    world.register::<Side>();
+    world.register::<DrillSpeed>();
+    world.register::<MineableMaterials>();
+    world.register::<TimeLeft>();
+    world.register::<context::Image>();
+    world.register::<Velocity>();
+    world.register::<MaxSpeed>();
+    world.register::<SeekPosition>();
+    world.register::<SeekForce>();
+    world.register::<AvoidanceForce>();
+    world.register::<FrictionForce>();
 }

@@ -39,7 +39,7 @@ pub struct AveragePosition(pub Option<Vector3<f32>>);
 #[derive(Component, Default, NewtypeProxy)]
 pub struct Events(pub Vec<WindowEvent>);
 
-#[derive(Deserialize, Serialize, Component, NewtypeProxy, Clone, Copy)]
+#[derive(Deserialize, Serialize, Component, NewtypeProxy, Clone, Copy, PartialEq, Debug)]
 #[storage(VecStorage)]
 pub struct Position(pub Vector3<f32>);
 
