@@ -120,9 +120,9 @@ pub struct Commands(pub Vec<Command>);
 impl Commands {
     pub fn order(&mut self, shift: bool, command: Command) {
         if !shift {
-            self.0.clear();
+            self.clear();
         }
 
-        self.0.push(command);
+        self.push(command);
     }
 }

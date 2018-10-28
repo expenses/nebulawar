@@ -184,23 +184,39 @@ pub struct MovementPlane(pub f32);
 #[derive(Component)]
 pub struct TimeLeft(pub f32);
 
-#[derive(Component)]
+#[derive(Component, NewtypeProxy)]
 pub struct Velocity(pub Vector3<f32>);
 
 #[derive(Component)]
 pub struct MaxSpeed(pub f32);
 
 #[derive(Component)]
-pub enum SeekPosition {
-    Point(Vector3<f32>),
-    WithinDistance(Vector3<f32>, f32)
+pub struct SeekPosition {
+    point: Vector3<f32>,
+    within_distance: Option<f32>,
+    last_point: bool
 }
 
 impl SeekPosition {
+    pub fn to_point(point: Vector3<f32>, last_point: bool) -> Self {
+        Self {
+            point, last_point,
+            within_distance: None
+        }
+    }
+
+    pub fn within_distance(point: Vector3<f32>, within_distance: f32, last_point: bool) -> Self {
+        Self {
+            point, last_point,
+            within_distance: Some(within_distance)
+        }
+    }
+
     pub fn target_point(&self, from: Vector3<f32>) -> Vector3<f32> {
-        match *self {
-            SeekPosition::Point(point) => point,
-            SeekPosition::WithinDistance(point, distance) => point + (from - point).normalize_to(distance)
+        if let Some(distance) = self.within_distance {
+            self.point + (from - self.point).normalize_to(distance)
+        } else {
+            self.point
         }
     }
 
@@ -210,6 +226,10 @@ impl SeekPosition {
 
     pub fn close_enough(&self, point: Vector3<f32>) -> bool {
         close_enough(self.target_point(point), point)
+    }
+
+    pub fn last_point(&self) -> bool {
+        self.last_point
     }
 }
 
@@ -221,3 +241,15 @@ pub struct AvoidanceForce(pub Vector3<f32>);
 
 #[derive(Component)]
 pub struct FrictionForce(pub Vector3<f32>);
+
+#[derive(Component, NewtypeProxy)]
+pub struct MouseRay(pub collision::Ray<f32, Point3<f32>, Vector3<f32>>);
+
+impl Default for MouseRay {
+    fn default() -> Self {
+        MouseRay(collision::Ray::new(
+            Point3::new(0.0, 0.0, 0.0),
+            Vector3::zero()
+        ))
+    }
+}

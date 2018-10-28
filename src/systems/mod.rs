@@ -94,8 +94,10 @@ impl<'a> System<'a> for ShipMovementSystem {
         }
 
         for (entity, commands) in (&entities, &mut commands).join() {
+            let last = commands.len() == 1;
+
             let finished = commands.first()
-                .map(|command| handle_command(command, entity, &mut materials, &mut mineable, &size, &drill_speed, &pos, &mut seek).unwrap_or(true))
+                .map(|command| handle_command(command, entity, &mut materials, &mut mineable, &size, &drill_speed, &pos, &mut seek, last).unwrap_or(true))
                 .unwrap_or(false);
             
             if finished {
@@ -110,7 +112,7 @@ fn handle_command(
     entity: Entity,
     materials: &mut WriteStorage<Materials>, mineable_materials: &mut WriteStorage<MineableMaterials>,
     size: &ReadStorage<Size>, drill_speed: &ReadStorage<DrillSpeed>, pos: &ReadStorage<Position>,
-    seek: &mut WriteStorage<SeekPosition>
+    seek: &mut WriteStorage<SeekPosition>, last: bool
 ) -> Option<bool> {
     
     let entity_position = pos.get(entity)?.0;
@@ -120,7 +122,7 @@ fn handle_command(
             let reached = close_enough(entity_position, *position);
 
             if !reached {
-                seek.insert(entity, SeekPosition::Point(*position)).unwrap();
+                seek.insert(entity, SeekPosition::to_point(*position, last)).unwrap();
             }
 
             Some(reached)
@@ -139,16 +141,16 @@ fn handle_command(
                     Interaction::Attack => Some(true),
                 }
             } else {
-                seek.insert(entity, SeekPosition::WithinDistance(target_position, distance)).unwrap();
+                seek.insert(entity, SeekPosition::within_distance(target_position, distance, last)).unwrap();
                 Some(false)
             }
         }
     }
 }
 
-pub struct RightClickSystem<'a>(pub &'a Context);
+pub struct RightClickSystem;
 
-impl<'a> System<'a> for RightClickSystem<'a> {
+impl<'a> System<'a> for RightClickSystem {
     type SystemData = (
         Read<'a, RightClickOrder>,
         Read<'a, Controls>,
@@ -266,9 +268,9 @@ impl<'a> System<'a> for TimeStepSystem {
     }
 }
 
-pub struct LeftClickSystem<'a>(pub &'a Context);
+pub struct LeftClickSystem;
 
-impl<'a> System<'a> for LeftClickSystem<'a> {
+impl<'a> System<'a> for LeftClickSystem {
     type SystemData = (
         Read<'a, Controls>,
         Read<'a, EntityUnderMouse>,
@@ -290,23 +292,22 @@ impl<'a> System<'a> for LeftClickSystem<'a> {
     }
 }
 
-pub struct RightClickInteractionSystem<'a>(pub &'a Context);
+pub struct RightClickInteractionSystem;
 
-impl<'a> System<'a> for RightClickInteractionSystem<'a> {
+impl<'a> System<'a> for RightClickInteractionSystem {
     type SystemData = (
         Entities<'a>,
         Write<'a, RightClickOrder>,
         Read<'a, EntityUnderMouse>,
-        Read<'a, Camera>,
-        Read<'a, Controls>,
         Read<'a, MovementPlane>,
+        Read<'a, MouseRay>,
         ReadStorage<'a, MineableMaterials>,
         ReadStorage<'a, Side>,
         ReadStorage<'a, Selectable>,
         ReadStorage<'a, DrillSpeed>
     );
 
-    fn run(&mut self, (entities, mut order, entity, camera, controls, plane, mineable, side, selectable, drill): Self::SystemData) {
+    fn run(&mut self, (entities, mut order, entity, plane, ray, mineable, side, selectable, drill): Self::SystemData) {
         let ordering = (&entities, &selectable, &side).join()
             .filter(|(_, selectable, side)| selectable.selected && **side == Side::Friendly)
             .map(|(entity, _, _)| entity);
@@ -326,9 +327,7 @@ impl<'a> System<'a> for RightClickInteractionSystem<'a> {
 
             order.command = Some(Command::GoToAnd(entity, interaction));
         } else {
-            let ray = self.0.ray(&camera, controls.mouse());
-
-            order.command = Plane::new(UP, -plane.0).intersection(&ray)
+            order.command = Plane::new(UP, -plane.0).intersection(&ray.0)
                 .map(|point| Command::MoveTo(point_to_vector(point)));
 
             order.to_move = ordering.collect();
@@ -342,7 +341,7 @@ impl<'a> System<'a> for EntityUnderMouseSystem<'a> {
     type SystemData = (
         Entities<'a>,
         Read<'a, Camera>,
-        Read<'a, Controls>,
+        Read<'a, MouseRay>,
         Write<'a, EntityUnderMouse>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, components::Rotation>,
@@ -350,9 +349,7 @@ impl<'a> System<'a> for EntityUnderMouseSystem<'a> {
         ReadStorage<'a, Model>
     );
 
-    fn run(&mut self, (entities, camera, controls, mut entity, pos, rot, size, model): Self::SystemData) {
-        let ray = self.0.ray(&camera, controls.mouse());
-
+    fn run(&mut self, (entities, camera, ray, mut entity, pos, rot, size, model): Self::SystemData) {
         entity.0 = (&entities, &pos, &rot, &size, &model).join()
             .filter_map(|(entity, pos, rot, size, model)| {
                 let rotation: Matrix4<f32> = rot.0.into();
@@ -363,11 +360,11 @@ impl<'a> System<'a> for EntityUnderMouseSystem<'a> {
                 
                 let bound: Aabb3<f32> = mesh.compute_bound();
 
-                if !bound.intersects_transformed(&ray, &transform) {
+                if !bound.intersects_transformed(&ray.0, &transform) {
                     return None;
                 }
 
-                mesh.intersection_transformed(&ray, &transform)
+                mesh.intersection_transformed(&ray.0, &transform)
                     .map(point_to_vector)
                     .map(|intersection| (entity, intersection, camera.position().distance2(intersection)))
             })
@@ -522,5 +519,19 @@ impl<'a> System<'a> for TickTimedEntities {
                 entities.delete(entity).unwrap();
             }
         }
+    }
+}
+
+pub struct SetMouseRay<'a>(pub &'a Context);
+
+impl<'a> System<'a> for SetMouseRay<'a> {
+    type SystemData = (
+        Write<'a, MouseRay>,
+        Read<'a, Controls>,
+        Read<'a, Camera>
+    );
+
+    fn run(&mut self, (mut ray, controls, camera): Self::SystemData) {
+        ray.0 = self.0.ray(&camera, controls.mouse());
     }
 }

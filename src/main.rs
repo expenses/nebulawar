@@ -135,27 +135,30 @@ impl Game {
         *self.world.write_resource() = Secs(secs);
 
         EventHandlerSystem                         .run_now(&self.world.res);
-        TestDeleteSystem                           .run_now(&self.world.res);
 
-        SeekSystem                                 .run_now(&self.world.res);
-        AvoidanceSystem                            .run_now(&self.world.res);
-        FrictionSystem                             .run_now(&self.world.res);
-        MergeForceSystem                           .run_now(&self.world.res);
+        SetMouseRay                 (&self.context).run_now(&self.world.res);
 
-        ApplyVelocitySystem                        .run_now(&self.world.res);
-        SetRotationSystem                          .run_now(&self.world.res);
-        FinishSeekSystem                           .run_now(&self.world.res);
+        specs::DispatcherBuilder::new()
+            .with(TestDeleteSystem, "test_delete", &[])
+            .with(SeekSystem, "seek", &[])
+            .with(AvoidanceSystem, "avoidance", &[])
+            .with(FrictionSystem, "friction", &[])
+            .with(MergeForceSystem, "merge", &["seek", "avoidance", "friction"])
+            .with(ApplyVelocitySystem, "apply", &["merge"])
+            .with(SetRotationSystem, "set_rotation", &["merge"])
+            .with(FinishSeekSystem, "finish_seek", &["apply", "set_rotation"])
+            .with(SpinSystem, "spin", &[])
+            .with(ShipMovementSystem, "ship_movement", &["apply"])
+            .build()
+            .dispatch(&self.world.res);
 
-
-        SpinSystem                                 .run_now(&self.world.res);
-        ShipMovementSystem                         .run_now(&self.world.res);
         EntityUnderMouseSystem      (&self.context).run_now(&self.world.res);
         AveragePositionSystem                      .run_now(&self.world.res);
-        RightClickInteractionSystem (&self.context).run_now(&self.world.res);
+        RightClickInteractionSystem                .run_now(&self.world.res);
         MiddleClickSystem                          .run_now(&self.world.res);
-        LeftClickSystem             (&self.context).run_now(&self.world.res);
+        LeftClickSystem                            .run_now(&self.world.res);
         DragSelectSystem            (&self.context).run_now(&self.world.res);
-        RightClickSystem            (&self.context).run_now(&self.world.res);
+        RightClickSystem                           .run_now(&self.world.res);
         UpdateControlsSystem                       .run_now(&self.world.res);
         TimeStepSystem                             .run_now(&self.world.res);
         StepCameraSystem                           .run_now(&self.world.res);
@@ -258,6 +261,7 @@ fn setup_world(world: &mut World) {
     world.add_resource(Events(Vec::new()));
     world.add_resource(Log(Vec::new()));
     world.add_resource(MovementPlane(0.0));
+    world.add_resource(MouseRay::default());
 
     world.register::<context::Model>();
     world.register::<Position>();

@@ -7,11 +7,16 @@ pub struct ApplyVelocitySystem;
 
 impl<'a> System<'a> for ApplyVelocitySystem {
     type SystemData = (
+        Read<'a, Paused>,
         WriteStorage<'a, Position>,
         ReadStorage<'a, Velocity>
     );
 
-    fn run(&mut self, (mut position, velocity): Self::SystemData) {
+    fn run(&mut self, (paused, mut position, velocity): Self::SystemData) {
+        if paused.0 {
+            return;
+        }
+
         for (position, velocity) in (&mut position, &velocity).join() {
             position.0 += velocity.0;
         }
@@ -28,7 +33,7 @@ impl<'a> System<'a> for SetRotationSystem {
 
     fn run(&mut self, (mut rotation, velocity): Self::SystemData) {
         for (rotation, velocity) in (&mut rotation, &velocity).join() {
-            if velocity.0.magnitude() > 0.0 {
+            if velocity.magnitude() > 0.0 {
                 rotation.0 = look_at(velocity.0);
             }
         }
@@ -53,11 +58,11 @@ impl<'a> System<'a> for SeekSystem {
             let max_speed = speed.0;
             let max_acceleration = 0.01;
 
-            let braking_distance = vel.0.magnitude2() / (2.0 * max_acceleration);
+            let braking_distance = vel.magnitude2() / (2.0 * max_acceleration);
 
             let delta = seek_pos.delta(pos.0);
 
-            let desired = if delta.magnitude() < braking_distance {
+            let desired = if delta.magnitude() < braking_distance && seek_pos.last_point() {
                 Vector3::zero()
             } else {
                 delta.normalize_to(max_speed)
@@ -82,7 +87,7 @@ impl<'a> System<'a> for FinishSeekSystem {
 
     fn run(&mut self, (entities, mut seek, mut seek_pos, mut vel, pos): Self::SystemData) {
         for (entity, vel, pos) in (&entities, &mut vel, &pos).join() {
-            if seek_pos.get(entity).map(|seek| seek.close_enough(pos.0)).unwrap_or(false) {
+            if seek_pos.get(entity).map(|seek| seek.close_enough(pos.0) && seek.last_point()).unwrap_or(false) {
                 seek.remove(entity);
                 seek_pos.remove(entity);
                 vel.0 = Vector3::zero();
@@ -115,7 +120,7 @@ impl<'a> System<'a> for AvoidanceSystem {
             let mut count = 0;
 
             for (p, s) in &entity_positions {
-                let distance = pos.0.distance(&p.0);
+                let distance = pos.distance(&p.0);
 
                 if distance > 0.0 && distance < (size.0 + s.0) {
                     let diff = (pos.0 - p.0).normalize_to(1.0 / distance);
@@ -164,6 +169,7 @@ pub struct MergeForceSystem;
 impl<'a> System<'a> for MergeForceSystem {
     type SystemData = (
         Entities<'a>,
+        Read<'a, Paused>,
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, SeekForce>,
         ReadStorage<'a, AvoidanceForce>,
@@ -171,7 +177,11 @@ impl<'a> System<'a> for MergeForceSystem {
         ReadStorage<'a, MaxSpeed>
     );
 
-    fn run(&mut self, (entities, mut vel, seek, avoid, friction, speed): Self::SystemData) {
+    fn run(&mut self, (entities, paused, mut vel, seek, avoid, friction, speed): Self::SystemData) {
+        if paused.0 {
+            return;
+        }
+
         for (entity, vel, avoid, friction, speed) in (&entities, &mut vel, &avoid, &friction, &speed).join() {
             let seek = seek.get(entity).map(|seek| seek.0).unwrap_or_else(Vector3::zero);
 

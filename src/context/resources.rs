@@ -15,15 +15,17 @@ use collision::primitive::ConvexPolyhedron;
 #[cfg(feature = "embed_resources")]
 macro_rules! load_resource {
     ($filename:expr) => (
-        include_bytes!(concat!("../../", $filename))
+        include_bytes!(concat!("../../resources/", $filename))
     )
 }
 
 #[cfg(not(feature = "embed_resources"))]
 macro_rules! load_resource {
-    ($filename:expr) => (
-        &fs::read($filename)?
-    )
+    ($filename:expr) => ({
+        use std::fs;
+        use std::path::*;
+        &fs::read(PathBuf::from("resources").join($filename))?
+    })
 }
 
 pub fn billboard(display: &Display) -> VertexBuffer<Vertex> {
@@ -142,17 +144,17 @@ impl Resources {
     pub fn new(display: &Display) -> Result<Self, failure::Error> {
         Ok(Self {
             models: [
-                ObjModel::new(display, load_resource!("resources/models/fighter.obj"),   load_resource!("resources/models/fighter.png"))?,
-                ObjModel::new(display, load_resource!("resources/models/tanker.obj"),    load_resource!("resources/models/tanker.png"))?,
-                ObjModel::new(display, load_resource!("resources/models/carrier.obj"),   load_resource!("resources/models/carrier.png"))?,
-                ObjModel::new(display, load_resource!("resources/models/asteroid.obj"),  load_resource!("resources/models/asteroid.png"))?,
-                ObjModel::new(display, load_resource!("resources/models/miner.obj"),  load_resource!("resources/models/miner.png"))?
+                ObjModel::new(display, load_resource!("models/fighter.obj"),  load_resource!("models/fighter.png"))?,
+                ObjModel::new(display, load_resource!("models/tanker.obj"),   load_resource!("models/tanker.png"))?,
+                ObjModel::new(display, load_resource!("models/carrier.obj"),  load_resource!("models/carrier.png"))?,
+                ObjModel::new(display, load_resource!("models/asteroid.obj"), load_resource!("models/asteroid.png"))?,
+                ObjModel::new(display, load_resource!("models/miner.obj"),    load_resource!("models/miner.png"))?
             ],
             images: [
-                load_image(display, load_resource!("resources/star.png")),
-                load_image(display, load_resource!("resources/ui/button.png")),
-                load_image(display, load_resource!("resources/ui/move.png")),
-                load_image(display, load_resource!("resources/ui/mine.png"))
+                load_image(display, load_resource!("star.png")),
+                load_image(display, load_resource!("ui/button.png")),
+                load_image(display, load_resource!("ui/move.png")),
+                load_image(display, load_resource!("ui/mine.png"))
             ],
             font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display)?
         })
