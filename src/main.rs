@@ -1,3 +1,6 @@
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::type_complexity))]
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
+
 extern crate glium;
 extern crate obj;
 extern crate genmesh;
@@ -223,7 +226,7 @@ fn main() {
                 glutin::WindowEvent::KeyboardInput {input: KeyboardInput {state, virtual_keycode: Some(key), ..}, ..} => {
                     game.handle_keypress(key, state == ElementState::Pressed);
                 },
-                event @ _ => game.world.write_resource::<Events>().push(event)
+                event => game.world.write_resource::<Events>().push(event)
             }
         });
 

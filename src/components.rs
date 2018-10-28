@@ -76,7 +76,7 @@ pub struct CreationTime(pub f32);
 
 impl CreationTime {
     pub fn from_age(age: u16) -> Self {
-        let days = age as f32 * 360.0;
+        let days = f32::from(age) * 360.0;
         let seconds = days * 24.0 * 60.0 * 60.0;
         CreationTime(-seconds)
     }

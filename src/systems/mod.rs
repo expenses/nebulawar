@@ -161,13 +161,13 @@ impl<'a> System<'a> for RightClickSystem<'a> {
         if controls.right_clicked() {
             if let Some(ref command) = order.command {
                 match command {
-                    &Command::GoToAnd(entity, interaction) => {
+                    Command::GoToAnd(entity, interaction) => {
                         order.to_move.iter()
-                            .for_each(|e| commands.get_mut(*e).unwrap().order(controls.shift, Command::GoToAnd(entity, interaction)));
+                            .for_each(|e| commands.get_mut(*e).unwrap().order(controls.shift, Command::GoToAnd(*entity, *interaction)));
                     },
-                    &Command::MoveTo(target) => {
+                    Command::MoveTo(target) => {
                         if let Some(avg) = avg_pos.0 {
-                            let positions = formation.arrange(order.to_move.len(), avg, target, 4.0);
+                            let positions = formation.arrange(order.to_move.len(), avg, *target, 4.0);
 
                             order.to_move.iter()
                                 .zip(positions)

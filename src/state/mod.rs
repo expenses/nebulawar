@@ -142,7 +142,7 @@ impl ColouredVertex {
 
         let value = noise::Perlin::new()
             .set_seed(rng.gen())
-            .get([vector.x as f64, vector.y as f64, vector.z as f64])
+            .get([f64::from(vector.x), f64::from(vector.y), f64::from(vector.z)])
             + rng.gen_range(-0.5, 0.5);
 
         Self {

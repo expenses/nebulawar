@@ -19,8 +19,8 @@ pub enum Interaction {
 }
 
 impl Interaction {
-    pub fn image(&self) -> Image {
-        match *self {
+    pub fn image(self) -> Image {
+        match self {
             Interaction::Follow => Image::Move,
             Interaction::Mine => Image::Mine,
             Interaction::Attack => Image::Mine

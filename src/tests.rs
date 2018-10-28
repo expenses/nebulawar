@@ -1,3 +1,5 @@
+#![cfg(tests)]
+
 use specs::*;
 use components::*;
 use systems::*;

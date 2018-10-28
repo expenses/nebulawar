@@ -257,8 +257,6 @@ impl<'a> System<'a> for RenderMovementPlane<'a> {
 
             let point = Vector3::new(round_to(point.x, distance), point.y, round_to(point.z, distance));
 
-           // let y = plane.0;
-
             let points = 5;
 
             let radius = points as f32 * distance / 2.0;

@@ -146,13 +146,6 @@ impl<'a> System<'a> for FrictionSystem {
         ReadStorage<'a, SeekPosition>
     );
 
-    /*fn run(&mut self, (entities, mut friction, vel, seek): Self::SystemData) {
-        for (entity, vel, ()) in (&entities, &vel, !&seek).join() {
-            let force = calc_force(vel.0, Vector3::zero(), 0.01);
-            friction.insert(entity, FrictionForce(force)).unwrap();
-        }
-    }*/
-
     fn run(&mut self, (entities, mut friction, vel, seek): Self::SystemData) {
         for (entity, vel) in (&entities, &vel).join() {
             let force = if seek.get(entity).is_none() {
@@ -180,7 +173,7 @@ impl<'a> System<'a> for MergeForceSystem {
 
     fn run(&mut self, (entities, mut vel, seek, avoid, friction, speed): Self::SystemData) {
         for (entity, vel, avoid, friction, speed) in (&entities, &mut vel, &avoid, &friction, &speed).join() {
-            let seek = seek.get(entity).map(|seek| seek.0).unwrap_or(Vector3::zero());
+            let seek = seek.get(entity).map(|seek| seek.0).unwrap_or_else(Vector3::zero);
 
             let combined = seek + avoid.0 * 10.0 + friction.0;
             let combined = limit_vector(combined, 0.01);
