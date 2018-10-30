@@ -11,7 +11,6 @@ use failure;
 use specs::*;
 use collision::primitive::ConvexPolyhedron;
 
-
 #[cfg(feature = "embed_resources")]
 macro_rules! load_resource {
     ($filename:expr) => (
@@ -91,7 +90,7 @@ pub fn load_wavefront(data: &[u8]) ->  Vec<Vertex> {
         .collect()
 }
 
-#[derive(Copy, Clone, Component)]
+#[derive(Copy, Clone, Component, Serialize, Deserialize)]
 pub enum Image {
     Star = 0,
     Button = 1,
@@ -99,7 +98,7 @@ pub enum Image {
     Mine = 3
 }
 
-#[derive(Deserialize, Serialize, Component, Copy, Clone)]
+#[derive(Serialize, Deserialize, Component, Copy, Clone)]
 pub enum Model {
     Fighter = 0,
     Tanker = 1,

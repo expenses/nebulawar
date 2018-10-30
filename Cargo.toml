@@ -40,8 +40,9 @@ log = "*"
 # 'retain_mut'
 odds = {version = "*", features = ["std-vec"]}
 # ECS (waiting on: saveload stuff)
-specs = {git = "https://github.com/slide-rs/specs", default-features = false, features = ["serde"]}
-specs-derive = {git = "https://github.com/slide-rs/specs"}
+specs = {git = "https://github.com/expenses/specs", default-features = false, features = ["serde"], branch="better_entity_serialization_errors"}
+specs-derive = {git = "https://github.com/expenses/specs"}
+
 # Triangulation
 spade = "*"
 # Noise (waiting on: image being optional)

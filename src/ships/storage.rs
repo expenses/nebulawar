@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StoredResource {
     amount: f32,
     capacity: f32
@@ -24,7 +24,7 @@ impl StoredResource {
             amount, capacity
         }
     }
-    
+
     pub fn reduce(&mut self, amount: f32) -> f32 {
         let reduced_by = self.amount.min(amount);
         self.amount -= reduced_by;

@@ -4,6 +4,7 @@ use ships::*;
 use cgmath::{Vector3, Quaternion, Zero};
 use rand::*;
 use context::*;
+use specs::saveload::*;
 
 pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, side: Side) -> Entity {
     let components = tag.default_components(0);
@@ -20,7 +21,8 @@ pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, sid
         .with(Materials(StoredResource::empty(500.0)))
         .with(Selectable::new(false))
         .with(Velocity(Vector3::zero()))
-        .with(side);
+        .with(side)
+        .marked::<U64Marker>();
 
     if let Some(speed) = components.drill_speed() {
         entity = entity.with(DrillSpeed(speed));
@@ -36,6 +38,7 @@ pub fn create_person(parent: Entity, world: &mut World, occupation: Occupation) 
         .with(CreationTime::from_age(30))
         .with(occupation)
         .with(Parent(parent))
+        .marked::<U64Marker>()
         .build();
 }
 
@@ -46,20 +49,17 @@ pub fn add_asteroid(rng: &mut ThreadRng, world: &mut World) {
     let y = rng.gen_range(-100.0, 100.0);
     let z = rng.gen_range(500.0, 1000.0) * rng.gen_range(-1.0, 1.0);
 
-    let location = Vector3::new(x, y, z);
-
     let resources = size.powi(3) * rng.gen_range(0.1, 1.0);
-
-    let spin = ObjectSpin::random(rng);
 
     world.create_entity()
         .with(Model::Asteroid)
-        .with(spin)
-        .with(Position(location))
+        .with(ObjectSpin::random(rng))
+        .with(Position(Vector3::new(x, y, z)))
         .with(MineableMaterials(StoredResource::full(resources)))
         .with(Size(size))
         .with(Selectable::new(false))
         .with(Side::Neutral)
+        .marked::<U64Marker>()
         .build();
 }
 

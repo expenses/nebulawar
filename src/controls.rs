@@ -5,7 +5,7 @@
 use std::mem::swap;
 use specs::*;
 
-#[derive(is_enum_variant, Debug)]
+#[derive(is_enum_variant, Debug, Clone)]
 enum MouseState {
     Dragging(f32, f32),
     Dragged(f32, f32),
@@ -54,7 +54,7 @@ impl Default for MouseState {
     }
 }
 
-#[derive(Default, Component)]
+#[derive(Default, Component, Clone)]
 pub struct Controls {
     mouse: (f32, f32),
 
@@ -67,7 +67,9 @@ pub struct Controls {
     pub forwards: bool,
     pub back: bool,
     pub shift: bool,
-    pub delete: bool
+    pub delete: bool,
+    pub save: bool,
+    pub load: bool
 }
 
 impl Controls {
@@ -84,6 +86,9 @@ impl Controls {
     }
 
     pub fn update(&mut self) {
+        self.save = false;
+        self.load = false;
+
         self.left_state.update(self.mouse);
         self.middle_state.update(self.mouse);
         self.right_state.update(self.mouse);

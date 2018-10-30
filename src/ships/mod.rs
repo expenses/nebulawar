@@ -1,6 +1,6 @@
 use cgmath::Vector3;
 use context::*;
-use specs::{DenseVecStorage, Component, Entity, ReadStorage};
+use specs::{DenseVecStorage, Component, Entity, ReadStorage, error::*, saveload::*};
 use components::*;
 
 pub mod components;
@@ -28,7 +28,7 @@ impl Interaction {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, ConvertSaveload, Clone)]
 pub enum Command {
     MoveTo(Vector3<f32>),
     GoToAnd(Entity, Interaction)
@@ -111,18 +111,5 @@ impl ShipType {
             ShipType::Carrier => 4.0,
             ShipType::Miner => 2.0
         }
-    }
-}
-
-#[derive(Component, NewtypeProxy)]
-pub struct Commands(pub Vec<Command>);
-
-impl Commands {
-    pub fn order(&mut self, shift: bool, command: Command) {
-        if !shift {
-            self.clear();
-        }
-
-        self.push(command);
     }
 }

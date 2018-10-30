@@ -3,7 +3,7 @@ use std::f32::consts::*;
 use util::*;
 use specs::*;
 
-#[derive(Serialize, Deserialize, Component)]
+#[derive(Serialize, Deserialize, Clone, Component)]
 pub struct Camera {
     center: Vector3<f32>,
     longitude: f32,

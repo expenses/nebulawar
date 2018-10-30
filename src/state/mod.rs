@@ -30,15 +30,15 @@ impl SystemType {
     }
 }
 
-#[derive(Deserialize, Serialize, Component)]
-pub struct System {
+#[derive(Serialize, Deserialize, Component, Clone)]
+pub struct StarSystem {
     pub location: Vector2<f32>,
     pub stars: Vec<context::Vertex>,
     pub light: Vector3<f32>,
     pub background: Vec<context::Vertex>
 }
 
-impl System {
+impl StarSystem {
     pub fn new(location: Vector2<f32>, rng: &mut ThreadRng, world: &mut World) -> Self {
         let _distance_from_center = location.magnitude();
 
@@ -72,7 +72,7 @@ impl System {
     }
 }
 
-impl Default for System {
+impl Default for StarSystem {
     fn default() -> Self {
         Self {
             location: Vector2::zero(),

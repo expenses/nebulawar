@@ -3,7 +3,7 @@ use specs::*;
 use components;
 use context::*;
 use circle_size;
-use state;
+use state::*;
 use super::*;
 use cgmath::Matrix4;
 
@@ -12,7 +12,7 @@ pub struct ObjectRenderer<'a>(pub &'a mut Context);
 impl<'a> System<'a> for ObjectRenderer<'a> {
     type SystemData = (
         Read<'a, Camera>,
-        Read<'a, state::System>,
+        Read<'a, StarSystem>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, components::Rotation>,
         ReadStorage<'a, Size>,
@@ -165,7 +165,7 @@ impl<'a> System<'a> for RenderDebug<'a> {
         Read<'a, Controls>,
         Read<'a, Camera>,
         Read<'a, EntityUnderMouse>,
-        Read<'a, state::System>,
+        Read<'a, StarSystem>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Velocity>,
         ReadStorage<'a, SeekForce>,
@@ -218,7 +218,7 @@ pub struct RenderSystem<'a>(pub &'a mut Context);
 impl<'a> System<'a> for RenderSystem<'a> {
     type SystemData = (
         Read<'a, Camera>,
-        Read<'a, state::System>
+        Read<'a, StarSystem>
     );
 
     fn run(&mut self, (camera, system): Self::SystemData) {
@@ -293,7 +293,7 @@ pub struct RenderBillboards<'a>(pub &'a mut Context);
 impl<'a> System<'a> for RenderBillboards<'a> {
     type SystemData = (
         Read<'a, Camera>,
-        Read<'a, state::System>,
+        Read<'a, StarSystem>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, Image>
@@ -311,7 +311,7 @@ pub struct FlushUI<'a>(pub &'a mut Context);
 impl<'a> System<'a> for FlushUI<'a> {
     type SystemData = (
         Read<'a, Camera>,
-        Read<'a, state::System>
+        Read<'a, StarSystem>
     );
 
     fn run(&mut self, (camera, system): Self::SystemData) {

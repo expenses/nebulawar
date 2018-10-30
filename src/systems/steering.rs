@@ -2,6 +2,7 @@ use components::{self, *};
 use specs::*;
 use util::*;
 use cgmath::{InnerSpace, Vector3, Zero};
+use resources::*;
 
 pub struct ApplyVelocitySystem;
 

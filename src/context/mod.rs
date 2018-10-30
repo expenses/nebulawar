@@ -124,7 +124,7 @@ impl Context {
         self.target.clear_color_srgb_and_depth((0.0, 0.0, 0.0, 1.0), 1.0);
     }
 
-    pub fn flush_ui(&mut self, camera: &Camera, system: &System) {
+    pub fn flush_ui(&mut self, camera: &Camera, system: &StarSystem) {
         self.lines.flush(&mut self.target, &self.display);
 
         let uniforms = uniform!{
@@ -154,13 +154,13 @@ impl Context {
         self.target = self.display.draw();
     }
 
-    pub fn render_billboard_facing_camera(&mut self, position: Vector3<f32>, size: f32, image: Image, camera: &Camera, system: &System) {
+    pub fn render_billboard_facing_camera(&mut self, position: Vector3<f32>, size: f32, image: Image, camera: &Camera, system: &StarSystem) {
         let rotation: Matrix4<f32> = look_at(-camera.direction()).into();
 
         self.render_billboard(Matrix4::from_translation(position) * rotation * Matrix4::from_scale(size), image, camera, system);
     }
 
-    pub fn render_billboard(&mut self, matrix: Matrix4<f32>, image: Image, camera: &Camera, system: &System) {
+    pub fn render_billboard(&mut self, matrix: Matrix4<f32>, image: Image, camera: &Camera, system: &StarSystem) {
         let uniforms = self.uniforms(matrix, camera, system, &self.resources.images[image as usize], Mode::Shadeless);
         let params = self.draw_params();
 
@@ -173,7 +173,7 @@ impl Context {
         ).unwrap();
     }
 
-    pub fn render_stars(&mut self, system: &System, camera: &Camera) {
+    pub fn render_stars(&mut self, system: &StarSystem, camera: &Camera) {
         let uniforms = self.background_uniforms(camera, system, Mode::White);
 
         let vertices = VertexBuffer::new(&self.display, &system.stars).unwrap();
@@ -188,7 +188,7 @@ impl Context {
         self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
     }
 
-    pub fn render_skybox(&mut self, system: &System, camera: &Camera) {
+    pub fn render_skybox(&mut self, system: &StarSystem, camera: &Camera) {
          let uniforms = self.background_uniforms(camera, system, Mode::VertexColored);
 
         let vertices = VertexBuffer::new(&self.display, &system.background).unwrap();
@@ -199,7 +199,7 @@ impl Context {
         self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
     }
 
-    pub fn background_uniforms<'a>(&self, camera: &Camera, system: &System, mode: Mode) -> impl Uniforms + 'a {
+    pub fn background_uniforms<'a>(&self, camera: &Camera, system: &StarSystem, mode: Mode) -> impl Uniforms + 'a {
         uniform! {
             model: matrix_to_array(Matrix4::identity()),
             view: matrix_to_array(camera.view_matrix_only_direction()),
@@ -209,7 +209,7 @@ impl Context {
         }
     }
 
-    pub fn uniforms<'a>(&self, position: Matrix4<f32>, camera: &Camera, system: &System, texture: &'a SrgbTexture2d, mode: Mode) -> impl Uniforms + 'a {
+    pub fn uniforms<'a>(&self, position: Matrix4<f32>, camera: &Camera, system: &StarSystem, texture: &'a SrgbTexture2d, mode: Mode) -> impl Uniforms + 'a {
         uniform!{
             model: matrix_to_array(position),
             view: matrix_to_array(camera.view_matrix()),
@@ -220,7 +220,7 @@ impl Context {
         }
     }
 
-    pub fn render_model(&mut self, model: Model, location: Vector3<f32>, rotation: Quaternion<f32>, size: f32, camera: &Camera, system: &System) {
+    pub fn render_model(&mut self, model: Model, location: Vector3<f32>, rotation: Quaternion<f32>, size: f32, camera: &Camera, system: &StarSystem) {
         let scale = Matrix4::from_scale(size);
         let rotation: Matrix4<f32> = rotation.into();
         let position = Matrix4::from_translation(location) * rotation * scale;

@@ -3,7 +3,7 @@ use util::*;
 use std::f32::consts::*;
 use specs::*;
 
-#[derive(Deserialize, Serialize, Debug, Component)]
+#[derive(Deserialize, Serialize, Debug, Component, Clone)]
 pub enum Formation {
     Screen,
     DeltaWing,

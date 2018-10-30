@@ -1,4 +1,4 @@
-use specs::*;
+use specs::{*, saveload::*};
 use components::{self, *};
 use context::*;
 use camera::*;
@@ -8,13 +8,16 @@ use util::*;
 use collision::*;
 use controls::Controls;
 use glium::glutin::{WindowEvent, MouseScrollDelta, dpi::LogicalPosition};
+use resources::*;
 
 mod rendering;
 mod storage;
 mod steering;
+mod saving;
 
 pub use self::rendering::*;
 pub use self::steering::*;
+pub use self::saving::*;
 use self::storage::*;
 
 pub struct SpinSystem;
@@ -475,14 +478,17 @@ impl<'a> System<'a> for TestDeleteSystem {
     type SystemData = (
         Entities<'a>,
         Read<'a, Controls>,
+        Write<'a, U64MarkerAllocator>,
         WriteStorage<'a, Selectable>,
         WriteStorage<'a, Position>,
         WriteStorage<'a, Size>,
         WriteStorage<'a, TimeLeft>,
-        WriteStorage<'a, Image>
+        WriteStorage<'a, Image>,
+        WriteStorage<'a, U64Marker>,
+        ReadStorage<'a, Parent>
     );
 
-    fn run(&mut self, (entities, controls, selectable, mut position, mut size, mut time, mut image): Self::SystemData) {
+    fn run(&mut self, (entities, controls, mut allocator, selectable, mut position, mut size, mut time, mut image, mut markers, parent): Self::SystemData) {
         if controls.delete {
             (&entities, &selectable).join()
                 .filter(|(_, selectable)| selectable.selected)
@@ -492,11 +498,16 @@ impl<'a> System<'a> for TestDeleteSystem {
 
                     entities.delete(entity).unwrap();
 
+                    (&entities, &parent).join()
+                        .filter(|(_, parent)| parent.0 == entity)
+                        .for_each(|(entity, _)| entities.delete(entity).unwrap());
+
                     entities.build_entity()
                         .with(p, &mut position)
                         .with(s, &mut size)
                         .with(TimeLeft(2.0), &mut time)
                         .with(Image::Star, &mut image)
+                        .marked(&mut markers, &mut allocator)
                         .build();
                 });
         }

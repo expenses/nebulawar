@@ -38,7 +38,7 @@ use glutin::*;
 use glutin::dpi::*;
 use std::time::*;
 use specs::{World, RunNow};
-use specs::shred::FetchMut;
+use specs::shred::{Fetch, FetchMut};
 
 mod camera;
 mod util;
@@ -50,6 +50,7 @@ mod components;
 mod systems;
 mod entities;
 mod tests;
+mod resources;
 
 use state::*;
 use controls::*;
@@ -59,26 +60,21 @@ use util::*;
 use ships::*;
 use systems::focus_on_selected;
 use entities::*;
+use resources::*;
 
 struct Game {
     context: context::Context,
-    rng: ThreadRng,
     world: specs::World
 }
 
 impl Game {
     fn new(mut world: World, events_loop: &EventsLoop) -> Self {
-        let mut rng = rand::thread_rng();
-
-        use cgmath::Vector2;
-        let system = System::new(Vector2::new(rng.gen_range(-1.0, 1.0), rng.gen_range(-1.0, 1.0)), &mut rng, &mut world);
-        world.add_resource(system);
+        
 
         add_starting_entities(&mut world);
 
         Self {
             context: context::Context::new(events_loop),
-            rng,
             world
         }
     }
@@ -104,6 +100,8 @@ impl Game {
             VirtualKeyCode::Down   | VirtualKeyCode::S      => controls.back     = pressed,
             VirtualKeyCode::LShift | VirtualKeyCode::T      => controls.shift    = pressed,
             VirtualKeyCode::Back   | VirtualKeyCode::Delete => controls.delete   = pressed,
+            VirtualKeyCode::Z => controls.save = pressed,
+            VirtualKeyCode::L => controls.load = pressed,
             _ => {}
         }
     }
@@ -114,15 +112,6 @@ impl Game {
 
         match key {
             VirtualKeyCode::C => focus_on_selected(&mut self.world),
-            VirtualKeyCode::Z if pressed => {
-                // todo: saving etc
-                //let result = self.state.save("game.sav");
-                //self.print_potential_error(result);
-            },
-            VirtualKeyCode::L if pressed => {
-                //let result = self.state.load("game.sav");
-                //self.print_potential_error(result);
-            },
             VirtualKeyCode::P if pressed => self.world.write_resource::<Paused>().switch(),
             VirtualKeyCode::Slash if pressed => self.context.toggle_debug(),
             VirtualKeyCode::Comma if pressed => self.world.write_resource::<Formation>().rotate_left(),
@@ -159,11 +148,25 @@ impl Game {
         LeftClickSystem                            .run_now(&self.world.res);
         DragSelectSystem            (&self.context).run_now(&self.world.res);
         RightClickSystem                           .run_now(&self.world.res);
-        UpdateControlsSystem                       .run_now(&self.world.res);
+
         TimeStepSystem                             .run_now(&self.world.res);
         StepCameraSystem                           .run_now(&self.world.res);
         StepLogSystem                              .run_now(&self.world.res);
         TickTimedEntities                          .run_now(&self.world.res);
+
+        let controls: Controls = {
+            let controls: Fetch<Controls> = self.world.read_resource();
+            controls.clone()
+        };
+
+        if controls.save {
+            SaveSystem.run_now(&self.world.res);
+        } else if controls.load {
+            self.world = create_world();
+            LoadSystem.run_now(&self.world.res);
+        }
+        
+        UpdateControlsSystem                       .run_now(&self.world.res);
 
         self.world.maintain();
     }
@@ -206,13 +209,9 @@ impl Game {
 fn main() {
     env_logger::init();
 
-    let mut world = World::new();
-    
-    setup_world(&mut world);
-
     let mut events_loop = EventsLoop::new();
     
-    let mut game = Game::new(world, &events_loop);
+    let mut game = Game::new(create_world(), &events_loop);
 
     let mut time = Instant::now();
 
@@ -248,42 +247,63 @@ fn circle_size(z: f32) -> f32 {
     FAR / 2.0 * (1.0 - z)
 }
 
-fn setup_world(world: &mut World) {
+fn create_world() -> World {
+    let mut world = World::new();
+    
+    // Stuff to save
+    
     world.add_resource(Time(0.0));
-    world.add_resource(Secs(0.0));
     world.add_resource(Formation::default());
     world.add_resource(camera::Camera::default());
     world.add_resource(Paused(false));
+    world.add_resource(Log(Vec::new()));
+    world.add_resource(MovementPlane(0.0));
+
+    world.register::<Position>();
+    world.register::<Velocity>();
+    world.register::<components::Rotation>();
+    world.register::<Size>();
+    world.register::<Selectable>();
+    world.register::<context::Model>();
+    world.register::<ObjectSpin>();
+    world.register::<Side>();
+    world.register::<Commands>();
+    world.register::<ships::ShipType>();
+    world.register::<MaxSpeed>();
+    world.register::<Occupation>();
+    world.register::<Parent>();
+    world.register::<CreationTime>();
+    world.register::<DrillSpeed>();
+    world.register::<MineableMaterials>();
+    
+    world.register::<Materials>();
+    world.register::<TimeLeft>();
+    world.register::<context::Image>();
+
+    // Temp generated stuff
+    
+    world.add_resource(Secs(0.0));
     world.add_resource(RightClickOrder::default());
     world.add_resource(EntityUnderMouse(None));
     world.add_resource(Controls::default());
     world.add_resource(AveragePosition(None));
     world.add_resource(Events(Vec::new()));
-    world.add_resource(Log(Vec::new()));
-    world.add_resource(MovementPlane(0.0));
     world.add_resource(MouseRay::default());
 
-    world.register::<context::Model>();
-    world.register::<Position>();
-    world.register::<ObjectSpin>();
-    world.register::<Materials>();
-    world.register::<Size>();
-    world.register::<Commands>();
-    world.register::<components::Rotation>();
-    world.register::<ships::ShipType>();
-    world.register::<Selectable>();
-    world.register::<CreationTime>();
-    world.register::<Parent>();
-    world.register::<Occupation>();
-    world.register::<Side>();
-    world.register::<DrillSpeed>();
-    world.register::<MineableMaterials>();
-    world.register::<TimeLeft>();
-    world.register::<context::Image>();
-    world.register::<Velocity>();
-    world.register::<MaxSpeed>();
+    world.add_resource(specs::saveload::U64MarkerAllocator::new());
+    
     world.register::<SeekPosition>();
     world.register::<SeekForce>();
     world.register::<AvoidanceForce>();
     world.register::<FrictionForce>();
+
+    world.register::<specs::saveload::U64Marker>();
+
+    let mut rng = rand::thread_rng();
+
+    use cgmath::Vector2;
+    let system = StarSystem::new(Vector2::new(rng.gen_range(-1.0, 1.0), rng.gen_range(-1.0, 1.0)), &mut rng, &mut world);
+    world.add_resource(system);
+
+    world
 }

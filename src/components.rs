@@ -1,62 +1,28 @@
-use specs::*;
+use specs::{*, saveload::*, error::*};
 use cgmath::*;
 use util::*;
 use rand::*;
 use ships::*;
-use glium::glutin::*;
-use odds::vec::*;
-use context;
+use serde::*;
 
-#[derive(Component, Default, NewtypeProxy)]
-pub struct Secs(pub f32);
-
-#[derive(Component, Default)]
-pub struct Time(pub f32);
-
-#[derive(Component, Default)]
-pub struct Paused(pub bool);
-
-impl Paused {
-    pub fn switch(&mut self) {
-        self.0 = !self.0;
-    }
-}
-
-#[derive(Component, Default)]
-pub struct EntityUnderMouse(pub Option<(Entity, Vector3<f32>)>);
-
-// todo: have this on a per-entity basis
-
-#[derive(Component, Default)]
-pub struct RightClickOrder {
-    pub to_move: Vec<Entity>,
-    pub command: Option<Command>
-}
-
-#[derive(Component, Default)]
-pub struct AveragePosition(pub Option<Vector3<f32>>);
-
-#[derive(Component, Default, NewtypeProxy)]
-pub struct Events(pub Vec<WindowEvent>);
-
-#[derive(Deserialize, Serialize, Component, NewtypeProxy, Clone, Copy, PartialEq, Debug)]
+#[derive(Component, NewtypeProxy, Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 #[storage(VecStorage)]
 pub struct Position(pub Vector3<f32>);
 
-#[derive(Deserialize, Serialize, Component, NewtypeProxy)]
+#[derive(ConvertSaveload, Component, NewtypeProxy)]
 pub struct Materials(pub StoredResource);
 
-#[derive(Deserialize, Serialize, Component, NewtypeProxy)]
+#[derive(ConvertSaveload, Component, NewtypeProxy)]
 pub struct MineableMaterials(pub StoredResource);
 
-#[derive(Deserialize, Serialize, Component, NewtypeProxy, Clone, Copy)]
+#[derive(ConvertSaveload, Component, NewtypeProxy, Clone, Copy)]
 #[storage(VecStorage)]
 pub struct Size(pub f32);
 
-#[derive(Component, NewtypeProxy)]
+#[derive(Component, NewtypeProxy, ConvertSaveload, Clone)]
 pub struct Rotation(pub Quaternion<f32>);
 
-#[derive(Component)]
+#[derive(Component, ConvertSaveload)]
 pub struct Selectable {
     pub selected: bool,
     pub camera_following: bool
@@ -71,18 +37,18 @@ impl Selectable {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, ConvertSaveload)]
 pub struct CreationTime(pub f32);
 
 impl CreationTime {
     pub fn from_age(age: u16) -> Self {
-        let days = f32::from(age) * 360.0;
+        let days = age as f32 * 360.0;
         let seconds = days * 24.0 * 60.0 * 60.0;
         CreationTime(-seconds)
     }
 }
 
-#[derive(Component, NewtypeProxy)]
+#[derive(Component, NewtypeProxy, ConvertSaveload)]
 pub struct Parent(pub Entity);
 
 #[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Component)]
@@ -95,7 +61,7 @@ pub enum Occupation {
 }
 
 
-#[derive(Deserialize, Serialize, Component)]
+#[derive(ConvertSaveload, Component)]
 pub struct ObjectSpin {
     initial_rotation: Quaternion<f32>,
     rotation_axis: Vector3<f32>,
@@ -126,7 +92,7 @@ impl ObjectSpin {
     }
 }
 
-#[derive(Component, PartialEq)]
+#[derive(Component, PartialEq, Serialize, Deserialize, Clone)]
 pub enum Side {
     Friendly,
     Neutral,
@@ -143,51 +109,16 @@ impl Side {
     }
 }
 
-#[derive(Component, NewtypeProxy, Default)]
-pub struct Log(pub Vec<LogItem>);
-
-impl Log {
-    pub fn append(&mut self, text: String) {
-        self.push(LogItem {
-            age: 0.0,
-            content: text
-        })
-    }
-
-    pub fn step(&mut self, secs: f32) {
-        self.retain_mut(|item| {
-            item.age += secs;
-            item.age < 5.0
-        });
-    }
-
-    pub fn render(&self, context: &mut context::Context) {
-        let (_, height) = context.screen_dimensions();
-
-        for (i, item) in self.iter().enumerate() {
-            context.render_text(&item.content, 10.0, height - 30.0 - i as f32 * 20.0);
-        }
-    }
-}
-
-pub struct LogItem {
-    age: f32,
-    content: String
-}
-
-#[derive(Component)]
+#[derive(Component, ConvertSaveload)]
 pub struct DrillSpeed(pub f32);
 
-#[derive(Component, Default)]
-pub struct MovementPlane(pub f32);
-
-#[derive(Component)]
+#[derive(Component, Debug, Clone, PartialEq, ConvertSaveload)]
 pub struct TimeLeft(pub f32);
 
-#[derive(Component, NewtypeProxy)]
+#[derive(ConvertSaveload, Component, NewtypeProxy, Debug, Clone, PartialEq)]
 pub struct Velocity(pub Vector3<f32>);
 
-#[derive(Component)]
+#[derive(Component, ConvertSaveload)]
 pub struct MaxSpeed(pub f32);
 
 #[derive(Component)]
@@ -242,14 +173,33 @@ pub struct AvoidanceForce(pub Vector3<f32>);
 #[derive(Component)]
 pub struct FrictionForce(pub Vector3<f32>);
 
-#[derive(Component, NewtypeProxy)]
-pub struct MouseRay(pub collision::Ray<f32, Point3<f32>, Vector3<f32>>);
 
-impl Default for MouseRay {
-    fn default() -> Self {
-        MouseRay(collision::Ray::new(
-            Point3::new(0.0, 0.0, 0.0),
-            Vector3::zero()
-        ))
+#[derive(Component, NewtypeProxy)]
+pub struct Commands(pub Vec<Command>);
+
+impl Commands {
+    pub fn order(&mut self, shift: bool, command: Command) {
+        if !shift {
+            self.clear();
+        }
+
+        self.push(command);
+    }
+}
+
+impl<M: Serialize + Marker> ConvertSaveload<M> for Commands {
+    type Data = Vec<<Command as ConvertSaveload<M>>::Data>;
+    type Error = NoError;
+
+    fn convert_into<F: FnMut(Entity) -> Option<M>>(&self, mut ids: F) -> Result<Self::Data, Self::Error> {
+        self.0.iter().map(|command| command.convert_into(&mut ids)).collect()
+    }
+
+    fn convert_from<F: FnMut(M) -> Option<Entity>>(data: Self::Data, mut ids: F) -> Result<Self, Self::Error> {
+        let commands: Result<Vec<Command>, Self::Error> =  data.into_iter()
+            .map(|data| Command::convert_from(data, &mut ids))
+            .collect();
+
+        commands.map(Commands)
     }
 }
