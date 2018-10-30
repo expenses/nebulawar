@@ -11,6 +11,34 @@ use failure;
 use specs::*;
 use collision::primitive::ConvexPolyhedron;
 
+const NORMAL: [f32; 3] = [0.0, 0.0, 1.0];
+
+const TOP_LEFT: Vertex = Vertex {
+    position: [-0.5, 0.5, 0.0],
+    texture: [0.0; 2],
+    normal: NORMAL
+};
+
+const TOP_RIGHT: Vertex = Vertex {
+    position: [0.5, 0.5, 0.0],
+    texture: [1.0, 0.0],
+    normal: NORMAL
+};
+
+const BOTTOM_LEFT: Vertex = Vertex {
+    position: [-0.5, -0.5, 0.0],
+    texture: [0.0, 1.0],
+    normal: NORMAL
+};
+
+const BOTTOM_RIGHT: Vertex = Vertex {
+    position: [0.5, -0.5, 0.0],
+    texture: [1.0; 2],
+    normal: NORMAL
+};
+
+pub const BILLBOARD_VERTICES: [Vertex; 6] = [TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT];
+
 #[cfg(feature = "embed_resources")]
 macro_rules! load_resource {
     ($filename:expr) => (
@@ -25,36 +53,6 @@ macro_rules! load_resource {
         use std::path::*;
         &fs::read(PathBuf::from("resources").join($filename))?
     })
-}
-
-pub fn billboard_vertices() -> [Vertex; 6] {
-    let normal = [0.0, 0.0, 1.0];
-        
-    let top_left = Vertex {
-        position: [-0.5, 0.5, 0.0],
-        texture: [0.0; 2],
-        normal
-    };
-
-    let top_right = Vertex {
-        position: [0.5, 0.5, 0.0],
-        texture: [1.0, 0.0],
-        normal
-    };
-
-    let bottom_left = Vertex {
-        position: [-0.5, -0.5, 0.0],
-        texture: [0.0, 1.0],
-        normal
-    };
-
-    let bottom_right = Vertex {
-        position: [0.5, -0.5, 0.0],
-        texture: [1.0; 2],
-        normal
-    };
-
-    [top_left, top_right, bottom_left, top_right, bottom_right, bottom_left]
 }
 
 pub fn load_image(display: &Display, data: &[u8]) -> SrgbTexture2d {
@@ -161,7 +159,7 @@ impl Resources {
                 load_image(display, load_resource!("ui/mine.png"))
             ],
             font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display)?,
-            billboard: VertexBuffer::new(display, &billboard_vertices()).unwrap()
+            billboard: VertexBuffer::new(display, &BILLBOARD_VERTICES).unwrap()
         })
     }
 

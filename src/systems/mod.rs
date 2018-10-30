@@ -648,6 +648,7 @@ impl<'a> System<'a> for SpawnSmokeSystem {
         Write<'a, U64MarkerAllocator>,
 
         ReadStorage<'a, SpawnSmoke>,
+        ReadStorage<'a, Velocity>,
         
         WriteStorage<'a, Position>,
         WriteStorage<'a, Size>,
@@ -656,16 +657,16 @@ impl<'a> System<'a> for SpawnSmokeSystem {
         WriteStorage<'a, U64Marker>
     );
 
-    fn run(&mut self, (entities, paused, mut allocator, smoke, mut pos, mut size, mut time, mut image, mut markers): Self::SystemData) {
+    fn run(&mut self, (entities, paused, mut allocator, smoke, vel, mut pos, mut size, mut time, mut image, mut markers): Self::SystemData) {
         if paused.0 {
             return;
         }
 
-        for (entity, _) in (&entities, &smoke).join() {
+        for (entity, vel, _) in (&entities, &vel, &smoke).join() {
             if let Some(p) = pos.get(entity).map(|p| p.0) {
                 entities.build_entity()
-                    .with(Position(p), &mut pos)
-                    .with(Size(1.0), &mut size)
+                    .with(Position(p - vel.0), &mut pos)
+                    .with(Size(2.0), &mut size)
                     .with(TimeLeft(2.0), &mut time)
                     .with(Image::Smoke, &mut image)
                     .marked(&mut markers, &mut allocator)

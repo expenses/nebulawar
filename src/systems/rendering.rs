@@ -300,9 +300,11 @@ impl<'a> System<'a> for RenderBillboards<'a> {
     );
 
     fn run(&mut self, (camera, system, pos, size, image): Self::SystemData) {
+        let rotation = look_at(-camera.direction());
+
         for (pos, size, image) in (&pos, &size, &image).join() {
             if *image == Image::Smoke {
-                self.0.render_smoke(pos.0, size.0, &camera);
+                self.0.render_smoke(pos.0, size.0, rotation);
             } else {
                 self.0.render_billboard_facing_camera(pos.0, size.0, *image, &camera, &system);
             }
@@ -320,5 +322,18 @@ impl<'a> System<'a> for FlushUI<'a> {
 
     fn run(&mut self, (camera, system): Self::SystemData) {
         self.0.flush_ui(&camera, &system);
+    }
+}
+
+pub struct FlushSmoke<'a>(pub &'a mut Context);
+
+impl<'a> System<'a> for FlushSmoke<'a> {
+    type SystemData = (
+        Read<'a, Camera>,
+        Read<'a, StarSystem>
+    );
+
+    fn run(&mut self, (camera, system): Self::SystemData) {
+        self.0.flush_smoke(&system, &camera);
     }
 }

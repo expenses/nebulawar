@@ -185,16 +185,17 @@ impl Game {
 
         
         RenderCommandPaths  (&mut self.context).run_now(&self.world.res);
-        ObjectRenderer      (&mut self.context).run_now(&self.world.res);
+        RenderSystem        (&mut self.context).run_now(&self.world.res);
+        ObjectRenderer      (&mut self.context).run_now(&self.world.res); 
+        RenderBillboards    (&mut self.context).run_now(&self.world.res);
+        FlushSmoke          (&mut self.context).run_now(&self.world.res); 
         RenderDebug         (&mut self.context).run_now(&self.world.res);
         RenderSelected      (&mut self.context).run_now(&self.world.res);
         RenderMovementPlane (&mut self.context).run_now(&self.world.res);
-        RenderSystem        (&mut self.context).run_now(&self.world.res);
         RenderUI            (&mut self.context).run_now(&self.world.res);
         RenderLogSystem     (&mut self.context).run_now(&self.world.res);
         RenderDragSelection (&mut self.context).run_now(&self.world.res);
         FlushUI             (&mut self.context).run_now(&self.world.res);
-        RenderBillboards    (&mut self.context).run_now(&self.world.res);
         RenderMouse         (&mut self.context).run_now(&self.world.res);
 
         self.context.finish();

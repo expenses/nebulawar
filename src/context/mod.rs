@@ -211,14 +211,17 @@ impl Context {
         let params = self.draw_params();
 
         self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
-
-        // todo: do this somewhere else
-        self.flush_smoke(system, camera);
     }
 
     pub fn flush_smoke(&mut self, system: &StarSystem, camera: &Camera) {
         let uniforms = self.uniforms(Matrix4::identity(), camera, system, &self.resources.images[Image::Smoke as usize], Mode::Shadeless);
-        let params = self.draw_params();
+        let params = DrawParameters {
+            depth: Depth {
+                test: DepthTest::IfLess,
+                .. Default::default()
+            },
+            .. Self::draw_params(self)
+        };
 
         let buffer = VertexBuffer::new(&self.display, &self.smoke_buffer).unwrap();
 
@@ -233,15 +236,14 @@ impl Context {
         self.smoke_buffer.clear();
     }
 
-    pub fn render_smoke(&mut self, position: Vector3<f32>, size: f32, camera: &Camera) {
-        let rotation: Matrix4<f32> = look_at(-camera.direction()).into();
-        let matrix = Matrix4::from_translation(position) * rotation * Matrix4::from_scale(size);
-
-        let iterator = iter_owned(billboard_vertices())
+    pub fn render_smoke(&mut self, position: Vector3<f32>, size: f32, rotation: Quaternion<f32>) {
+        let iterator = iter_owned(BILLBOARD_VERTICES)
             .map(|mut vertex| {
-                let position: Vector3<f32> = vertex.position.into();
-                let position = matrix * position.extend(1.0);
-                vertex.position = position.truncate().into();
+                let mut pos: Vector3<f32> = vertex.position.into();
+                pos *= size;
+                pos = rotation * pos;
+                pos += position;
+                vertex.position = pos.into();
                 vertex
             });
 
