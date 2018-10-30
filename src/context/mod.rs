@@ -83,6 +83,8 @@ pub struct Context {
     text_buffer: Vec<runic::Vertex>,
     lines_3d_buffer: Vec<Vertex>,
     
+    smoke_buffer: Vec<Vertex>,
+
     debug: bool,
     pub gui: Gui
 }
@@ -114,6 +116,7 @@ impl Context {
             
             text_buffer: Vec::new(),
             lines_3d_buffer: Vec::new(),
+            smoke_buffer: Vec::new(),
             
             debug: false,
             gui: Gui::new(DEFAULT_WIDTH, DEFAULT_HEIGHT)
@@ -200,7 +203,7 @@ impl Context {
     }
 
     pub fn render_skybox(&mut self, system: &StarSystem, camera: &Camera) {
-         let uniforms = self.background_uniforms(camera, system, Mode::VertexColoured);
+        let uniforms = self.background_uniforms(camera, system, Mode::VertexColoured);
 
         let vertices = VertexBuffer::new(&self.display, &system.background).unwrap();
         let indices = NoIndices(PrimitiveType::TrianglesList);
@@ -208,6 +211,41 @@ impl Context {
         let params = self.draw_params();
 
         self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
+
+        // todo: do this somewhere else
+        self.flush_smoke(system, camera);
+    }
+
+    pub fn flush_smoke(&mut self, system: &StarSystem, camera: &Camera) {
+        let uniforms = self.uniforms(Matrix4::identity(), camera, system, &self.resources.images[Image::Smoke as usize], Mode::Shadeless);
+        let params = self.draw_params();
+
+        let buffer = VertexBuffer::new(&self.display, &self.smoke_buffer).unwrap();
+
+        self.target.draw(
+            &buffer,
+            &NoIndices(PrimitiveType::TrianglesList),
+            &self.program,
+            &uniforms,
+            &params
+        ).unwrap();
+
+        self.smoke_buffer.clear();
+    }
+
+    pub fn render_smoke(&mut self, position: Vector3<f32>, size: f32, camera: &Camera) {
+        let rotation: Matrix4<f32> = look_at(-camera.direction()).into();
+        let matrix = Matrix4::from_translation(position) * rotation * Matrix4::from_scale(size);
+
+        let iterator = iter_owned(billboard_vertices())
+            .map(|mut vertex| {
+                let position: Vector3<f32> = vertex.position.into();
+                let position = matrix * position.extend(1.0);
+                vertex.position = position.truncate().into();
+                vertex
+            });
+
+        self.smoke_buffer.extend(iterator);
     }
 
     pub fn background_uniforms<'a>(&self, camera: &Camera, system: &StarSystem, mode: Mode) -> impl Uniforms + 'a {

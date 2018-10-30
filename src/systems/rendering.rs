@@ -301,7 +301,11 @@ impl<'a> System<'a> for RenderBillboards<'a> {
 
     fn run(&mut self, (camera, system, pos, size, image): Self::SystemData) {
         for (pos, size, image) in (&pos, &size, &image).join() {
-            self.0.render_billboard_facing_camera(pos.0, size.0, *image, &camera, &system);
+            if *image == Image::Smoke {
+                self.0.render_smoke(pos.0, size.0, &camera);
+            } else {
+                self.0.render_billboard_facing_camera(pos.0, size.0, *image, &camera, &system);
+            }
         }
     }
 }

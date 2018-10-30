@@ -27,7 +27,7 @@ macro_rules! load_resource {
     })
 }
 
-fn create_billboard(display: &Display) -> VertexBuffer<Vertex> {
+pub fn billboard_vertices() -> [Vertex; 6] {
     let normal = [0.0, 0.0, 1.0];
         
     let top_left = Vertex {
@@ -54,7 +54,7 @@ fn create_billboard(display: &Display) -> VertexBuffer<Vertex> {
         normal
     };
 
-    VertexBuffer::new(display, &[top_left, top_right, bottom_left, top_right, bottom_right, bottom_left]).unwrap()
+    [top_left, top_right, bottom_left, top_right, bottom_right, bottom_left]
 }
 
 pub fn load_image(display: &Display, data: &[u8]) -> SrgbTexture2d {
@@ -90,7 +90,7 @@ pub fn load_wavefront(data: &[u8]) ->  Vec<Vertex> {
         .collect()
 }
 
-#[derive(Copy, Clone, Component, Serialize, Deserialize)]
+#[derive(Copy, Clone, Component, Serialize, Deserialize, PartialEq)]
 pub enum Image {
     Star = 0,
     Smoke = 1,
@@ -161,7 +161,7 @@ impl Resources {
                 load_image(display, load_resource!("ui/mine.png"))
             ],
             font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display)?,
-            billboard: create_billboard(display)
+            billboard: VertexBuffer::new(display, &billboard_vertices()).unwrap()
         })
     }
 
