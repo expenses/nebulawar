@@ -496,11 +496,7 @@ impl<'a> System<'a> for TestDeleteSystem {
                     let p = *position.get(entity).unwrap();
                     let s = *size.get(entity).unwrap();
 
-                    entities.delete(entity).unwrap();
-
-                    (&entities, &parent).join()
-                        .filter(|(_, parent)| parent.0 == entity)
-                        .for_each(|(entity, _)| entities.delete(entity).unwrap());
+                    delete_entity(entity, &entities, &parent);
 
                     entities.build_entity()
                         .with(p, &mut position)
@@ -520,14 +516,15 @@ impl<'a> System<'a> for TickTimedEntities {
     type SystemData = (
         Entities<'a>,
         Read<'a, Secs>,
-        WriteStorage<'a, TimeLeft>
+        WriteStorage<'a, TimeLeft>,
+        ReadStorage<'a, Parent>
     );
 
-    fn run(&mut self, (entities, secs, mut time): Self::SystemData) {
+    fn run(&mut self, (entities, secs, mut time, parents): Self::SystemData) {
         for (entity, time) in (&entities, &mut time).join() {
             time.0 -= secs.0;
             if time.0 < 0.0 {
-                entities.delete(entity).unwrap();
+                delete_entity(entity, &entities, &parents);
             }
         }
     }
@@ -545,4 +542,74 @@ impl<'a> System<'a> for SetMouseRay<'a> {
     fn run(&mut self, (mut ray, controls, camera): Self::SystemData) {
         ray.0 = self.0.ray(&camera, controls.mouse());
     }
+}
+
+pub struct ShootStuffSystem;
+
+impl<'a> System<'a> for ShootStuffSystem {
+    type SystemData = (
+        Entities<'a>,
+        Write<'a, U64MarkerAllocator>,
+        WriteStorage<'a, AttackTime>,
+        ReadStorage<'a, AttackDelay>,
+        WriteStorage<'a, Position>,
+        WriteStorage<'a, components::Rotation>,
+        WriteStorage<'a, Velocity>,
+        WriteStorage<'a, Size>,
+        WriteStorage<'a, Model>,
+        WriteStorage<'a, TimeLeft>,
+        WriteStorage<'a, U64Marker>
+    );
+
+    fn run(&mut self, (
+        entities, mut allocator,
+        mut attack_time, delay,
+        mut pos, mut rot, mut vel, mut size, mut model, mut time,
+        mut markers
+    ): Self::SystemData) {
+
+        for (entity, attack_time, delay) in (&entities, &mut attack_time, &delay).join() {
+            if attack_time.0 != 0.0 {
+                continue;
+            }
+
+            attack_time.0 = delay.0;
+
+            if let Some(p) = pos.get(entity).map(|p| p.0) {
+                entities.build_entity()
+                    .with(Position(p), &mut pos)
+                    .with(Rotation(Quaternion::zero()), &mut rot)
+                    .with(Velocity(Vector3::new(0.0, 0.0, 1.0)), &mut vel)
+                    .with(Size(0.1), &mut size)
+                    .with(Model::Missile, &mut model)
+                    .with(TimeLeft(2.0), &mut time)
+                    .marked(&mut markers, &mut allocator)
+                    .build();
+            }
+        }
+    }
+}
+
+pub struct ReduceAttackTime;
+
+impl<'a> System<'a> for ReduceAttackTime {
+    type SystemData = (
+        Read<'a, Secs>,
+        WriteStorage<'a, AttackTime>,
+    );
+
+    fn run(&mut self, (secs, mut time): Self::SystemData) {
+        for time in (&mut time).join() {
+            time.0 = move_towards(time.0, 0.0, secs.0);
+        }
+    }
+}
+
+fn delete_entity(entity: Entity, entities: &Entities, parents: &ReadStorage<Parent>) {
+    entities.delete(entity).unwrap();
+
+    (entities, parents).join()
+        .filter(|(_, parent)| parent.0 == entity)
+        .for_each(|(entity, _)| delete_entity(entity, entities, parents));
+
 }

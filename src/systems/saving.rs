@@ -29,11 +29,13 @@ type ComponentsA<'a> = (
 type ComponentsB<'a> = (
     WriteStorage<'a, Materials>,
     WriteStorage<'a, TimeLeft>,
-    WriteStorage<'a, Image>
+    WriteStorage<'a, Image>,
+    WriteStorage<'a, AttackDelay>,
+    WriteStorage<'a, AttackTime>
 );
 
-type ComponentsASerialized = <ComponentsA<'static> as SerializeComponents<NoError, U64Marker>>::Data;
-type ComponentsBSerialized = <ComponentsB<'static> as SerializeComponents<NoError, U64Marker>>::Data;
+type ComponentsASerialized = <ComponentsA<'static> as SerializeComponents<Error, U64Marker>>::Data;
+type ComponentsBSerialized = <ComponentsB<'static> as SerializeComponents<Error, U64Marker>>::Data;
 
 pub struct SaveSystem;
 
@@ -65,7 +67,7 @@ impl<'a> System<'a> for SaveSystem {
 
         let comp_a = (&entities, &markers).join()
             .map(|(entity, marker)| (marker, comp_a.serialize_entity(entity, ids)))
-            .map(|(marker, result): (&U64Marker, Result<ComponentsASerialized, NoError>)| {
+            .map(|(marker, result): (&U64Marker, Result<ComponentsASerialized, Error>)| {
                 EntityData {
                     marker: *marker,
                     components: result.unwrap()
@@ -75,7 +77,7 @@ impl<'a> System<'a> for SaveSystem {
 
         let comp_b = (&entities, &markers).join()
             .map(|(entity, marker)| (marker, comp_b.serialize_entity(entity, ids)))
-            .map(|(marker, result): (&U64Marker, Result<ComponentsBSerialized, NoError>)| {
+            .map(|(marker, result): (&U64Marker, Result<ComponentsBSerialized, Error>)| {
                 EntityData {
                     marker: *marker,
                     components: result.unwrap()
@@ -128,8 +130,6 @@ impl<'a> System<'a> for LoadSystem {
         mut comp_a, mut comp_b,
         mut markers
     ): Self::SystemData) {
-        println!("{}", entities.join().count());
-
         let file = File::open("save.sav").unwrap();
 
         let data: GameData = bincode::deserialize_from(file).unwrap();
@@ -145,12 +145,12 @@ impl<'a> System<'a> for LoadSystem {
         *plane = data.plane;
 
         data.comp_a.into_iter().for_each(|entity_data| {
-            let result: Result<(), NoError> = comp_a.deserialize_entity(func(entity_data.marker), entity_data.components, |e| Some(func(e)));
+            let result: Result<(), Error> = comp_a.deserialize_entity(func(entity_data.marker), entity_data.components, |e| Some(func(e)));
             result.unwrap();
         });
 
         data.comp_b.into_iter().for_each(|entity_data| {
-            let result: Result<(), NoError> = comp_b.deserialize_entity(func(entity_data.marker), entity_data.components, |e| Some(func(e)));
+            let result: Result<(), Error> = comp_b.deserialize_entity(func(entity_data.marker), entity_data.components, |e| Some(func(e)));
             result.unwrap();
         });
     }

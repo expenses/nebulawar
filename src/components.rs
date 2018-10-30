@@ -1,7 +1,7 @@
 use specs::{*, saveload::*, error::*};
 use cgmath::*;
 use util::*;
-use rand::*;
+use rand::ThreadRng;
 use ships::*;
 use serde::*;
 
@@ -189,7 +189,7 @@ impl Commands {
 
 impl<M: Serialize + Marker> ConvertSaveload<M> for Commands {
     type Data = Vec<<Command as ConvertSaveload<M>>::Data>;
-    type Error = NoError;
+    type Error = Error;
 
     fn convert_into<F: FnMut(Entity) -> Option<M>>(&self, mut ids: F) -> Result<Self::Data, Self::Error> {
         self.0.iter().map(|command| command.convert_into(&mut ids)).collect()
@@ -203,3 +203,9 @@ impl<M: Serialize + Marker> ConvertSaveload<M> for Commands {
         commands.map(Commands)
     }
 }
+
+#[derive(Component, ConvertSaveload)]
+pub struct AttackDelay(pub f32);
+
+#[derive(Component, ConvertSaveload)]
+pub struct AttackTime(pub f32);

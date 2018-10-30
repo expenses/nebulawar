@@ -104,7 +104,8 @@ pub enum Model {
     Tanker = 1,
     Carrier = 2,
     Asteroid = 3,
-    Miner = 4
+    Miner = 4,
+    Missile = 5
 }
 
 pub struct ObjModel {
@@ -134,7 +135,7 @@ impl ObjModel {
 }
 
 pub struct Resources {
-    pub models: [ObjModel; 5],
+    pub models: [ObjModel; 6],
     pub images: [SrgbTexture2d; 4],
     pub font: runic::CachedFont<'static>
 }
@@ -147,7 +148,8 @@ impl Resources {
                 ObjModel::new(display, load_resource!("models/tanker.obj"),   load_resource!("models/tanker.png"))?,
                 ObjModel::new(display, load_resource!("models/carrier.obj"),  load_resource!("models/carrier.png"))?,
                 ObjModel::new(display, load_resource!("models/asteroid.obj"), load_resource!("models/asteroid.png"))?,
-                ObjModel::new(display, load_resource!("models/miner.obj"),    load_resource!("models/miner.png"))?
+                ObjModel::new(display, load_resource!("models/miner.obj"),    load_resource!("models/miner.png"))?,
+                ObjModel::new(display, load_resource!("models/missile.obj"),  load_resource!("models/missile.png"))?
             ],
             images: [
                 load_image(display, load_resource!("star.png")),

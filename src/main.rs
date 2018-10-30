@@ -38,7 +38,7 @@ use glutin::*;
 use glutin::dpi::*;
 use std::time::*;
 use specs::{World, RunNow};
-use specs::shred::{Fetch, FetchMut};
+use specs::shred::{Fetch, FetchMut, Dispatcher};
 
 mod camera;
 mod util;
@@ -64,7 +64,8 @@ use resources::*;
 
 struct Game {
     context: context::Context,
-    world: specs::World
+    world: specs::World,
+    dispatcher: Dispatcher<'static, 'static>
 }
 
 impl Game {
@@ -73,9 +74,22 @@ impl Game {
 
         add_starting_entities(&mut world);
 
+        let dispatcher = specs::DispatcherBuilder::new()
+            .with(TestDeleteSystem, "test_delete", &[])
+            .with(SeekSystem, "seek", &[])
+            .with(AvoidanceSystem, "avoidance", &[])
+            .with(FrictionSystem, "friction", &[])
+            .with(MergeForceSystem, "merge", &["seek", "avoidance", "friction"])
+            .with(ApplyVelocitySystem, "apply", &["merge"])
+            .with(SetRotationSystem, "set_rotation", &["merge"])
+            .with(FinishSeekSystem, "finish_seek", &["apply", "set_rotation"])
+            .with(SpinSystem, "spin", &[])
+            .with(ShipMovementSystem, "ship_movement", &["apply"])
+            .build();
+
         Self {
             context: context::Context::new(events_loop),
-            world
+            world, dispatcher
         }
     }
 
@@ -127,19 +141,7 @@ impl Game {
 
         SetMouseRay                 (&self.context).run_now(&self.world.res);
 
-        specs::DispatcherBuilder::new()
-            .with(TestDeleteSystem, "test_delete", &[])
-            .with(SeekSystem, "seek", &[])
-            .with(AvoidanceSystem, "avoidance", &[])
-            .with(FrictionSystem, "friction", &[])
-            .with(MergeForceSystem, "merge", &["seek", "avoidance", "friction"])
-            .with(ApplyVelocitySystem, "apply", &["merge"])
-            .with(SetRotationSystem, "set_rotation", &["merge"])
-            .with(FinishSeekSystem, "finish_seek", &["apply", "set_rotation"])
-            .with(SpinSystem, "spin", &[])
-            .with(ShipMovementSystem, "ship_movement", &["apply"])
-            .build()
-            .dispatch(&self.world.res);
+        self.dispatcher.dispatch(&self.world.res);
 
         EntityUnderMouseSystem      (&self.context).run_now(&self.world.res);
         AveragePositionSystem                      .run_now(&self.world.res);
@@ -149,10 +151,13 @@ impl Game {
         DragSelectSystem            (&self.context).run_now(&self.world.res);
         RightClickSystem                           .run_now(&self.world.res);
 
+        ShootStuffSystem                            .run_now(&self.world.res);
+
         TimeStepSystem                             .run_now(&self.world.res);
         StepCameraSystem                           .run_now(&self.world.res);
         StepLogSystem                              .run_now(&self.world.res);
         TickTimedEntities                          .run_now(&self.world.res);
+        ReduceAttackTime                           .run_now(&self.world.res);
 
         let controls: Controls = {
             let controls: Fetch<Controls> = self.world.read_resource();
@@ -279,6 +284,8 @@ fn create_world() -> World {
     world.register::<Materials>();
     world.register::<TimeLeft>();
     world.register::<context::Image>();
+    world.register::<AttackDelay>();
+    world.register::<AttackTime>();
 
     // Temp generated stuff
     
