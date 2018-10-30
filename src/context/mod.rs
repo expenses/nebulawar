@@ -266,28 +266,6 @@ impl Context {
 
     // todo: move screen dims into systems so the pers matrix can be generated
 
-    // Get the screen position of a point if it is in front of the camera
-    pub fn screen_position(&self, point: Vector3<f32>, camera: &Camera) -> Option<(f32, f32, f32)> {
-        let modelview = camera.view_matrix() * Matrix4::from_translation(point);
-
-        let gl_position = self.perspective_matrix() * modelview * Vector4::new(0.0, 0.0, 0.0, 1.0);
-
-        let x = gl_position[0] / gl_position[3];
-        let y = gl_position[1] / gl_position[3];
-        let z = gl_position[2] / gl_position[3];
-
-        let (width, height) = self.screen_dimensions();
-        let (x, y) = opengl_pos_to_screen_pos(x, y, width, height);
-        // this may be dpi dependent, not sure
-        let (x, y) = (x * 2.0, y * 2.0);
-
-        if z < 1.0 {
-            Some((x, y, z))
-        } else {
-            None
-        }
-    }
-
     fn draw_params(&self) -> DrawParameters<'static> {
         let mut params = DrawParameters {
             depth: Depth {
@@ -320,25 +298,6 @@ impl Context {
 
             last = Some(vertex);
         }
-    }
-
-    // http://webglfactory.blogspot.com/2011/05/how-to-convert-world-to-screen.html
-    // http://antongerdelan.net/opengl/raycasting.html
-    pub fn ray(&self, camera: &Camera, mouse: (f32, f32)) -> collision::Ray<f32, Point3<f32>, Vector3<f32>> {
-        // Get mouse position
-        let (x, y) = mouse;
-
-        let (width, height) = self.screen_dimensions();
-        let (x, y) = screen_pos_to_opengl_pos(x, y, width, height);
-
-        let clip = Vector4::new(-x, -y, -1.0, 1.0);
-
-        let eye = self.perspective_matrix().invert().unwrap() * clip;
-        let eye = Vector4::new(eye.x, eye.y, -1.0, 0.0);
-
-        let direction = (camera.view_matrix().invert().unwrap() * eye).truncate().normalize_to(-1.0);
-
-        collision::Ray::new(vector_to_point(camera.position()), direction)
     }
 
     pub fn toggle_debug(&mut self) {

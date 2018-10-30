@@ -47,20 +47,21 @@ impl<'a> System<'a> for SpinSystem {
     }
 }
 
-pub struct DragSelectSystem<'a>(pub &'a Context);
+pub struct DragSelectSystem;
 
-impl<'a> System<'a> for DragSelectSystem<'a> {
+impl<'a> System<'a> for DragSelectSystem {
     type SystemData = (
         Read<'a, Controls>,
         Read<'a, Camera>,
+        Read<'a, ScreenDimensions>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Selectable>
     );
 
-    fn run(&mut self, (controls, camera, pos, mut selectable): Self::SystemData) {
+    fn run(&mut self, (controls, camera, screen_dims, pos, mut selectable): Self::SystemData) {
         if let Some((left, top, right, bottom)) = controls.left_drag_rect() {
             for (pos, selectable) in (&pos, &mut selectable).join() {
-                if let Some((x, y, _)) = self.0.screen_position(pos.0, &camera) {
+                if let Some((x, y, _)) = camera.screen_position(pos.0, screen_dims.0) {
                     let selected = x >= left && x <= right && y >= top && y <= bottom;
                     
                     if !controls.shift {
@@ -307,13 +308,14 @@ impl<'a> System<'a> for RightClickInteractionSystem {
         ReadStorage<'a, MineableMaterials>,
         ReadStorage<'a, Side>,
         ReadStorage<'a, Selectable>,
-        ReadStorage<'a, DrillSpeed>
+        ReadStorage<'a, DrillSpeed>,
+        ReadStorage<'a, Commands>
     );
 
-    fn run(&mut self, (entities, mut order, entity, plane, ray, mineable, side, selectable, drill): Self::SystemData) {
-        let ordering = (&entities, &selectable, &side).join()
-            .filter(|(_, selectable, side)| selectable.selected && **side == Side::Friendly)
-            .map(|(entity, _, _)| entity);
+    fn run(&mut self, (entities, mut order, entity, plane, ray, mineable, side, selectable, drill, commands): Self::SystemData) {
+        let ordering = (&entities, &selectable, &side, &commands).join()
+            .filter(|(_, selectable, side, _)| selectable.selected && **side == Side::Friendly)
+            .map(|(entity, _, _, _)| entity);
 
         if let Some((entity, _)) = entity.0 {
             let interaction = if side.get(entity) == Some(&Side::Enemy) {
@@ -464,10 +466,15 @@ pub struct StepLogSystem;
 impl<'a> System<'a> for StepLogSystem {
     type SystemData = (
         Read<'a, Secs>,
+        Read<'a, Paused>,
         Write<'a, Log>
     );
 
-    fn run(&mut self, (secs, mut log): Self::SystemData) {
+    fn run(&mut self, (secs, paused, mut log): Self::SystemData) {
+        if paused.0 {
+            return;
+        }
+
         log.step(secs.0);
     }
 }
@@ -516,11 +523,16 @@ impl<'a> System<'a> for TickTimedEntities {
     type SystemData = (
         Entities<'a>,
         Read<'a, Secs>,
+        Read<'a, Paused>,
         WriteStorage<'a, TimeLeft>,
         ReadStorage<'a, Parent>
     );
 
-    fn run(&mut self, (entities, secs, mut time, parents): Self::SystemData) {
+    fn run(&mut self, (entities, secs, paused, mut time, parents): Self::SystemData) {
+        if paused.0 {
+            return;
+        }
+
         for (entity, time) in (&entities, &mut time).join() {
             time.0 -= secs.0;
             if time.0 < 0.0 {
@@ -530,17 +542,18 @@ impl<'a> System<'a> for TickTimedEntities {
     }
 }
 
-pub struct SetMouseRay<'a>(pub &'a Context);
+pub struct SetMouseRay;
 
-impl<'a> System<'a> for SetMouseRay<'a> {
+impl<'a> System<'a> for SetMouseRay {
     type SystemData = (
         Write<'a, MouseRay>,
         Read<'a, Controls>,
-        Read<'a, Camera>
+        Read<'a, Camera>,
+        Read<'a, ScreenDimensions>
     );
 
-    fn run(&mut self, (mut ray, controls, camera): Self::SystemData) {
-        ray.0 = self.0.ray(&camera, controls.mouse());
+    fn run(&mut self, (mut ray, controls, camera, screen_dims): Self::SystemData) {
+        ray.0 = camera.ray(controls.mouse(), screen_dims.0);
     }
 }
 
@@ -552,19 +565,23 @@ impl<'a> System<'a> for ShootStuffSystem {
         Write<'a, U64MarkerAllocator>,
         WriteStorage<'a, AttackTime>,
         ReadStorage<'a, AttackDelay>,
+        
         WriteStorage<'a, Position>,
         WriteStorage<'a, components::Rotation>,
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, Size>,
         WriteStorage<'a, Model>,
         WriteStorage<'a, TimeLeft>,
+        WriteStorage<'a, Selectable>,
+        WriteStorage<'a, Side>,
+
         WriteStorage<'a, U64Marker>
     );
 
     fn run(&mut self, (
         entities, mut allocator,
         mut attack_time, delay,
-        mut pos, mut rot, mut vel, mut size, mut model, mut time,
+        mut pos, mut rot, mut vel, mut size, mut model, mut time, mut selectable, mut side,
         mut markers
     ): Self::SystemData) {
 
@@ -583,6 +600,8 @@ impl<'a> System<'a> for ShootStuffSystem {
                     .with(Size(0.1), &mut size)
                     .with(Model::Missile, &mut model)
                     .with(TimeLeft(2.0), &mut time)
+                    .with(Selectable::new(false), &mut selectable)
+                    .with(Side::Friendly, &mut side)
                     .marked(&mut markers, &mut allocator)
                     .build();
             }
@@ -595,10 +614,15 @@ pub struct ReduceAttackTime;
 impl<'a> System<'a> for ReduceAttackTime {
     type SystemData = (
         Read<'a, Secs>,
+        Read<'a, Paused>,
         WriteStorage<'a, AttackTime>,
     );
 
-    fn run(&mut self, (secs, mut time): Self::SystemData) {
+    fn run(&mut self, (secs, paused, mut time): Self::SystemData) {
+        if paused.0 {
+            return;
+        }
+
         for time in (&mut time).join() {
             time.0 = move_towards(time.0, 0.0, secs.0);
         }

@@ -75,6 +75,41 @@ impl Camera {
     pub fn move_towards(&mut self, target: Vector3<f32>) {
         self.center = move_towards(self.center, target, 50.0);
     }
+
+    pub fn screen_position(&self, point: Vector3<f32>, (screen_width, screen_height): (f32, f32)) -> Option<(f32, f32, f32)> {
+        let modelview = self.view_matrix() * Matrix4::from_translation(point);
+
+        let gl_position = perspective_matrix(screen_height / screen_width) * modelview * Vector4::new(0.0, 0.0, 0.0, 1.0);
+
+        let x = gl_position[0] / gl_position[3];
+        let y = gl_position[1] / gl_position[3];
+        let z = gl_position[2] / gl_position[3];
+
+        let (x, y) = opengl_pos_to_screen_pos(x, y, screen_width, screen_height);
+        // this may be dpi dependent, not sure
+        let (x, y) = (x * 2.0, y * 2.0);
+
+        if z < 1.0 {
+            Some((x, y, z))
+        } else {
+            None
+        }
+    }
+
+    // http://webglfactory.blogspot.com/2011/05/how-to-convert-world-to-screen.html
+    // http://antongerdelan.net/opengl/raycasting.html
+    pub fn ray(&self, (x, y): (f32, f32), (screen_width, screen_height): (f32, f32)) -> collision::Ray<f32, Point3<f32>, Vector3<f32>> {
+        let (x, y) = screen_pos_to_opengl_pos(x, y, screen_width, screen_height);
+
+        let clip = Vector4::new(-x, -y, -1.0, 1.0);
+
+        let eye = perspective_matrix(screen_height / screen_width).invert().unwrap() * clip;
+        let eye = Vector4::new(eye.x, eye.y, -1.0, 0.0);
+
+        let direction = (self.view_matrix().invert().unwrap() * eye).truncate().normalize_to(-1.0);
+
+        collision::Ray::new(vector_to_point(self.position()), direction)
+    }
 }
 
 impl Default for Camera {

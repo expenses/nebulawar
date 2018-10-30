@@ -75,16 +75,28 @@ impl Game {
         add_starting_entities(&mut world);
 
         let dispatcher = specs::DispatcherBuilder::new()
-            .with(TestDeleteSystem, "test_delete", &[])
+            .with(EventHandlerSystem, "events", &[])
             .with(SeekSystem, "seek", &[])
             .with(AvoidanceSystem, "avoidance", &[])
             .with(FrictionSystem, "friction", &[])
-            .with(MergeForceSystem, "merge", &["seek", "avoidance", "friction"])
+
+            // these have to wait for events because of stuff like paused being pressed
+            .with(SetMouseRay, "mouse_ray", &["events"])
+            .with(TimeStepSystem, "time step", &["events"])
+            .with(StepLogSystem, "step log", &["events"])
+            .with(ReduceAttackTime, "reduce_attack", &["events"])
+            .with(TickTimedEntities, "tick_timed", &["events"])
+            .with(TestDeleteSystem, "test_delete", &["events"])
+            .with(SpinSystem, "spin", &["events"])
+    
+            .with(MergeForceSystem, "merge", &["events", "seek", "avoidance", "friction"])
+
             .with(ApplyVelocitySystem, "apply", &["merge"])
             .with(SetRotationSystem, "set_rotation", &["merge"])
-            .with(FinishSeekSystem, "finish_seek", &["apply", "set_rotation"])
-            .with(SpinSystem, "spin", &[])
+
             .with(ShipMovementSystem, "ship_movement", &["apply"])
+            .with(FinishSeekSystem, "finish_seek", &["apply", "set_rotation"])
+            
             .build();
 
         Self {
@@ -136,10 +148,7 @@ impl Game {
 
     fn update(&mut self, secs: f32) {
         *self.world.write_resource() = Secs(secs);
-
-        EventHandlerSystem                         .run_now(&self.world.res);
-
-        SetMouseRay                 (&self.context).run_now(&self.world.res);
+        *self.world.write_resource() = ScreenDimensions(self.context.screen_dimensions());
 
         self.dispatcher.dispatch(&self.world.res);
 
@@ -148,16 +157,10 @@ impl Game {
         RightClickInteractionSystem                .run_now(&self.world.res);
         MiddleClickSystem                          .run_now(&self.world.res);
         LeftClickSystem                            .run_now(&self.world.res);
-        DragSelectSystem            (&self.context).run_now(&self.world.res);
+        DragSelectSystem                           .run_now(&self.world.res);
         RightClickSystem                           .run_now(&self.world.res);
-
-        ShootStuffSystem                            .run_now(&self.world.res);
-
-        TimeStepSystem                             .run_now(&self.world.res);
+        ShootStuffSystem                           .run_now(&self.world.res);
         StepCameraSystem                           .run_now(&self.world.res);
-        StepLogSystem                              .run_now(&self.world.res);
-        TickTimedEntities                          .run_now(&self.world.res);
-        ReduceAttackTime                           .run_now(&self.world.res);
 
         let controls: Controls = {
             let controls: Fetch<Controls> = self.world.read_resource();
@@ -296,8 +299,8 @@ fn create_world() -> World {
     world.add_resource(AveragePosition(None));
     world.add_resource(Events(Vec::new()));
     world.add_resource(MouseRay::default());
-
     world.add_resource(specs::saveload::U64MarkerAllocator::new());
+    world.add_resource(ScreenDimensions((0.0, 0.0)));
     
     world.register::<SeekPosition>();
     world.register::<SeekForce>();

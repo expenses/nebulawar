@@ -32,16 +32,17 @@ impl<'a> System<'a> for RenderSelected<'a> {
     type SystemData = (
         Entities<'a>,
         Read<'a, Camera>,
+        Read<'a, ScreenDimensions>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Selectable>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, Side>
     );
 
-    fn run(&mut self, (entities, camera, pos, selectable, size, side): Self::SystemData) {
+    fn run(&mut self, (entities, camera, screen_dims, pos, selectable, size, side): Self::SystemData) {
         for (entity, pos, selectable, side) in (&entities, &pos, &selectable, &side).join() {
             if selectable.selected {
-                if let Some((x, y, z)) = self.0.screen_position(pos.0, &camera) {
+                if let Some((x, y, z)) = camera.screen_position(pos.0, screen_dims.0) {
                     let size = size.get(entity).map(|size| size.0).unwrap_or(1.0);
                     self.0.render_circle(x, y, circle_size(z) * size, side.color());
                 }
@@ -166,6 +167,7 @@ impl<'a> System<'a> for RenderDebug<'a> {
         Read<'a, Camera>,
         Read<'a, EntityUnderMouse>,
         Read<'a, StarSystem>,
+        Read<'a, MouseRay>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Velocity>,
         ReadStorage<'a, SeekForce>,
@@ -173,7 +175,7 @@ impl<'a> System<'a> for RenderDebug<'a> {
         ReadStorage<'a, FrictionForce>
     );
 
-    fn run(&mut self, (entities, controls, camera, entity, system, pos, vel, seek, avoid, friction): Self::SystemData) {
+    fn run(&mut self, (entities, controls, camera, entity, system, ray, pos, vel, seek, avoid, friction): Self::SystemData) {
         if !self.0.is_debugging() {
             return;
         }
@@ -182,8 +184,7 @@ impl<'a> System<'a> for RenderDebug<'a> {
             self.0.render_model(Model::Asteroid, point, Quaternion::zero(), 1.0, &camera, &system);
         }
 
-        let ray = self.0.ray(&camera, controls.mouse());
-        if let Some(point) = Plane::new(UP, 0.0).intersection(&ray).map(point_to_vector) {
+        if let Some(point) = Plane::new(UP, 0.0).intersection(&ray.0).map(point_to_vector) {
             self.0.render_model(Model::Asteroid, point, Quaternion::zero(), 1.0, &camera, &system);
         }
 
