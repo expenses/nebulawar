@@ -183,12 +183,13 @@ impl Game {
     fn render(&mut self) {
         self.context.clear();
 
-        RenderSystem        (&mut self.context).run_now(&self.world.res);
+        
         RenderCommandPaths  (&mut self.context).run_now(&self.world.res);
         ObjectRenderer      (&mut self.context).run_now(&self.world.res);
         RenderDebug         (&mut self.context).run_now(&self.world.res);
         RenderSelected      (&mut self.context).run_now(&self.world.res);
         RenderMovementPlane (&mut self.context).run_now(&self.world.res);
+        RenderSystem        (&mut self.context).run_now(&self.world.res);
         RenderUI            (&mut self.context).run_now(&self.world.res);
         RenderLogSystem     (&mut self.context).run_now(&self.world.res);
         RenderDragSelection (&mut self.context).run_now(&self.world.res);

@@ -33,13 +33,13 @@ impl Button {
     pub fn render(&self, context: &mut Context) {
         let (x, y, width, height) = self.location(context);
 
-        let color = if self.state(context).is_hovering() {
+        let colour = if self.state(context).is_hovering() {
             [0.0, 0.0, 0.0, 0.25]
         } else {
             [0.0; 4]
         };
 
-        context.render_image(Image::Button, x, y, width, height, color);
-        context.render_image(self.image, x, y, width, height, color);
+        context.render_image(Image::Button, x, y, width, height, colour);
+        context.render_image(self.image, x, y, width, height, colour);
     }
 }

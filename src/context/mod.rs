@@ -42,7 +42,7 @@ pub enum Mode {
     Normal = 1,
     Shadeless = 2,
     White = 3,
-    VertexColored = 4
+    VertexColoured = 4
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize)]
@@ -61,10 +61,10 @@ impl Vertex {
         }
     }
 
-    pub fn with_color(position: Vector3<f32>, color: [f32; 3]) -> Self {
+    pub fn with_colour(position: Vector3<f32>, colour: [f32; 3]) -> Self {
         Self {
             position: position.into(),
-            normal: color,
+            normal: colour,
             texture: [0.0; 2]
         }
     }
@@ -134,7 +134,7 @@ impl Context {
             view: matrix_to_array(camera.view_matrix()),
             perspective: matrix_to_array(self.perspective_matrix()),
             light_direction: vector_to_array(system.light),
-            mode: Mode::VertexColored as i32
+            mode: Mode::VertexColoured as i32
         };
 
         let vertices = VertexBuffer::new(&self.display, &self.lines_3d_buffer).unwrap();
@@ -200,7 +200,7 @@ impl Context {
     }
 
     pub fn render_skybox(&mut self, system: &StarSystem, camera: &Camera) {
-         let uniforms = self.background_uniforms(camera, system, Mode::VertexColored);
+         let uniforms = self.background_uniforms(camera, system, Mode::VertexColoured);
 
         let vertices = VertexBuffer::new(&self.display, &system.background).unwrap();
         let indices = NoIndices(PrimitiveType::TrianglesList);
@@ -253,8 +253,8 @@ impl Context {
         self.lines.render_rect(top_left, bottom_right);
     }
 
-    pub fn render_circle(&mut self, x: f32, y: f32, radius: f32, color: [f32; 4]) {
-        self.lines.render_circle(x, y, radius, color);
+    pub fn render_circle(&mut self, x: f32, y: f32, radius: f32, colour: [f32; 4]) {
+        self.lines.render_circle(x, y, radius, colour);
     }
 
     pub fn screen_dimensions(&self) -> (f32, f32) {
@@ -296,11 +296,11 @@ impl Context {
         params
     }
 
-    pub fn render_3d_lines<I: Iterator<Item=Vector3<f32>>>(&mut self, iterator: I, color: [f32; 3]) {
+    pub fn render_3d_lines<I: Iterator<Item=Vector3<f32>>>(&mut self, iterator: I, colour: [f32; 3]) {
         let mut last = None;
 
         for vector in iterator {
-            let vertex = Vertex::with_color(vector, color);
+            let vertex = Vertex::with_colour(vector, colour);
 
             if let Some(last) = last {
                 self.lines_3d_buffer.push(last);

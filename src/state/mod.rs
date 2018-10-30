@@ -6,7 +6,7 @@ use util::*;
 use entities::*;
 use spade;
 use spade::delaunay::FloatDelaunayTriangulation;
-use tint::Color;
+use tint::Colour;
 
 #[derive(Debug)]
 enum SystemType {
@@ -85,19 +85,20 @@ impl Default for StarSystem {
 
 // https://www.redblobgames.com/x/1842-delaunay-voronoi-sphere/#delaunay
 fn make_background(rng: &mut ThreadRng) -> Vec<context::Vertex> {
-    let nebula_color = Color::new(rng.gen_range(0.0, 360.0), 1.0, rng.gen_range(0.5, 1.0), 1.0).from_hsv();
-    let nebula_color = Vector3::new(nebula_color.red as f32, nebula_color.green as f32, nebula_color.blue as f32);
+    let nebula_colour = Colour::new(rng.gen_range(0.0, 360.0), 1.0, rng.gen_range(0.5, 1.0), 1.0).from_hsv();
+    let nebula_colour = Vector3::new(nebula_colour.red as f32, nebula_colour.green as f32, nebula_colour.blue as f32);
+    let colour_mod = rng.gen_range(-0.5, 1.0);
 
     let mut dlt = FloatDelaunayTriangulation::with_walk_locate();
 
     // Get the point to rotate the sphere around
-    let target_point = ColouredVertex::rand(rng, Quaternion::zero(), nebula_color);
+    let target_point = ColouredVertex::rand(rng, Quaternion::zero(), nebula_colour, colour_mod);
 
     // Get the rotation to that point
     let rotation_quat = Quaternion::look_at(target_point.vector, UP);
 
     for _ in 0 .. 100 {
-        dlt.insert(ColouredVertex::rand(rng, rotation_quat, nebula_color));
+        dlt.insert(ColouredVertex::rand(rng, rotation_quat, nebula_colour, colour_mod));
     }
 
     let triangles_to_fill_gap = dlt.edges()
@@ -114,9 +115,9 @@ fn make_background(rng: &mut ThreadRng) -> Vec<context::Vertex> {
         .chain(triangles_to_fill_gap)
         // map to game vertices
         .map(|vertex| {
-            context::Vertex::with_color(
+            context::Vertex::with_colour(
                 vertex.vector * (BACKGROUND_DISTANCE + 2500.0),
-                vertex.color
+                vertex.colour
             )
         })
         // collect into vec
@@ -130,11 +131,11 @@ struct ColouredVertex {
     vector: Vector3<f32>,
     projected_x: f32,
     projected_y: f32,
-    color: [f32; 3]
+    colour: [f32; 3]
 }
 
 impl ColouredVertex {
-    fn rand(rng: &mut ThreadRng, rotation_quat: Quaternion<f32>, color: Vector3<f32>) -> Self {
+    fn rand(rng: &mut ThreadRng, rotation_quat: Quaternion<f32>, colour: Vector3<f32>, colour_mod: f64) -> Self {
         use noise::{self, NoiseFn, Seedable};
 
         let vector = uniform_sphere_distribution(rng);
@@ -142,12 +143,11 @@ impl ColouredVertex {
 
         let value = noise::Perlin::new()
             .set_seed(rng.gen())
-            .get([f64::from(vector.x), f64::from(vector.y), f64::from(vector.z)])
-            + rng.gen_range(-0.5, 0.5);
+            .get([f64::from(vector.x), f64::from(vector.y), f64::from(vector.z)]) + colour_mod;
 
         Self {
             vector,
-            color: (color * value as f32).into(),
+            colour: (colour * value as f32).into(),
             // calculate points stereographically projected
             projected_x: rotated_vector.x / (1.0 - rotated_vector.z),
             projected_y: rotated_vector.y / (1.0 - rotated_vector.z)

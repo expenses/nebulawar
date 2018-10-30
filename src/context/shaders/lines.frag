@@ -1,19 +1,19 @@
 #version 140
 
-in vec4 v_color;
+in vec4 v_colour;
 in vec2 v_uv;
 
-out vec4 color;
+out vec4 colour;
 
 uniform bool draw_image;
 uniform sampler2D image;
 
 void main() {
     if (draw_image) {
-        vec4 image_color = texture(image, v_uv);
+        vec4 image_colour = texture(image, v_uv);
 
-        color = mix(image_color, vec4(v_color.rgb, 1.0), v_color.a);
+        colour = mix(image_colour, vec4(v_colour.rgb, 1.0), v_colour.a);
     } else {
-        color = v_color;
+        colour = v_colour;
     }
 }

@@ -44,7 +44,7 @@ impl<'a> System<'a> for RenderSelected<'a> {
             if selectable.selected {
                 if let Some((x, y, z)) = camera.screen_position(pos.0, screen_dims.0) {
                     let size = size.get(entity).map(|size| size.0).unwrap_or(1.0);
-                    self.0.render_circle(x, y, circle_size(z) * size, side.color());
+                    self.0.render_circle(x, y, circle_size(z) * size, side.colour());
                 }
             }
         }

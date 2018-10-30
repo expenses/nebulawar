@@ -100,7 +100,7 @@ pub enum Side {
 }
 
 impl Side {
-    pub fn color(&self) -> [f32; 4] {
+    pub fn colour(&self) -> [f32; 4] {
         match *self {
             Side::Friendly => [0.0, 0.8, 0.0, 1.0],
             Side::Neutral => [1.0, 0.8, 0.2, 1.0],

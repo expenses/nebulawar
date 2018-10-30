@@ -15,28 +15,28 @@ pub const FRAG: &str = include_str!("shaders/lines.frag");
 #[derive(Copy, Clone, Debug)]
 struct Vertex2d {
     position: [f32; 2],
-    color: [f32; 4],
+    colour: [f32; 4],
     uv: [f32; 2]
 }
 
 impl Vertex2d {
-    fn new(position: [f32; 2], uv: [f32; 2], color: [f32; 4]) -> Self {
+    fn new(position: [f32; 2], uv: [f32; 2], colour: [f32; 4]) -> Self {
         Self {
-            position, uv, color
+            position, uv, colour
         }
     }
 }
 
-implement_vertex!(Vertex2d, position, color, uv);
+implement_vertex!(Vertex2d, position, colour, uv);
 
 struct Constructor {
-    color: [f32; 4]
+    colour: [f32; 4]
 }
 
 impl Constructor {
-    fn new(color: [f32; 4]) -> Self {
+    fn new(colour: [f32; 4]) -> Self {
         Self {
-            color
+            colour
         }
     }
 }
@@ -45,7 +45,7 @@ impl VertexConstructor<FillVertex, Vertex2d> for Constructor {
     fn new_vertex(&mut self, vertex: FillVertex) -> Vertex2d {
         Vertex2d {
             position: vertex.position.to_array(),
-            color: self.color,
+            colour: self.colour,
             uv: [0.0; 2]
         }
     }
@@ -54,7 +54,7 @@ impl VertexConstructor<StrokeVertex, Vertex2d> for Constructor {
     fn new_vertex(&mut self, vertex: StrokeVertex) -> Vertex2d {
         Vertex2d {
             position: vertex.position.to_array(),
-            color: self.color,
+            colour: self.colour,
             uv: [0.0; 2]
         }
     }
@@ -115,12 +115,12 @@ impl LineRenderer {
         );
     }
 
-    pub fn render_circle(&mut self, x: f32, y: f32, radius: f32, color: [f32; 4]) {        
+    pub fn render_circle(&mut self, x: f32, y: f32, radius: f32, colour: [f32; 4]) {        
         stroke_circle(
             point(x, y),
             radius,
             &self.stroke_options,
-            &mut BuffersBuilder::new(&mut self.vertex_buffers, Constructor::new(color))
+            &mut BuffersBuilder::new(&mut self.vertex_buffers, Constructor::new(colour))
         );
     }
 
