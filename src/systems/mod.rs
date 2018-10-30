@@ -593,10 +593,12 @@ impl<'a> System<'a> for ShootStuffSystem {
             attack.time = attack.delay;
 
             if let Some(p) = pos.get(entity).map(|p| p.0) {
+                let direction = uniform_sphere_distribution(&mut rand::thread_rng());
+
                 entities.build_entity()
                     .with(Position(p), &mut pos)
                     .with(Rotation(Quaternion::zero()), &mut rot)
-                    .with(Velocity(Vector3::new(0.0, 0.0, 1.0)), &mut vel)
+                    .with(Velocity(direction), &mut vel)
                     .with(Size(0.1), &mut size)
                     .with(Model::Missile, &mut model)
                     .with(TimeLeft(20.0), &mut time)
