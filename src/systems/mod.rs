@@ -563,8 +563,7 @@ impl<'a> System<'a> for ShootStuffSystem {
     type SystemData = (
         Entities<'a>,
         Write<'a, U64MarkerAllocator>,
-        WriteStorage<'a, AttackTime>,
-        ReadStorage<'a, AttackDelay>,
+        WriteStorage<'a, CanAttack>,
         
         WriteStorage<'a, Position>,
         WriteStorage<'a, components::Rotation>,
@@ -574,23 +573,24 @@ impl<'a> System<'a> for ShootStuffSystem {
         WriteStorage<'a, TimeLeft>,
         WriteStorage<'a, Selectable>,
         WriteStorage<'a, Side>,
+        WriteStorage<'a, SpawnSmoke>,
 
         WriteStorage<'a, U64Marker>
     );
 
     fn run(&mut self, (
         entities, mut allocator,
-        mut attack_time, delay,
-        mut pos, mut rot, mut vel, mut size, mut model, mut time, mut selectable, mut side,
+        mut attack,
+        mut pos, mut rot, mut vel, mut size, mut model, mut time, mut selectable, mut side, mut smoke,
         mut markers
     ): Self::SystemData) {
 
-        for (entity, attack_time, delay) in (&entities, &mut attack_time, &delay).join() {
-            if attack_time.0 != 0.0 {
+        for (entity, attack) in (&entities, &mut attack).join() {
+            if attack.time != 0.0 {
                 continue;
             }
 
-            attack_time.0 = delay.0;
+            attack.time = attack.delay;
 
             if let Some(p) = pos.get(entity).map(|p| p.0) {
                 entities.build_entity()
@@ -599,9 +599,10 @@ impl<'a> System<'a> for ShootStuffSystem {
                     .with(Velocity(Vector3::new(0.0, 0.0, 1.0)), &mut vel)
                     .with(Size(0.1), &mut size)
                     .with(Model::Missile, &mut model)
-                    .with(TimeLeft(2.0), &mut time)
+                    .with(TimeLeft(20.0), &mut time)
                     .with(Selectable::new(false), &mut selectable)
                     .with(Side::Friendly, &mut side)
+                    .with(SpawnSmoke, &mut smoke)
                     .marked(&mut markers, &mut allocator)
                     .build();
             }
@@ -615,16 +616,16 @@ impl<'a> System<'a> for ReduceAttackTime {
     type SystemData = (
         Read<'a, Secs>,
         Read<'a, Paused>,
-        WriteStorage<'a, AttackTime>,
+        WriteStorage<'a, CanAttack>,
     );
 
-    fn run(&mut self, (secs, paused, mut time): Self::SystemData) {
+    fn run(&mut self, (secs, paused, mut attack): Self::SystemData) {
         if paused.0 {
             return;
         }
 
-        for time in (&mut time).join() {
-            time.0 = move_towards(time.0, 0.0, secs.0);
+        for attack in (&mut attack).join() {
+            attack.time = move_towards(attack.time, 0.0, secs.0);
         }
     }
 }
@@ -636,4 +637,40 @@ fn delete_entity(entity: Entity, entities: &Entities, parents: &ReadStorage<Pare
         .filter(|(_, parent)| parent.0 == entity)
         .for_each(|(entity, _)| delete_entity(entity, entities, parents));
 
+}
+
+pub struct SpawnSmokeSystem;
+
+impl<'a> System<'a> for SpawnSmokeSystem {
+    type SystemData = (
+        Entities<'a>,
+        Read<'a, Paused>,
+        Write<'a, U64MarkerAllocator>,
+
+        ReadStorage<'a, SpawnSmoke>,
+        
+        WriteStorage<'a, Position>,
+        WriteStorage<'a, Size>,
+        WriteStorage<'a, TimeLeft>,
+        WriteStorage<'a, Image>,
+        WriteStorage<'a, U64Marker>
+    );
+
+    fn run(&mut self, (entities, paused, mut allocator, smoke, mut pos, mut size, mut time, mut image, mut markers): Self::SystemData) {
+        if paused.0 {
+            return;
+        }
+
+        for (entity, _) in (&entities, &smoke).join() {
+            if let Some(p) = pos.get(entity).map(|p| p.0) {
+                entities.build_entity()
+                    .with(Position(p), &mut pos)
+                    .with(Size(1.0), &mut size)
+                    .with(TimeLeft(2.0), &mut time)
+                    .with(Image::Smoke, &mut image)
+                    .marked(&mut markers, &mut allocator)
+                    .build();
+            }
+        }
+    }
 }

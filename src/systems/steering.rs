@@ -3,6 +3,7 @@ use specs::*;
 use util::*;
 use cgmath::{InnerSpace, Vector3, Zero};
 use resources::*;
+use context::*;
 
 pub struct ApplyVelocitySystem;
 
@@ -106,12 +107,14 @@ impl<'a> System<'a> for AvoidanceSystem {
         ReadStorage<'a, Velocity>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, MaxSpeed>,
-        ReadStorage<'a, Size>
+        ReadStorage<'a, Size>,
+        ReadStorage<'a, Image>
     );
 
-    fn run(&mut self, (entities, mut avoidance, vel, positions, speed, sizes): Self::SystemData) {
+    fn run(&mut self, (entities, mut avoidance, vel, positions, speed, sizes, image): Self::SystemData) {
         // collect the entity positions into a vec to avoid having to deref the ecs storage (which can be slow)
-        let entity_positions: Vec<_> = (&positions, &sizes).join().collect();
+        // Also dont collect entities with an image because having images push entities about seems kinda wierd
+        let entity_positions: Vec<_> = (&positions, &sizes, !&image).join().collect();
 
         for (entity, vel, pos, speed, size) in (&entities, &vel, &positions, &speed, &sizes).join() {
             let max_speed = speed.0;
@@ -120,7 +123,7 @@ impl<'a> System<'a> for AvoidanceSystem {
             let mut sum = Vector3::zero();
             let mut count = 0;
 
-            for (p, s) in &entity_positions {
+            for (p, s, _) in &entity_positions {
                 let distance = pos.distance(&p.0);
 
                 if distance > 0.0 && distance < (size.0 + s.0) {

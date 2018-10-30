@@ -76,11 +76,13 @@ pub struct Context {
     display: Display,
     program: Program,
     target: Frame,
-    pub resources: Resources,
+    resources: Resources,
     lines: LineRenderer,
     text_program: Program,
-    text: Vec<runic::Vertex>,
-    lines_3d: Vec<Vertex>,
+    
+    text_buffer: Vec<runic::Vertex>,
+    lines_3d_buffer: Vec<Vertex>,
+    
     debug: bool,
     pub gui: Gui
 }
@@ -109,8 +111,10 @@ impl Context {
             lines: LineRenderer::new(&display),
             text_program: runic::default_program(&display).unwrap(),
             display, program,
-            text: Vec::new(),
-            lines_3d: Vec::new(),
+            
+            text_buffer: Vec::new(),
+            lines_3d_buffer: Vec::new(),
+            
             debug: false,
             gui: Gui::new(DEFAULT_WIDTH, DEFAULT_HEIGHT)
         }
@@ -124,9 +128,7 @@ impl Context {
         self.target.clear_color_srgb_and_depth((0.0, 0.0, 0.0, 1.0), 1.0);
     }
 
-    pub fn flush_ui(&mut self, camera: &Camera, system: &StarSystem) {
-        self.lines.flush(&mut self.target, &self.display);
-
+    fn flush_3d_lines(&mut self, camera: &Camera, system: &StarSystem) {
         let uniforms = uniform!{
             model: matrix_to_array(Matrix4::identity()),
             view: matrix_to_array(camera.view_matrix()),
@@ -135,16 +137,25 @@ impl Context {
             mode: Mode::VertexColored as i32
         };
 
-        let vertices = VertexBuffer::new(&self.display, &self.lines_3d).unwrap();
+        let vertices = VertexBuffer::new(&self.display, &self.lines_3d_buffer).unwrap();
         let indices = NoIndices(PrimitiveType::LinesList);
 
         let params = self.draw_params();
         self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
 
-        self.resources.font.render_vertices(&self.text, [1.0; 4], &mut self.target, &self.display, &self.text_program, true).unwrap();
+        self.lines_3d_buffer.clear();
+    }
 
-        self.lines_3d.clear();
-        self.text.clear();
+    fn flush_text(&mut self) {
+        self.resources.font.render_vertices(&self.text_buffer, [1.0; 4], &mut self.target, &self.display, &self.text_program, true).unwrap();
+        self.text_buffer.clear();
+    }
+
+    pub fn flush_ui(&mut self, camera: &Camera, system: &StarSystem) {
+        self.lines.flush(&mut self.target, &self.display);
+
+        self.flush_3d_lines(camera, system);
+        self.flush_text();
 
         self.gui.clear();
     }
@@ -165,7 +176,7 @@ impl Context {
         let params = self.draw_params();
 
         self.target.draw(
-            &billboard(&self.display),
+            &self.resources.billboard,
             &NoIndices(PrimitiveType::TrianglesList),
             &self.program,
             &uniforms,
@@ -235,7 +246,7 @@ impl Context {
 
     pub fn render_text(&mut self, text: &str, x: f32, y: f32) {
         let iterator = self.resources.font.get_pixelated_vertices(text, [x, y], 16.0, 1.0, &self.display).unwrap();
-        self.text.extend(iterator);
+        self.text_buffer.extend(iterator);
     }
 
     pub fn render_rect(&mut self, top_left: (f32, f32), bottom_right: (f32, f32)) {
@@ -292,8 +303,8 @@ impl Context {
             let vertex = Vertex::with_color(vector, color);
 
             if let Some(last) = last {
-                self.lines_3d.push(last);
-                self.lines_3d.push(vertex);
+                self.lines_3d_buffer.push(last);
+                self.lines_3d_buffer.push(vertex);
             }
 
             last = Some(vertex);

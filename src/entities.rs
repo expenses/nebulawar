@@ -22,8 +22,10 @@ pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, sid
         .with(Selectable::new(false))
         .with(Velocity(Vector3::zero()))
         .with(side)
-        .with(AttackDelay(1.0))
-        .with(AttackTime(0.0))
+        .with(CanAttack {
+            delay: 10.0,
+            time: 1.0
+        })
         .marked::<U64Marker>();
 
     if let Some(speed) = components.drill_speed() {

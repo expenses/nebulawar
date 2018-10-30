@@ -95,6 +95,7 @@ impl Game {
             .with(SetRotationSystem, "set_rotation", &["merge"])
 
             .with(ShipMovementSystem, "ship_movement", &["apply"])
+            .with(SpawnSmokeSystem, "smoke", &["apply"])
             .with(FinishSeekSystem, "finish_seek", &["apply", "set_rotation"])
             
             .build();
@@ -287,8 +288,8 @@ fn create_world() -> World {
     world.register::<Materials>();
     world.register::<TimeLeft>();
     world.register::<context::Image>();
-    world.register::<AttackDelay>();
-    world.register::<AttackTime>();
+    world.register::<CanAttack>();
+    world.register::<SpawnSmoke>();
 
     // Temp generated stuff
     

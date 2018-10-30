@@ -27,7 +27,7 @@ macro_rules! load_resource {
     })
 }
 
-pub fn billboard(display: &Display) -> VertexBuffer<Vertex> {
+fn create_billboard(display: &Display) -> VertexBuffer<Vertex> {
     let normal = [0.0, 0.0, 1.0];
         
     let top_left = Vertex {
@@ -93,9 +93,10 @@ pub fn load_wavefront(data: &[u8]) ->  Vec<Vertex> {
 #[derive(Copy, Clone, Component, Serialize, Deserialize)]
 pub enum Image {
     Star = 0,
-    Button = 1,
-    Move = 2,
-    Mine = 3
+    Smoke = 1,
+    Button = 2,
+    Move = 3,
+    Mine = 4
 }
 
 #[derive(Serialize, Deserialize, Component, Copy, Clone)]
@@ -136,7 +137,8 @@ impl ObjModel {
 
 pub struct Resources {
     pub models: [ObjModel; 6],
-    pub images: [SrgbTexture2d; 4],
+    pub images: [SrgbTexture2d; 5],
+    pub billboard: VertexBuffer<Vertex>,
     pub font: runic::CachedFont<'static>
 }
 
@@ -153,11 +155,13 @@ impl Resources {
             ],
             images: [
                 load_image(display, load_resource!("star.png")),
+                load_image(display, load_resource!("smoke.png")),
                 load_image(display, load_resource!("ui/button.png")),
                 load_image(display, load_resource!("ui/move.png")),
                 load_image(display, load_resource!("ui/mine.png"))
             ],
-            font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display)?
+            font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display)?,
+            billboard: create_billboard(display)
         })
     }
 

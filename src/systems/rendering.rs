@@ -163,7 +163,6 @@ pub struct RenderDebug<'a>(pub &'a mut Context);
 impl<'a> System<'a> for RenderDebug<'a> {
     type SystemData = (
         Entities<'a>,
-        Read<'a, Controls>,
         Read<'a, Camera>,
         Read<'a, EntityUnderMouse>,
         Read<'a, StarSystem>,
@@ -175,7 +174,7 @@ impl<'a> System<'a> for RenderDebug<'a> {
         ReadStorage<'a, FrictionForce>
     );
 
-    fn run(&mut self, (entities, controls, camera, entity, system, ray, pos, vel, seek, avoid, friction): Self::SystemData) {
+    fn run(&mut self, (entities, camera, entity, system, ray, pos, vel, seek, avoid, friction): Self::SystemData) {
         if !self.0.is_debugging() {
             return;
         }

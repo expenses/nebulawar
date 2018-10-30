@@ -205,7 +205,11 @@ impl<M: Serialize + Marker> ConvertSaveload<M> for Commands {
 }
 
 #[derive(Component, ConvertSaveload)]
-pub struct AttackDelay(pub f32);
+pub struct CanAttack {
+    pub time: f32,
+    pub delay: f32
+}
 
-#[derive(Component, ConvertSaveload)]
-pub struct AttackTime(pub f32);
+
+#[derive(Component, Serialize, Deserialize)]
+pub struct SpawnSmoke;
