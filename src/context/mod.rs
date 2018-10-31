@@ -236,18 +236,15 @@ impl Context {
         self.smoke_buffer.clear();
     }
 
-    pub fn render_smoke(&mut self, position: Vector3<f32>, size: f32, rotation: Quaternion<f32>) {
-        let iterator = iter_owned(BILLBOARD_VERTICES)
-            .map(|mut vertex| {
-                let mut pos: Vector3<f32> = vertex.position.into();
-                pos *= size;
-                pos = rotation * pos;
-                pos += position;
-                vertex.position = pos.into();
-                vertex
-            });
+    pub fn render_smoke<I: Iterator<Item=Vertex>>(&mut self, iterator: I, len: usize) {
+        if len > self.smoke_buffer.len() {
+            let difference = len - self.smoke_buffer.len();
+            self.smoke_buffer.reserve(difference);
+        }
 
-        self.smoke_buffer.extend(iterator);
+        for vertex in iterator {
+            self.smoke_buffer.push(vertex);
+        }
     }
 
     pub fn background_uniforms<'a>(&self, camera: &Camera, system: &StarSystem, mode: Mode) -> impl Uniforms + 'a {

@@ -302,13 +302,22 @@ impl<'a> System<'a> for RenderBillboards<'a> {
     fn run(&mut self, (camera, system, pos, size, image): Self::SystemData) {
         let rotation = look_at(-camera.direction());
 
-        for (pos, size, image) in (&pos, &size, &image).join() {
-            if *image == Image::Smoke {
-                self.0.render_smoke(pos.0, size.0, rotation);
-            } else {
-                self.0.render_billboard_facing_camera(pos.0, size.0, *image, &camera, &system);
-            }
-        }
+        let len = (&pos, &size, &image).join().count() * 6;
+
+        let iterator = (&pos, &size, &image).join()
+            .flat_map(|(pos, size, _)| {
+                iter_owned(BILLBOARD_VERTICES).map(move |v| (v, pos.0, size.0))
+            })
+            .map(|(mut v, pos, size)| {
+                let mut p: Vector3<f32> = v.position.into();
+                p *= size;
+                p = rotation * p;
+                p += pos;
+                v.position = p.into();
+                v
+            });
+
+        self.0.render_smoke(iterator, len);
     }
 }
 
