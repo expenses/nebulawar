@@ -62,7 +62,7 @@ impl<'a> System<'a> for RenderCommandPaths<'a> {
     fn run(&mut self, (positions, commands): Self::SystemData) {
         for (pos, commands) in (&positions, &commands).join() {
             let points = iter_owned([pos.0])
-                .chain(commands.iter().map(|command| command.point(&positions)));
+                .chain(commands.iter().filter_map(|command| command.point(&positions)));
 
             self.0.render_3d_lines(points, WHITE);
         }

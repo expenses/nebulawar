@@ -159,3 +159,15 @@ pub const CLOSE_ENOUGH_DISTANCE: f32 = 0.1;
 pub fn close_enough(a: Vector3<f32>, b: Vector3<f32>) -> bool {
     a.distance2(b) < CLOSE_ENOUGH_DISTANCE
 }
+
+pub fn avg_position<I: Iterator<Item = Vector3<f32>>>(iterator: I) -> Option<Vector3<f32>> {
+    let (len, sum) = iterator.fold((0, Vector3::zero()), |(len, sum), position| {
+        (len + 1, sum + position)
+    });
+
+    if len > 0 {
+        Some(sum / len as f32)
+    } else {
+        None
+    }
+}

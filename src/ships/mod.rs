@@ -35,10 +35,10 @@ pub enum Command {
 }
 
 impl Command {
-    pub fn point(&self, positions: &ReadStorage<Position>) -> Vector3<f32> {
+    pub fn point(&self, positions: &ReadStorage<Position>) -> Option<Vector3<f32>> {
         match *self {
-            Command::MoveTo(point) => point,
-            Command::GoToAnd(entity, _) => positions.get(entity).unwrap().0,
+            Command::MoveTo(point) => Some(point),
+            Command::GoToAnd(entity, _) => positions.get(entity).map(|position| position.0),
         }
     }
 }

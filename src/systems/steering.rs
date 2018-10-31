@@ -1,9 +1,8 @@
-use components::{self, *};
+use components;
 use specs::*;
 use util::*;
 use cgmath::{InnerSpace, Vector3, Zero};
-use resources::*;
-use context::*;
+use super::*;
 
 pub struct ApplyVelocitySystem;
 
@@ -124,7 +123,7 @@ impl<'a> System<'a> for AvoidanceSystem {
             let mut count = 0;
 
             for (p, s, _) in &entity_positions {
-                let distance = pos.distance(&p.0);
+                let distance = pos.distance(p.0);
 
                 if distance > 0.0 && distance < (size.0 + s.0) {
                     let diff = (pos.0 - p.0).normalize_to(1.0 / distance);

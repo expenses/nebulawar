@@ -211,7 +211,6 @@ pub struct CanAttack {
     pub range: f32
 }
 
-
 #[derive(Component, Serialize, Deserialize, Default)]
 #[storage(NullStorage)]
 pub struct SpawnSmoke;
@@ -221,3 +220,6 @@ pub struct AttackTarget {
     pub entity: Entity,
     pub kamikaze: bool
 }
+
+#[derive(Component, ConvertSaveload)]
+pub struct Health(pub f32);

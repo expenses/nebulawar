@@ -27,6 +27,7 @@ pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, sid
             time: 1.0,
             range: 50.0
         })
+        .with(Health(100.0))
         .marked::<U64Marker>();
 
     if let Some(speed) = components.drill_speed() {

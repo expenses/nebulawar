@@ -12,6 +12,10 @@ pub enum Formation {
 
 impl Formation {
     pub fn arrange(&self, ships: usize, position: Vector3<f32>, target: Vector3<f32>, distance: f32) -> Vec<Vector3<f32>> {
+        if ships == 0 {
+            return Vec::new();
+        }
+
         let mut step = target - position;
         step.y = 0.0;
         let step = step.normalize_to(distance);

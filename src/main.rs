@@ -178,6 +178,8 @@ impl Game {
         
         UpdateControlsSystem                       .run_now(&self.world.res);
 
+        DestroyShips.run_now(&self.world.res);
+
         self.world.maintain();
     }
 
@@ -293,6 +295,8 @@ fn create_world() -> World {
     world.register::<context::Image>();
     world.register::<CanAttack>();
     world.register::<SpawnSmoke>();
+    world.register::<AttackTarget>();
+    world.register::<Health>();
 
     // Temp generated stuff
     
@@ -310,7 +314,6 @@ fn create_world() -> World {
     world.register::<SeekForce>();
     world.register::<AvoidanceForce>();
     world.register::<FrictionForce>();
-    world.register::<AttackTarget>();
 
     world.register::<specs::saveload::U64Marker>();
 

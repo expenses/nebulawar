@@ -1,6 +1,6 @@
 use specs::*;
 use ships::StoredResource;
-use components::*;
+use super::*;
 
 impl<'a> StorageGetter for WriteStorage<'a, Materials> {
     fn get(&self, entity: Entity) -> Option<&StoredResource> {

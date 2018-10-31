@@ -1,11 +1,9 @@
-use components::{self, *};
+use components;
 use specs::{*, saveload::*, error::*};
-use camera::*;
 use state::*;
-use resources::*;
-use ships::*;
 use context::{Model, Image};
 use std::fs::*;
+use super::*;
 
 type ComponentsA<'a> = (
     WriteStorage<'a, Position>,
