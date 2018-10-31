@@ -94,7 +94,8 @@ pub enum Image {
     Star,
     Smoke,
     Move,
-    Mine
+    Mine,
+    Attack
 }
 
 impl Image {

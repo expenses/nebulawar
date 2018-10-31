@@ -23,8 +23,9 @@ pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, sid
         .with(Velocity(Vector3::zero()))
         .with(side)
         .with(CanAttack {
-            delay: 10.0,
-            time: 1.0
+            delay: 1.0,
+            time: 1.0,
+            range: 50.0
         })
         .marked::<U64Marker>();
 

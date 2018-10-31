@@ -87,12 +87,14 @@ impl<'a> System<'a> for ShipMovementSystem {
         WriteStorage<'a, Materials>,
         WriteStorage<'a, MineableMaterials>,
         WriteStorage<'a, SeekPosition>,
+        WriteStorage<'a, AttackTarget>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Size>,
-        ReadStorage<'a, DrillSpeed>
+        ReadStorage<'a, DrillSpeed>,
+        ReadStorage<'a, CanAttack>
     );
 
-    fn run(&mut self, (entities, paused, mut commands, mut materials, mut mineable, mut seek, pos, size, drill_speed): Self::SystemData) {
+    fn run(&mut self, (entities, paused, mut commands, mut materials, mut mineable, mut seek, mut attack_target, pos, size, drill_speed, attack): Self::SystemData) {
         if paused.0 {
             return;
         }
@@ -101,7 +103,7 @@ impl<'a> System<'a> for ShipMovementSystem {
             let last = commands.len() == 1;
 
             let finished = commands.first()
-                .map(|command| handle_command(command, entity, &mut materials, &mut mineable, &size, &drill_speed, &pos, &mut seek, last).unwrap_or(true))
+                .map(|command| handle_command(command, entity, &mut materials, &mut mineable, &size, &drill_speed, &pos, &mut seek, &mut attack_target, last, &attack).unwrap_or(true))
                 .unwrap_or(false);
             
             if finished {
@@ -116,10 +118,12 @@ fn handle_command(
     entity: Entity,
     materials: &mut WriteStorage<Materials>, mineable_materials: &mut WriteStorage<MineableMaterials>,
     size: &ReadStorage<Size>, drill_speed: &ReadStorage<DrillSpeed>, pos: &ReadStorage<Position>,
-    seek: &mut WriteStorage<SeekPosition>, last: bool
+    seek: &mut WriteStorage<SeekPosition>, attack_target: &mut WriteStorage<AttackTarget>, last: bool, attack: &ReadStorage<CanAttack>
 ) -> Option<bool> {
     
     let entity_position = pos.get(entity)?.0;
+
+    attack_target.remove(entity);
 
     match command {
         Command::MoveTo(position) => {
@@ -134,7 +138,13 @@ fn handle_command(
         Command::GoToAnd(target, interaction) => {
             let target_position = pos.get(*target)?.0;
 
-            let distance = size.get(*target)?.0 + size.get(entity)?.0;
+            let distance = if *interaction == Interaction::Attack {
+                attack_target.insert(entity, AttackTarget {entity: *target, kamikaze: false}).unwrap();
+                
+                attack.get(entity)?.range - CLOSE_ENOUGH_DISTANCE * 2.0
+            } else {
+                size.get(*target)?.0 + size.get(entity)?.0
+            };
 
             if entity_position.distance(target_position) - CLOSE_ENOUGH_DISTANCE < distance {
                 match interaction {
@@ -142,7 +152,7 @@ fn handle_command(
                     Interaction::Mine => {
                         transfer_between_different(mineable_materials, materials, *target, entity, drill_speed.get(entity).unwrap().0)
                     },
-                    Interaction::Attack => Some(true),
+                    Interaction::Attack => Some(false),
                 }
             } else {
                 seek.insert(entity, SeekPosition::within_distance(target_position, distance, last)).unwrap();
@@ -505,13 +515,7 @@ impl<'a> System<'a> for TestDeleteSystem {
 
                     delete_entity(entity, &entities, &parent);
 
-                    entities.build_entity()
-                        .with(p, &mut position)
-                        .with(s, &mut size)
-                        .with(TimeLeft(2.0), &mut time)
-                        .with(Image::Star, &mut image)
-                        .marked(&mut markers, &mut allocator)
-                        .build();
+                    create_explosion(p.0, s.0, &entities, &mut position, &mut size, &mut time, &mut image, &mut markers, &mut allocator);
                 });
         }
     }
@@ -574,6 +578,8 @@ impl<'a> System<'a> for ShootStuffSystem {
         WriteStorage<'a, Selectable>,
         WriteStorage<'a, Side>,
         WriteStorage<'a, SpawnSmoke>,
+        WriteStorage<'a, AttackTarget>,
+        WriteStorage<'a, MaxSpeed>,
 
         WriteStorage<'a, U64Marker>
     );
@@ -581,32 +587,36 @@ impl<'a> System<'a> for ShootStuffSystem {
     fn run(&mut self, (
         entities, mut allocator,
         mut attack,
-        mut pos, mut rot, mut vel, mut size, mut model, mut time, mut selectable, mut side, mut smoke,
+        mut pos, mut rot, mut vel, mut size, mut model, mut time, mut selectable, mut side, mut smoke, mut target, mut speed,
         mut markers
     ): Self::SystemData) {
 
         for (entity, attack) in (&entities, &mut attack).join() {
-            if attack.time != 0.0 {
-                continue;
-            }
+            if let Some(p) = pos.get(entity).cloned() {
+                if let Some(target_entity) = target.get(entity).map(|target| target.entity) {
+                    let target_pos = pos.get(target_entity).unwrap().0;
 
-            attack.time = attack.delay;
+                    if attack.time != 0.0 || p.distance(target_pos) > attack.range + CLOSE_ENOUGH_DISTANCE * 2.0 {
+                        continue;
+                    }
 
-            if let Some(p) = pos.get(entity).map(|p| p.0) {
-                let direction = uniform_sphere_distribution(&mut rand::thread_rng());
+                    attack.time = attack.delay;
 
-                entities.build_entity()
-                    .with(Position(p), &mut pos)
-                    .with(Rotation(Quaternion::zero()), &mut rot)
-                    .with(Velocity(direction), &mut vel)
-                    .with(Size(0.1), &mut size)
-                    .with(Model::Missile, &mut model)
-                    .with(TimeLeft(20.0), &mut time)
-                    .with(Selectable::new(false), &mut selectable)
-                    .with(Side::Friendly, &mut side)
-                    .with(SpawnSmoke, &mut smoke)
-                    .marked(&mut markers, &mut allocator)
-                    .build();
+                    entities.build_entity()
+                        .with(p, &mut pos)
+                        .with(Rotation(Quaternion::zero()), &mut rot)
+                        .with(Velocity(Vector3::zero()), &mut vel)
+                        .with(Size(0.1), &mut size)
+                        .with(Model::Missile, &mut model)
+                        .with(TimeLeft(20.0), &mut time)
+                        .with(Selectable::new(false), &mut selectable)
+                        .with(Side::Friendly, &mut side)
+                        .with(SpawnSmoke, &mut smoke)
+                        .with(AttackTarget {entity: target_entity, kamikaze: true}, &mut target)
+                        .with(MaxSpeed(5.0), &mut speed)
+                        .marked(&mut markers, &mut allocator)
+                        .build();
+                }
             }
         }
     }
@@ -676,4 +686,56 @@ impl<'a> System<'a> for SpawnSmokeSystem {
             }
         }
     }
+}
+
+pub struct KamikazeSystem;
+
+impl<'a> System<'a> for KamikazeSystem {
+    type SystemData = (
+        Entities<'a>,
+        Write<'a, U64MarkerAllocator>,
+
+        WriteStorage<'a, SeekPosition>,
+        WriteStorage<'a, Position>,
+        WriteStorage<'a, Size>,
+        WriteStorage<'a, TimeLeft>,
+        WriteStorage<'a, Image>,
+        WriteStorage<'a, U64Marker>,
+
+        ReadStorage<'a, AttackTarget>,
+        ReadStorage<'a, Parent>,
+    );
+
+    fn run(&mut self, (entities, mut allocator, mut seek, mut position, mut size, mut time, mut image, mut markers, target, parents): Self::SystemData) {
+        for (entity, target) in (&entities, &target).join() {
+            if target.kamikaze {
+                if let Some(pos) = position.get(entity).cloned() {
+                    if let Some(target_pos) = position.get(target.entity).cloned() {
+                        if pos.distance(target_pos.0) < 2.0 {
+                            // todo: explosion
+                            delete_entity(entity, &entities, &parents);
+
+                            create_explosion(target_pos.0, 10.0, &entities, &mut position, &mut size, &mut time, &mut image, &mut markers, &mut allocator);
+                        } else {
+                            seek.insert(entity, SeekPosition::to_point(target_pos.0, false)).unwrap();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn create_explosion(
+    position: Vector3<f32>, explosion_size: f32,
+    entities: &Entities, pos: &mut WriteStorage<Position>, size: &mut WriteStorage<Size>, time: &mut WriteStorage<TimeLeft>, image: &mut WriteStorage<Image>,
+    markers: &mut WriteStorage<U64Marker>, allocator: &mut Write<U64MarkerAllocator>
+) -> Entity {
+    entities.build_entity()
+        .with(Position(position), pos)
+        .with(Size(explosion_size), size)
+        .with(TimeLeft(2.0), time)
+        .with(Image::Star, image)
+        .marked(markers, allocator)
+        .build()
 }

@@ -23,7 +23,7 @@ impl Interaction {
         match self {
             Interaction::Follow => Image::Move,
             Interaction::Mine => Image::Mine,
-            Interaction::Attack => Image::Mine
+            Interaction::Attack => Image::Attack
         }
     }
 }

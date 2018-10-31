@@ -161,6 +161,7 @@ impl Game {
         DragSelectSystem                           .run_now(&self.world.res);
         RightClickSystem                           .run_now(&self.world.res);
         ShootStuffSystem                           .run_now(&self.world.res);
+        KamikazeSystem.run_now(&self.world.res);
         StepCameraSystem                           .run_now(&self.world.res);
 
         let controls: Controls = {
@@ -309,6 +310,7 @@ fn create_world() -> World {
     world.register::<SeekForce>();
     world.register::<AvoidanceForce>();
     world.register::<FrictionForce>();
+    world.register::<AttackTarget>();
 
     world.register::<specs::saveload::U64Marker>();
 

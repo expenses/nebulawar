@@ -30,7 +30,8 @@ type ComponentsB<'a> = (
     WriteStorage<'a, Materials>,
     WriteStorage<'a, TimeLeft>,
     WriteStorage<'a, Image>,
-    WriteStorage<'a, CanAttack>
+    WriteStorage<'a, CanAttack>,
+    WriteStorage<'a, AttackTarget>
 );
 
 type ComponentsASerialized = <ComponentsA<'static> as SerializeComponents<Error, U64Marker>>::Data;
