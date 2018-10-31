@@ -64,3 +64,8 @@ embed_resources = []
 name = "Fleet Commander"
 identifier = "io.github.expenses.fleet_commander"
 icon = ["resources/ui/mine.png"]
+
+[build-dependencies]
+texture_packer = "*"
+image = {version = "*", default-features = false, features = ["png_codec"]}
+codegen = { git = "https://github.com/carllerche/codegen" }

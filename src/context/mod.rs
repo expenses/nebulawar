@@ -168,18 +168,18 @@ impl Context {
         self.target = self.display.draw();
     }
 
-    pub fn render_billboard_facing_camera(&mut self, position: Vector3<f32>, size: f32, image: Image, camera: &Camera, system: &StarSystem) {
-        let rotation: Matrix4<f32> = look_at(-camera.direction()).into();
-
-        self.render_billboard(Matrix4::from_translation(position) * rotation * Matrix4::from_scale(size), image, camera, system);
-    }
-
     pub fn render_billboard(&mut self, matrix: Matrix4<f32>, image: Image, camera: &Camera, system: &StarSystem) {
-        let uniforms = self.uniforms(matrix, camera, system, &self.resources.images[image as usize], Mode::Shadeless);
+        let uniforms = self.uniforms(matrix, camera, system, &self.resources.image, Mode::Shadeless);
         let params = self.draw_params();
 
+        let mut vertices = BILLBOARD_VERTICES;
+
+        for mut vertex in vertices.iter_mut() {
+            vertex.texture = image.translate(vertex.texture);
+        }
+
         self.target.draw(
-            &self.resources.billboard,
+            &VertexBuffer::new(&self.display, &vertices).unwrap(),
             &NoIndices(PrimitiveType::TrianglesList),
             &self.program,
             &uniforms,
@@ -214,7 +214,7 @@ impl Context {
     }
 
     pub fn flush_smoke(&mut self, system: &StarSystem, camera: &Camera) {
-        let uniforms = self.uniforms(Matrix4::identity(), camera, system, &self.resources.images[Image::Smoke as usize], Mode::Shadeless);
+        let uniforms = self.uniforms(Matrix4::identity(), camera, system, &self.resources.image, Mode::Shadeless);
         let params = DrawParameters {
             depth: Depth {
                 test: DepthTest::IfLess,

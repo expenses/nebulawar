@@ -10,6 +10,7 @@ use std::io;
 use failure;
 use specs::*;
 use collision::primitive::ConvexPolyhedron;
+use cgmath::Vector2;
 
 const NORMAL: [f32; 3] = [0.0, 0.0, 1.0];
 
@@ -90,12 +91,21 @@ pub fn load_wavefront(data: &[u8]) ->  Vec<Vertex> {
 
 #[derive(Copy, Clone, Component, Serialize, Deserialize, PartialEq)]
 pub enum Image {
-    Star = 0,
-    Smoke = 1,
-    Button = 2,
-    Move = 3,
-    Mine = 4
+    Star,
+    Smoke,
+    Move,
+    Mine
 }
+
+impl Image {
+    pub fn translate(&self, uv: [f32; 2]) -> [f32; 2] {
+        let mut uv: Vector2<f32> = uv.into();
+        uv = Vector2::new(uv.x * self.dimensions().x, uv.y * self.dimensions().y);
+        (self.offset() + uv).into()
+    }
+}
+
+include!(concat!(env!("OUT_DIR"), "/packed_textures.rs"));
 
 #[derive(Serialize, Deserialize, Component, Copy, Clone)]
 pub enum Model {
@@ -135,7 +145,7 @@ impl ObjModel {
 
 pub struct Resources {
     pub models: [ObjModel; 6],
-    pub images: [SrgbTexture2d; 5],
+    pub image: SrgbTexture2d,
     pub billboard: VertexBuffer<Vertex>,
     pub font: runic::CachedFont<'static>
 }
@@ -151,19 +161,9 @@ impl Resources {
                 ObjModel::new(display, load_resource!("models/miner.obj"),    load_resource!("models/miner.png"))?,
                 ObjModel::new(display, load_resource!("models/missile.obj"),  load_resource!("models/missile.png"))?
             ],
-            images: [
-                load_image(display, load_resource!("star.png")),
-                load_image(display, load_resource!("smoke.png")),
-                load_image(display, load_resource!("ui/button.png")),
-                load_image(display, load_resource!("ui/move.png")),
-                load_image(display, load_resource!("ui/mine.png"))
-            ],
+            image: load_image(display, load_resource!("output/packed.png")),
             font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display)?,
             billboard: VertexBuffer::new(display, &BILLBOARD_VERTICES).unwrap()
         })
-    }
-
-    pub fn image_dimensions(&self, image: Image) -> (u32, u32) {
-        self.images[image as usize].dimensions()
     }
 }

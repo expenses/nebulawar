@@ -129,7 +129,7 @@ impl LineRenderer {
 
         let uniforms = uniform!{
             window_dimensions: [dimensions.width as f32, dimensions.height as f32],
-            image: Sampler::new(&resources.images[image as usize])
+            image: Sampler::new(&resources.image)
                 .minify_filter(MinifySamplerFilter::Nearest)
                 .magnify_filter(MagnifySamplerFilter::Nearest),
             draw_image: true
@@ -141,10 +141,10 @@ impl LineRenderer {
         };
 
         let vertices = [
-            Vertex2d::new([x - width / 2.0, y - height / 2.0], [0.0, 1.0], overlay),
-            Vertex2d::new([x + width / 2.0, y - height / 2.0], [1.0, 1.0], overlay),
-            Vertex2d::new([x - width / 2.0, y + height / 2.0], [0.0, 0.0], overlay),
-            Vertex2d::new([x + width / 2.0, y + height / 2.0], [1.0, 0.0], overlay)
+            Vertex2d::new([x - width / 2.0, y - height / 2.0], image.translate([0.0, 1.0]), overlay),
+            Vertex2d::new([x + width / 2.0, y - height / 2.0], image.translate([1.0, 1.0]), overlay),
+            Vertex2d::new([x - width / 2.0, y + height / 2.0], image.translate([0.0, 0.0]), overlay),
+            Vertex2d::new([x + width / 2.0, y + height / 2.0], image.translate([1.0, 0.0]), overlay)
         ];
 
         let vertices = VertexBuffer::new(display, &vertices).unwrap();

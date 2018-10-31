@@ -293,27 +293,27 @@ pub struct RenderBillboards<'a>(pub &'a mut Context);
 impl<'a> System<'a> for RenderBillboards<'a> {
     type SystemData = (
         Read<'a, Camera>,
-        Read<'a, StarSystem>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, Image>
     );
 
-    fn run(&mut self, (camera, system, pos, size, image): Self::SystemData) {
+    fn run(&mut self, (camera, pos, size, image): Self::SystemData) {
         let rotation = look_at(-camera.direction());
 
         let len = (&pos, &size, &image).join().count() * 6;
 
         let iterator = (&pos, &size, &image).join()
-            .flat_map(|(pos, size, _)| {
-                iter_owned(BILLBOARD_VERTICES).map(move |v| (v, pos.0, size.0))
+            .flat_map(|(pos, size, image)| {
+                iter_owned(BILLBOARD_VERTICES).map(move |v| (v, pos.0, size.0, image))
             })
-            .map(|(mut v, pos, size)| {
+            .map(|(mut v, pos, size, image)| {
                 let mut p: Vector3<f32> = v.position.into();
                 p *= size;
                 p = rotation * p;
                 p += pos;
                 v.position = p.into();
+                v.texture = image.translate(v.texture);
                 v
             });
 
