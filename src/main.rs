@@ -101,7 +101,7 @@ impl Game {
             .with(ShootStuffSystem, "shooting", &["apply"])
             .with(KamikazeSystem, "kamikaze", &["apply"])
             .with(StepCameraSystem, "camera", &["apply"])
-
+            
             .with(FinishSeekSystem, "finish_seek", &["apply", "set_rotation"])
 
             .with(EntityUnderMouseSystem, "mouse_entity", &["mouse_ray", "apply", "set_rotation", "spin"])

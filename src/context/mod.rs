@@ -6,23 +6,20 @@ use self::lines::*;
 pub use self::resources::{Image, Model, MeshArray, Resources, BILLBOARD_VERTICES};
 pub const WHITE: [f32; 3] = [1.0; 3];
 
-use cgmath::*;
-
 use {
-    glium,
     glium::{
+        self,
         *,
-       uniforms::*,
-       index::*,
-       texture::*
-    }
+        uniforms::*,
+        index::*,
+        texture::*
+    },
+    cgmath::*,
+    camera::*,
+    *,
+    runic,
+    pedot::*
 };
-
-use camera::*;
-use *;
-
-use runic;
-use pedot::*;
 
 // ** Line Rendering Woes **
 // rendering in 2d: doesnt work with rest of scene, rendering lines that go behind the camera is hard

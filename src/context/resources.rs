@@ -102,7 +102,7 @@ pub enum Image {
 }
 
 impl Image {
-    pub fn translate(&self, uv: [f32; 2]) -> [f32; 2] {
+    pub fn translate(self, uv: [f32; 2]) -> [f32; 2] {
         let mut uv: Vector2<f32> = uv.into();
         uv = Vector2::new(uv.x * self.dimensions().x, uv.y * self.dimensions().y);
         (self.offset() + uv).into()

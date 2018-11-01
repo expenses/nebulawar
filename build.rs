@@ -30,9 +30,9 @@ fn main() {
     {
         let impl_block = scope.new_impl("Image");    
 
-        let mut offset_match_block = Block::new("match *self");
+        let mut offset_match_block = Block::new("match self");
 
-        let mut dimensions_match_block = Block::new("match *self");
+        let mut dimensions_match_block = Block::new("match self");
 
         for (name, frame) in packer.get_frames() {
             let width = packer.width() as f32;
@@ -50,12 +50,12 @@ fn main() {
         }
 
         impl_block.new_fn("dimensions")
-            .arg_ref_self()
+            .arg_self()
             .ret("Vector2<f32>")
             .push_block(dimensions_match_block);
 
         impl_block.new_fn("offset")
-            .arg_ref_self()
+            .arg_self()
             .ret("Vector2<f32>")
             .push_block(offset_match_block);
     }
