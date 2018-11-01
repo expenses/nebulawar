@@ -39,6 +39,7 @@ pub struct SaveSystem;
 impl<'a> System<'a> for SaveSystem {
     type SystemData = (
         Entities<'a>,
+        Read<'a, Controls>,
 
         Read<'a, Camera>,
         Read<'a, StarSystem>,
@@ -47,6 +48,7 @@ impl<'a> System<'a> for SaveSystem {
         Read<'a, Formation>,
         Read<'a, Log>,
         Read<'a, MovementPlane>,
+        Read<'a, Debug>,
 
         ComponentsA<'a>,
         ComponentsB<'a>,
@@ -55,11 +57,15 @@ impl<'a> System<'a> for SaveSystem {
     );
 
     fn run(&mut self, (
-        entities,
-        cam, sys, time, paused, formation, log, plane,
+        entities, controls,
+        cam, sys, time, paused, formation, log, plane, debug,
         comp_a, comp_b,
         markers
     ): Self::SystemData) {
+        if !controls.save {
+            return;
+        }
+
         let ids = |entity| markers.get(entity).cloned();
 
         let comp_a = (&entities, &markers).join()
@@ -90,6 +96,7 @@ impl<'a> System<'a> for SaveSystem {
             formation: formation.clone(),
             log: log.clone(),
             plane: plane.clone(),
+            debug: debug.clone(),
 
             comp_a, comp_b
         };
@@ -105,6 +112,7 @@ pub struct LoadSystem;
 impl<'a> System<'a> for LoadSystem {
     type SystemData = (
         Entities<'a>,
+        Read<'a, Controls>,
         Write<'a, U64MarkerAllocator>,
 
         Write<'a, Camera>,
@@ -114,6 +122,7 @@ impl<'a> System<'a> for LoadSystem {
         Write<'a, Formation>,
         Write<'a, Log>,
         Write<'a, MovementPlane>,
+        Write<'a, Debug>,
 
         ComponentsA<'a>,
         ComponentsB<'a>,
@@ -122,11 +131,15 @@ impl<'a> System<'a> for LoadSystem {
     );
 
     fn run(&mut self, (
-        entities, mut allocator,
-        mut camera, mut system, mut time, mut paused, mut formation, mut log, mut plane,
+        entities, controls, mut allocator,
+        mut camera, mut system, mut time, mut paused, mut formation, mut log, mut plane, mut debug,
         mut comp_a, mut comp_b,
         mut markers
     ): Self::SystemData) {
+        if !controls.load {
+            return;
+        }
+
         let file = File::open("save.sav").unwrap();
 
         let data: GameData = bincode::deserialize_from(file).unwrap();
@@ -140,6 +153,7 @@ impl<'a> System<'a> for LoadSystem {
         *formation = data.formation;
         *log = data.log;
         *plane = data.plane;
+        *debug = data.debug;
 
         data.comp_a.into_iter().for_each(|entity_data| {
             let result: Result<(), Error> = comp_a.deserialize_entity(func(entity_data.marker), entity_data.components, |e| Some(func(e)));
@@ -162,6 +176,7 @@ struct GameData {
     formation: Formation,
     log: Log,
     plane: MovementPlane,
+    debug: Debug,
 
     comp_a: Vec<EntityData<U64Marker, ComponentsASerialized>>,
     comp_b: Vec<EntityData<U64Marker, ComponentsBSerialized>>

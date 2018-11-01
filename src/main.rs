@@ -38,7 +38,7 @@ use glutin::*;
 use glutin::dpi::*;
 use std::time::*;
 use specs::{World, RunNow};
-use specs::shred::{Fetch, Dispatcher};
+use specs::shred::{Dispatcher, DispatcherBuilder};
 
 mod camera;
 mod util;
@@ -73,7 +73,7 @@ impl Game {
 
         add_starting_entities(&mut world);
 
-        let builder = specs::DispatcherBuilder::new()
+        let builder = DispatcherBuilder::new()
             .with(EventHandlerSystem, "events", &[])
             .with(SeekSystem, "seek", &[])
             .with(AvoidanceSystem, "avoidance", &[])
@@ -88,6 +88,8 @@ impl Game {
             .with(TestDeleteSystem, "test_delete", &["events"])
             .with(SpinSystem, "spin", &["events"])
             .with(MiddleClickSystem, "middle_click", &["events"])
+            .with(SaveSystem, "save", &["events"])
+            .with(LoadSystem, "load", &["events"])
     
             .with(MergeForceSystem, "merge", &["events", "seek", "avoidance", "friction"])
 
@@ -95,7 +97,7 @@ impl Game {
             .with(SetRotationSystem, "set_rotation", &["merge"])
 
             .with(ShipMovementSystem, "ship_movement", &["apply"])
-            .with(SpawnSmokeSystem, "smoke", &["apply"])
+            .with(SpawnSmokeSystem, "spawn_smoke", &["apply"])
             .with(AveragePositionSystem, "avg_pos", &["apply"])
             .with(DragSelectSystem, "drag", &["apply"])
             .with(ShootStuffSystem, "shooting", &["apply"])
@@ -111,7 +113,9 @@ impl Game {
 
             .with(RightClickSystem, "right_click", &["right_click_interaction"])
             
-            .with(DestroyShips, "destroy_ships", &["kamikaze"]);
+            .with(DestroyShips, "destroy_ships", &["kamikaze"])
+
+            .with(UpdateControlsSystem, "update_controls", &["left_click", "right_click", "middle_click", "drag"]);
 
         info!("Dispatcher graph:\n{:?}", builder);
 
@@ -130,20 +134,6 @@ impl Game {
         *self.world.write_resource() = ScreenDimensions(self.context.screen_dimensions());
 
         self.dispatcher.dispatch(&self.world.res);
-
-        let controls: Controls = {
-            let controls: Fetch<Controls> = self.world.read_resource();
-            controls.clone()
-        };
-
-        if controls.save {
-            SaveSystem.run_now(&self.world.res);
-        } else if controls.load {
-            self.world = create_world();
-            LoadSystem.run_now(&self.world.res);
-        }
-        
-        UpdateControlsSystem.run_now(&self.world.res);
 
         self.world.maintain();
     }
@@ -230,6 +220,7 @@ fn create_world() -> World {
     world.add_resource(Paused(false));
     world.add_resource(Log(Vec::new()));
     world.add_resource(MovementPlane(0.0));
+    world.add_resource(Debug(false));
 
     world.register::<Position>();
     world.register::<Velocity>();
@@ -267,7 +258,6 @@ fn create_world() -> World {
     world.add_resource(MouseRay::default());
     world.add_resource(specs::saveload::U64MarkerAllocator::new());
     world.add_resource(ScreenDimensions((0.0, 0.0)));
-    world.add_resource(Debug(false));
     
     world.register::<SeekPosition>();
     world.register::<SeekForce>();

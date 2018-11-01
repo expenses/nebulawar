@@ -90,7 +90,7 @@ impl Default for MouseRay {
 #[derive(Component, Default)]
 pub struct ScreenDimensions(pub (f32, f32));
 
-#[derive(Component, Default)]
+#[derive(Component, Default, Clone, Serialize, Deserialize)]
 pub struct Debug(pub bool);
 
 #[derive(Component)]
@@ -109,6 +109,10 @@ impl Meshes {
 
     pub fn get_mesh(&self, model: context::Model) -> &ConvexPolyhedron<f32> {
         &self.meshes[model as usize]
+    }
+
+    pub fn intersects(&self, model_a: context::Model, transform_a: Matrix4<f32>, model_b: context::Model, transform_b: Matrix4<f32>) -> bool {
+        self.gjk.intersect(self.get_mesh(model_a), &transform_a, self.get_mesh(model_b), &transform_b).is_some()
     }
 }
 
