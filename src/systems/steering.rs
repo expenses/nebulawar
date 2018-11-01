@@ -94,13 +94,13 @@ impl<'a> System<'a> for AvoidanceSystem {
         ReadStorage<'a, Position>,
         ReadStorage<'a, MaxSpeed>,
         ReadStorage<'a, Size>,
-        ReadStorage<'a, Image>
+        ReadStorage<'a, NoCollide>
     );
 
-    fn run(&mut self, (entities, mut avoidance, vel, positions, speed, sizes, image): Self::SystemData) {
+    fn run(&mut self, (entities, mut avoidance, vel, positions, speed, sizes, nocollide): Self::SystemData) {
         // collect the entity positions into a vec to avoid having to deref the ecs storage (which can be slow)
         // Also dont collect entities with an image because having images push entities about seems kinda wierd
-        let entity_positions: Vec<_> = (&positions, &sizes, !&image).join().collect();
+        let entity_positions: Vec<_> = (&positions, &sizes, !&nocollide).join().collect();
 
         let iterator = entity_positions.iter().map(|(pos, size, _)| (pos.0, size.0));
 

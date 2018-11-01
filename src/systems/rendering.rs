@@ -55,16 +55,19 @@ pub struct RenderCommandPaths<'a>(pub &'a mut Context);
 impl<'a> System<'a> for RenderCommandPaths<'a> {
     type SystemData = (
         ReadStorage<'a, Position>,
+        ReadStorage<'a, Selectable>,
         ReadStorage<'a, Commands>
     );
 
-    fn run(&mut self, (positions, commands): Self::SystemData) {
-        for (pos, commands) in (&positions, &commands).join() {
-            let points = iter_owned([pos.0])
-                .chain(commands.iter().filter_map(|command| command.point(&positions)));
+    fn run(&mut self, (positions, selectable, commands): Self::SystemData) {
+        (&positions, &selectable, &commands).join()
+            .filter(|(_, selectable, _)| selectable.selected)
+            .for_each(|(pos, _, commands)| {
+                let points = iter_owned([pos.0])
+                    .chain(commands.iter().filter_map(|command| command.point(&positions)));
 
-            self.0.render_3d_lines(points, WHITE);
-        }
+                self.0.render_3d_lines(points, WHITE);
+            });
     }
 }
 
@@ -88,10 +91,11 @@ impl<'a> System<'a> for RenderUI<'a> {
         ReadStorage<'a, Occupation>,
         ReadStorage<'a, Parent>,
         ReadStorage<'a, Materials>,
-        ReadStorage<'a, MineableMaterials>
+        ReadStorage<'a, MineableMaterials>,
+        ReadStorage<'a, Health>
     );
 
-    fn run(&mut self, (entities, time, formation, paused, tag, selectable, occupation, parent, materials, mineable): Self::SystemData) {
+    fn run(&mut self, (entities, time, formation, paused, tag, selectable, occupation, parent, materials, mineable, health): Self::SystemData) {
         let y = &mut 10.0;
 
         if paused.0 {
@@ -116,6 +120,10 @@ impl<'a> System<'a> for RenderUI<'a> {
 
         if let Some(entity) = entity {
             self.render_text("---------------------", y);
+
+            if let Some(health) = health.get(entity) {
+                self.render_text(&format!("Health: {}", health.0), y);
+            }
 
             if let Some(materials) = materials.get(entity) {
                 self.render_text(&format!("Materials: {}", materials.0), y);
@@ -166,14 +174,18 @@ impl<'a> System<'a> for RenderDebug<'a> {
         Read<'a, EntityUnderMouse>,
         Read<'a, Debug>,
         Read<'a, ScreenDimensions>,
+        Read<'a, Meshes>,
         ReadStorage<'a, Position>,
+        ReadStorage<'a, components::Rotation>,
+        ReadStorage<'a, Size>,
+        ReadStorage<'a, Model>,
         ReadStorage<'a, Velocity>,
         ReadStorage<'a, SeekForce>,
         ReadStorage<'a, AvoidanceForce>,
         ReadStorage<'a, FrictionForce>
     );
 
-    fn run(&mut self, (entities, camera, entity, debug, screen_dims, pos, vel, seek, avoid, friction): Self::SystemData) {
+    fn run(&mut self, (entities, camera, entity, debug, screen_dims, meshes, pos, rot, size, model, vel, seek, avoid, friction): Self::SystemData) {
         if !debug.0 {
             return;
         }
@@ -186,26 +198,43 @@ impl<'a> System<'a> for RenderDebug<'a> {
 
         let scale = 1000.0;
 
-        for (entity, pos, vel) in (&entities, &pos, &vel).join() {
+        for (entity, pos, rot, size, model, vel) in (&entities, &pos, &rot, &size, &model, &vel).join() {
             let step = Vector3::new(0.0, 0.05, 0.0);
-            let mut pos = pos.0 + step;
+            let mut position = pos.0 + step;
 
             if let Some(seek) = seek.get(entity) {
-                self.0.render_3d_lines(iter_owned([pos, pos + seek.0 * scale]), [1.0, 0.0, 0.0]);
-                pos += step;
+                self.0.render_3d_line(position, position + seek.0 * scale, [1.0, 0.0, 0.0]);
+                position += step;
             }
 
             if let Some(avoid) = avoid.get(entity) {
-                self.0.render_3d_lines(iter_owned([pos, pos + avoid.0 * scale]), [0.0, 1.0, 0.0]);
-                pos += step;
+                self.0.render_3d_line(position, position + avoid.0 * scale, [0.0, 1.0, 0.0]);
+                position += step;
             }
 
             if let Some(friction) = friction.get(entity) {
-                self.0.render_3d_lines(iter_owned([pos, pos + friction.0 * scale]), [0.0, 0.0, 1.0]);
-                pos += step;
+                self.0.render_3d_line(position, position + friction.0 * scale, [0.0, 0.0, 1.0]);
+                position += step;
             }
 
-            self.0.render_3d_lines(iter_owned([pos, pos + vel.0 * scale / 10.0]), [0.0, 1.0, 1.0]);
+            self.0.render_3d_line(position, position + vel.0 * scale / 10.0, [0.0, 1.0, 1.0]);
+
+            // render bbox
+
+            let transform = make_transform(pos.0, rot.0, size.0);
+
+            let bbox = meshes.bbox(*model, transform);
+
+            let corners = bbox.to_corners();
+
+            for &(i, j) in [(0, 1), (0, 2), (1, 3), (2, 3)].iter() {
+                self.0.render_3d_line(point_to_vector(corners[i]), point_to_vector(corners[j]), WHITE);
+                self.0.render_3d_line(point_to_vector(corners[i + 4]), point_to_vector(corners[j + 4]), WHITE);
+            }
+
+            for i in 0 .. 4 {
+                self.0.render_3d_line(point_to_vector(corners[i]), point_to_vector(corners[i + 4]), WHITE);
+            }
         }
     }
 }
@@ -262,15 +291,17 @@ impl<'a> System<'a> for RenderMovementPlane<'a> {
             for i in 0 .. points + 1 {
                 let i = i as f32 * distance - radius;
 
-                self.0.render_3d_lines(iter_owned([
+                self.0.render_3d_line(
                     point + Vector3::new(i, 0.0, -radius),
-                    point + Vector3::new(i, 0.0, radius)
-                ]), WHITE);
+                    point + Vector3::new(i, 0.0, radius),
+                    WHITE
+                );
 
-                self.0.render_3d_lines(iter_owned([
+                self.0.render_3d_line(
                     point + Vector3::new(-radius, 0.0, i),
-                    point + Vector3::new(radius, 0.0, i)
-                ]), WHITE);
+                    point + Vector3::new(radius, 0.0, i),
+                    WHITE
+                );
             }
         }
     }

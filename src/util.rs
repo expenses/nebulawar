@@ -171,3 +171,8 @@ pub fn avg<I: Iterator<Item = Vector3<f32>>>(iterator: I) -> Option<Vector3<f32>
         None
     }
 }
+
+pub fn make_transform(pos: Vector3<f32>, rot: Quaternion<f32>, size: f32) -> Matrix4<f32> {
+    let rot: Matrix4<f32> = rot.into();
+    Matrix4::from_translation(pos) * rot * Matrix4::from_scale(size)
+}

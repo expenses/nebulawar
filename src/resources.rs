@@ -4,8 +4,8 @@ use glium::glutin::*;
 use ships::*;
 use odds::vec::*;
 use context;
+use collision::{ComputeBound, Aabb3, Aabb, Discrete};
 use collision::primitive::ConvexPolyhedron;
-use collision::algorithm::minkowski::*;
 
 #[derive(Component, Default, NewtypeProxy)]
 pub struct Secs(pub f32);
@@ -95,15 +95,13 @@ pub struct Debug(pub bool);
 
 #[derive(Component)]
 pub struct Meshes {
-    meshes: context::MeshArray,
-    gjk: GJK<SimplexProcessor3<f32>, EPA3<f32>, f32>
+    meshes: context::MeshArray
 }
 
 impl Meshes {
     pub fn new(meshes: context::MeshArray) -> Self {
         Self {
-            meshes,
-            gjk: GJK::new()
+            meshes
         }
     }
 
@@ -111,16 +109,23 @@ impl Meshes {
         &self.meshes[model as usize]
     }
 
+    pub fn bbox(&self, model: context::Model, transform: Matrix4<f32>) -> Aabb3<f32> {
+        let bbox: Aabb3<f32> = self.get_mesh(model).compute_bound();
+        bbox.transform(&transform)
+    }
+
     pub fn intersects(&self, model_a: context::Model, transform_a: Matrix4<f32>, model_b: context::Model, transform_b: Matrix4<f32>) -> bool {
-        self.gjk.intersect(self.get_mesh(model_a), &transform_a, self.get_mesh(model_b), &transform_b).is_some()
+        let bb_a = self.bbox(model_a, transform_a);
+        let bb_b = self.bbox(model_b, transform_b);
+
+        bb_a.intersects(&bb_b)
     }
 }
 
 impl Default for Meshes {
     fn default() -> Self {
         Self {
-            meshes: context::MeshArray::default(),
-            gjk: GJK::new()
+            meshes: context::MeshArray::default()
         }
     }
 }

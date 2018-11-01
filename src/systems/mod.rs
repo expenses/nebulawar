@@ -3,7 +3,7 @@ use components::{self, *};
 use context::*;
 use camera::*;
 use ships::*;
-use cgmath::{Vector3, Quaternion, Matrix4, MetricSpace};
+use cgmath::{Vector3, MetricSpace};
 use util::*;
 use collision::*;
 use controls::Controls;

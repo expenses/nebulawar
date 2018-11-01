@@ -343,6 +343,10 @@ impl Context {
         }
     }
 
+    pub fn render_3d_line(&mut self, start: Vector3<f32>, end: Vector3<f32>, colour: [f32; 3]) {
+        self.render_3d_lines(iter_owned([start, end]), colour);
+    }
+
     pub fn render_image(&mut self, image: Image, x: f32, y: f32, width: f32, height: f32, overlay: [f32; 4]) {
         self.lines.render_image(image, x, y, width, height, overlay, &mut self.target, &self.display, &self.resources)
     }

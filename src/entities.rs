@@ -14,6 +14,7 @@ pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, sid
         .with(Size(tag.size()))
         .with(tag.model())
         .with(MaxSpeed(components.thrust() / tag.mass()))
+        .with(Health(tag.mass()))
         .with(tag)
         .with(Rotation(Quaternion::zero()))
         .with(Commands(Vec::new()))
@@ -27,7 +28,6 @@ pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, sid
             time: 1.0,
             range: 50.0
         })
-        .with(Health(100.0))
         .marked::<U64Marker>();
 
     if let Some(speed) = components.drill_speed() {
@@ -104,5 +104,5 @@ pub fn add_starting_entities(world: &mut World) {
         create_ship(world, ShipType::Miner, Vector3::new(0.0, 2.5 - i as f32 * 15.0, 30.0), Side::Friendly);
     }
 
-    create_ship(world, ShipType::Fighter, Vector3::new(100.0, 0.0, 100.0), Side::Enemy);
+    create_ship(world, ShipType::Carrier, Vector3::new(100.0, 0.0, 100.0), Side::Enemy);
 }

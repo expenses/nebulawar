@@ -246,6 +246,8 @@ fn create_world() -> World {
     world.register::<SpawnSmoke>();
     world.register::<AttackTarget>();
     world.register::<Health>();
+    world.register::<NoCollide>();
+    world.register::<ExplosionSize>();
 
     // Temp generated stuff
     

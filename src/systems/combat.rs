@@ -41,6 +41,8 @@ impl<'a> System<'a> for ShootStuffSystem {
         WriteStorage<'a, AttackTarget>,
         WriteStorage<'a, MaxSpeed>,
         WriteStorage<'a, Health>,
+        WriteStorage<'a, NoCollide>,
+        WriteStorage<'a, ExplosionSize>,
 
         WriteStorage<'a, U64Marker>
     );
@@ -48,37 +50,40 @@ impl<'a> System<'a> for ShootStuffSystem {
     fn run(&mut self, (
         entities, mut allocator,
         mut attack,
-        mut pos, mut rot, mut vel, mut size, mut model, mut time, mut selectable, mut side, mut smoke, mut target, mut speed, mut health,
+        mut pos, mut rot, mut vel, mut size, mut model, mut time, mut selectable, mut side, mut smoke, mut target, mut speed, mut health, mut nocollide, mut explosion_size,
         mut markers
     ): Self::SystemData) {
 
         for (entity, attack) in (&entities, &mut attack).join() {
-            if let Some(p) = pos.get(entity).cloned() {
-                if let Some(target_entity) = target.get(entity).map(|target| target.entity) {
-                    let target_pos = pos.get(target_entity).unwrap().0;
+            let entity_pos = pos.get(entity).unwrap().clone();
+            let entity_rot = rot.get(entity).unwrap().clone();
 
-                    if attack.time != 0.0 || p.distance(target_pos) > attack.range + CLOSE_ENOUGH_DISTANCE * 2.0 {
-                        continue;
-                    }
+            if let Some(target_entity) = target.get(entity).map(|target| target.entity) {
+                let target_pos = pos.get(target_entity).unwrap().0;
 
-                    attack.time = attack.delay;
-
-                    entities.build_entity()
-                        .with(p, &mut pos)
-                        .with(Rotation(Quaternion::zero()), &mut rot)
-                        .with(Velocity(Vector3::zero()), &mut vel)
-                        .with(Size(0.1), &mut size)
-                        .with(Model::Missile, &mut model)
-                        .with(TimeLeft(20.0), &mut time)
-                        .with(Selectable::new(false), &mut selectable)
-                        .with(Side::Friendly, &mut side)
-                        .with(SpawnSmoke, &mut smoke)
-                        .with(AttackTarget {entity: target_entity, kamikaze: true}, &mut target)
-                        .with(MaxSpeed(5.0), &mut speed)
-                        .with(Health(1.0), &mut health)
-                        .marked(&mut markers, &mut allocator)
-                        .build();
+                if attack.time != 0.0 || entity_pos.distance(target_pos) > attack.range + CLOSE_ENOUGH_DISTANCE * 2.0 {
+                    continue;
                 }
+
+                attack.time = attack.delay;
+
+                entities.build_entity()
+                    .with(entity_pos, &mut pos)
+                    .with(entity_rot, &mut rot)
+                    .with(Velocity(Vector3::zero()), &mut vel)
+                    .with(Size(0.1), &mut size)
+                    .with(Model::Missile, &mut model)
+                    .with(TimeLeft(20.0), &mut time)
+                    .with(Selectable::new(false), &mut selectable)
+                    .with(Side::Friendly, &mut side)
+                    .with(SpawnSmoke, &mut smoke)
+                    .with(AttackTarget {entity: target_entity, kamikaze: true}, &mut target)
+                    .with(MaxSpeed(5.0), &mut speed)
+                    .with(Health(1.0), &mut health)
+                    .with(NoCollide, &mut nocollide)
+                    .with(ExplosionSize(5.0), &mut explosion_size)
+                    .marked(&mut markers, &mut allocator)
+                    .build();
             }
         }
     }
@@ -119,10 +124,12 @@ impl<'a> System<'a> for SpawnSmokeSystem {
         WriteStorage<'a, Size>,
         WriteStorage<'a, TimeLeft>,
         WriteStorage<'a, Image>,
+        WriteStorage<'a, NoCollide>,
+
         WriteStorage<'a, U64Marker>
     );
 
-    fn run(&mut self, (entities, paused, mut allocator, smoke, vel, mut pos, mut size, mut time, mut image, mut markers): Self::SystemData) {
+    fn run(&mut self, (entities, paused, mut allocator, smoke, vel, mut pos, mut size, mut time, mut image, mut nocollide, mut markers): Self::SystemData) {
         if paused.0 {
             return;
         }
@@ -134,6 +141,7 @@ impl<'a> System<'a> for SpawnSmokeSystem {
                     .with(Size(2.0), &mut size)
                     .with(TimeLeft(2.0), &mut time)
                     .with(Image::Smoke, &mut image)
+                    .with(NoCollide, &mut nocollide)
                     .marked(&mut markers, &mut allocator)
                     .build();
             }
@@ -146,27 +154,43 @@ pub struct KamikazeSystem;
 impl<'a> System<'a> for KamikazeSystem {
     type SystemData = (
         Entities<'a>,
+        Read<'a, Meshes>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Size>,
+        ReadStorage<'a, components::Rotation>,
         ReadStorage<'a, AttackTarget>,
+        ReadStorage<'a, Model>,
         WriteStorage<'a, SeekPosition>,
         WriteStorage<'a, Health>
     );
 
-    fn run(&mut self, (entities, position, size, target, mut seek, mut health): Self::SystemData) {
+    fn run(&mut self, (entities, meshes, position, size, rotation, target, model, mut seek, mut health): Self::SystemData) {
         for (entity, target) in (&entities, &target).join() {
             if target.kamikaze {
-                if let Some(pos) = position.get(entity).cloned() {
-                    if let Some(target_pos) = position.get(target.entity).cloned() {
-                        if pos.distance(target_pos.0) < size.get(target.entity).unwrap().0 * 2.0 {
-                            health.get_mut(target.entity).unwrap().0 -= 25.0;
-                            health.get_mut(entity).unwrap().0 = 0.0;
-                        } else {
-                            seek.insert(entity, SeekPosition::to_point(target_pos.0, false)).unwrap();
-                        }
+                let entity_pos = position.get(entity).unwrap().0;
+                let entity_rot = rotation.get(entity).unwrap().0;
+                let entity_size = size.get(entity).unwrap().0;
+                let entity_model = model.get(entity).unwrap();
+
+                let entity_transform = make_transform(entity_pos, entity_rot, entity_size);
+
+
+                if entities.is_alive(target.entity) {
+                    let target_pos = position.get(target.entity).unwrap().0;
+                    let target_rot = rotation.get(target.entity).unwrap().0;
+                    let target_size = size.get(target.entity).unwrap().0;
+                    let target_model = model.get(target.entity).unwrap();
+
+                    let target_transform = make_transform(target_pos, target_rot, target_size);
+
+                    if meshes.intersects(*entity_model, entity_transform, *target_model, target_transform) {
+                        health.get_mut(target.entity).unwrap().0 -= 25.0;
+                        health.get_mut(entity).unwrap().0 = 0.0;
                     } else {
-                        seek.remove(entity);
+                        seek.insert(entity, SeekPosition::to_point(target_pos, false)).unwrap();
                     }
+                } else {
+                    seek.remove(entity);
                 }
             }
         }
@@ -181,23 +205,29 @@ impl<'a> System<'a> for DestroyShips {
         Write<'a, U64MarkerAllocator>,
 
         ReadStorage<'a, Health>,
+        ReadStorage<'a, ExplosionSize>,
         
         WriteStorage<'a, Position>,
         WriteStorage<'a, Size>,
         WriteStorage<'a, TimeLeft>,
         WriteStorage<'a, Image>,
+        WriteStorage<'a, NoCollide>,
+
         WriteStorage<'a, U64Marker>,
         
         ReadStorage<'a, Parent>
     );
 
-    fn run(&mut self, (entities, mut allocator, health, mut position, mut size, mut time, mut image, mut markers, parents): Self::SystemData) {
+    fn run(&mut self, (entities, mut allocator, health, explosion_size, mut position, mut size, mut time, mut image, mut nocollide, mut markers, parents): Self::SystemData) {
         for (entity, health) in (&entities, &health).join() {
             if health.0 <= 0.0 {
                 delete_entity(entity, &entities, &parents);
                 if let Some(pos) = position.get(entity).cloned() {
-                    let explosion_size = size.get(entity).map(|size| size.0).unwrap_or(5.0) * 2.0;
-                    create_explosion(pos.0, explosion_size, &entities, &mut position, &mut size, &mut time, &mut image, &mut markers, &mut allocator);
+                    let explosion_size = explosion_size.get(entity).map(|size| size.0)
+                        .or(size.get(entity).map(|size| size.0 * 2.0))
+                        .unwrap_or(10.0);
+                    
+                    create_explosion(pos.0, explosion_size, &entities, &mut position, &mut size, &mut time, &mut image, &mut nocollide, &mut markers, &mut allocator);
                 }
             }
         }
@@ -206,7 +236,7 @@ impl<'a> System<'a> for DestroyShips {
 
 fn create_explosion(
     position: Vector3<f32>, explosion_size: f32,
-    entities: &Entities, pos: &mut WriteStorage<Position>, size: &mut WriteStorage<Size>, time: &mut WriteStorage<TimeLeft>, image: &mut WriteStorage<Image>,
+    entities: &Entities, pos: &mut WriteStorage<Position>, size: &mut WriteStorage<Size>, time: &mut WriteStorage<TimeLeft>, image: &mut WriteStorage<Image>, nocollide: &mut WriteStorage<NoCollide>,
     markers: &mut WriteStorage<U64Marker>, allocator: &mut Write<U64MarkerAllocator>
 ) -> Entity {
     entities.build_entity()
@@ -214,6 +244,7 @@ fn create_explosion(
         .with(Size(explosion_size), size)
         .with(TimeLeft(2.0), time)
         .with(Image::Star, image)
+        .with(NoCollide, nocollide)
         .marked(markers, allocator)
         .build()
 }

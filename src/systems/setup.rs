@@ -126,9 +126,7 @@ impl<'a> System<'a> for EntityUnderMouseSystem {
     fn run(&mut self, (entities, camera, ray, meshes, mut entity, pos, rot, size, model): Self::SystemData) {
         entity.0 = (&entities, &pos, &rot, &size, &model).join()
             .filter_map(|(entity, pos, rot, size, model)| {
-                let rotation: Matrix4<f32> = rot.0.into();
-
-                let transform = Matrix4::from_translation(pos.0) * rotation * Matrix4::from_scale(size.0);
+                let transform = make_transform(pos.0, rot.0, size.0);
 
                 let mesh = meshes.get_mesh(*model);
                 

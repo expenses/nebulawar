@@ -223,3 +223,10 @@ pub struct AttackTarget {
 
 #[derive(Component, ConvertSaveload)]
 pub struct Health(pub f32);
+
+#[derive(Component, Default, Serialize, Deserialize, Clone)]
+#[storage(NullStorage)]
+pub struct NoCollide;
+
+#[derive(Component, ConvertSaveload)]
+pub struct ExplosionSize(pub f32);
