@@ -1,4 +1,5 @@
 use super::*;
+use cgmath::Zero;
 
 pub struct TestDeleteSystem;
 

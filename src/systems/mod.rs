@@ -3,7 +3,7 @@ use components::{self, *};
 use context::*;
 use camera::*;
 use ships::*;
-use cgmath::{Vector3, Quaternion, Zero, Matrix4, MetricSpace};
+use cgmath::{Vector3, Quaternion, Matrix4, MetricSpace};
 use util::*;
 use collision::*;
 use controls::Controls;
@@ -202,18 +202,6 @@ pub fn focus_on_selected(world: &mut World) {
     world.exec(|mut selectable: WriteStorage<Selectable>| {
         (&mut selectable).join().for_each(|selectable| selectable.camera_following = selectable.selected)
     });
-}
-
-pub fn avg_position<I: Iterator<Item = Vector3<f32>>>(iterator: I) -> Option<Vector3<f32>> {
-    let (len, sum) = iterator.fold((0, Vector3::zero()), |(len, sum), position| {
-        (len + 1, sum + position)
-    });
-
-    if len > 0 {
-        Some(sum / len as f32)
-    } else {
-        None
-    }
 }
 
 pub struct StepCameraSystem;

@@ -5,7 +5,7 @@ use context::*;
 use circle_size;
 use state::*;
 use super::*;
-use cgmath::Matrix4;
+use cgmath::{Matrix4, Zero};
 
 pub struct ObjectRenderer<'a>(pub &'a mut Context);
 

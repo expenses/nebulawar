@@ -13,18 +13,17 @@ fn load_image(filename: &str) -> DynamicImage {
 }
 
 fn main() {
-     let mut packer = TexturePacker::new_skyline(TexturePackerConfig {
+    let mut packer = TexturePacker::new_skyline(TexturePackerConfig {
         trim: false,
         texture_padding: 1,
         .. Default::default()
-     });
+    });
 
     packer.pack_own("star".to_string(), load_image("resources/star.png"));
     packer.pack_own("smoke".to_string(), load_image("resources/smoke.png"));
     packer.pack_own("mine".to_string(), load_image("resources/mine.png"));
     packer.pack_own("move".to_string(), load_image("resources/move.png"));
     packer.pack_own("attack".to_string(), load_image("resources/attack.png"));
-
 
     let mut scope = Scope::new();
 

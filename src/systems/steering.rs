@@ -56,20 +56,7 @@ impl<'a> System<'a> for SeekSystem {
 
     fn run(&mut self, (entities, mut seek, vel, pos, seek_pos, speed): Self::SystemData) {
         for (entity, vel, pos, seek_pos, speed) in (&entities, &vel, &pos, &seek_pos, &speed).join() {
-            let max_speed = speed.0;
-            let max_acceleration = 0.01;
-
-            let braking_distance = vel.magnitude2() / (2.0 * max_acceleration);
-
-            let delta = seek_pos.delta(pos.0);
-
-            let desired = if delta.magnitude() < braking_distance && seek_pos.last_point() {
-                Vector3::zero()
-            } else {
-                delta.normalize_to(max_speed)
-            };
-
-            let force = calc_force(vel.0, desired, max_acceleration);
+            let force = seek_and_arrival_force(pos.0, vel.0, seek_pos, speed.0, 0.01);
             seek.insert(entity, SeekForce(force)).unwrap();
         }
     }
@@ -115,29 +102,10 @@ impl<'a> System<'a> for AvoidanceSystem {
         // Also dont collect entities with an image because having images push entities about seems kinda wierd
         let entity_positions: Vec<_> = (&positions, &sizes, !&image).join().collect();
 
+        let iterator = entity_positions.iter().map(|(pos, size, _)| (pos.0, size.0));
+
         for (entity, vel, pos, speed, size) in (&entities, &vel, &positions, &speed, &sizes).join() {
-            let max_speed = speed.0;
-            let max_acceleration = 0.01;
-
-            let mut sum = Vector3::zero();
-            let mut count = 0;
-
-            for (p, s, _) in &entity_positions {
-                let distance = pos.distance(p.0);
-
-                if distance > 0.0 && distance < (size.0 + s.0) {
-                    let diff = (pos.0 - p.0).normalize_to(1.0 / distance);
-                    sum += diff;
-                    count += 1;
-                }
-            }
-
-            let force = if count > 0 {
-                let desired = sum.normalize_to(max_speed);
-                calc_force(vel.0, desired, max_acceleration)
-            } else {
-                Vector3::zero()
-            };
+            let force = avoidance_force(pos.0, vel.0, size.0, iterator.clone(), speed.0, 0.01);
 
             avoidance.insert(entity, AvoidanceForce(force)).unwrap();
         }
@@ -198,4 +166,40 @@ impl<'a> System<'a> for MergeForceSystem {
 fn calc_force(vel: Vector3<f32>, desired: Vector3<f32>, max_force: f32) -> Vector3<f32> {
     let steering = desired - vel;
     limit_vector(steering, max_force)
+}
+
+fn seek_and_arrival_force(pos: Vector3<f32>, vel: Vector3<f32>, seek_pos: &SeekPosition, max_speed: f32, max_force: f32) -> Vector3<f32> {
+    let braking_distance = vel.magnitude2() / (2.0 * max_force);
+
+    let delta = seek_pos.delta(pos);
+
+    let desired = if delta.magnitude() < braking_distance && seek_pos.last_point() {
+        Vector3::zero()
+    } else {
+        delta.normalize_to(max_speed)
+    };
+
+    calc_force(vel, desired, max_force)
+}
+
+fn avoidance_force<I: Iterator<Item=(Vector3<f32>, f32)>>(pos: Vector3<f32>, vel: Vector3<f32>, size: f32, iterator: I, max_speed: f32, max_force: f32) -> Vector3<f32> {
+    let mut sum = Vector3::zero();
+    let mut count = 0;
+
+    for (p, _, distance) in iterator
+        .map(|(p, s)| (p, s, pos.distance(p)))
+        .filter(|(_, s, distance)| *distance > 0.0 && *distance < (size + s))
+    {
+        
+        let diff = (pos - p).normalize_to(1.0 / distance);
+        sum += diff;
+        count += 1;
+    }
+
+    if count > 0 {
+        let desired = sum.normalize_to(max_speed);
+        calc_force(vel, desired, max_force)
+    } else {
+        Vector3::zero()
+    }
 }
