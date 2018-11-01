@@ -2,6 +2,7 @@ use cgmath::*;
 use std::f32::consts::*;
 use util::*;
 use specs::*;
+use ncollide3d::query::Ray;
 
 #[derive(Serialize, Deserialize, Clone, Component)]
 pub struct Camera {
@@ -98,7 +99,7 @@ impl Camera {
 
     // http://webglfactory.blogspot.com/2011/05/how-to-convert-world-to-screen.html
     // http://antongerdelan.net/opengl/raycasting.html
-    pub fn ray(&self, (x, y): (f32, f32), (screen_width, screen_height): (f32, f32)) -> collision::Ray<f32, Point3<f32>, Vector3<f32>> {
+    pub fn ray(&self, (x, y): (f32, f32), (screen_width, screen_height): (f32, f32)) -> Ray<f32> {
         let (x, y) = screen_pos_to_opengl_pos(x, y, screen_width, screen_height);
 
         let clip = Vector4::new(-x, -y, -1.0, 1.0);
@@ -108,7 +109,10 @@ impl Camera {
 
         let direction = (self.view_matrix().invert().unwrap() * eye).truncate().normalize_to(-1.0);
 
-        collision::Ray::new(vector_to_point(self.position()), direction)
+        Ray::new(
+            point_to_na_point(vector_to_point(self.position())),
+            vector_to_na_vector(direction)
+        )
     }
 }
 

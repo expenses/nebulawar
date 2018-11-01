@@ -221,19 +221,22 @@ impl<'a> System<'a> for RenderDebug<'a> {
 
             // render bbox
 
-            let transform = make_transform(pos.0, rot.0, size.0);
+            let bbox = meshes.get_bbox(*model, pos.0, rot.0, size.0);
 
-            let bbox = meshes.bbox(*model, transform);
+            let min = na_point_to_vector(*bbox.mins());
+            let max = na_point_to_vector(*bbox.maxs());
 
-            let corners = bbox.to_corners();
+            for i in 0 .. 3 {
+                let mut start = min;
+                let mut end = start;
+                end[i] = max[i];
+                self.0.render_3d_line(start, end, WHITE);
 
-            for &(i, j) in [(0, 1), (0, 2), (1, 3), (2, 3)].iter() {
-                self.0.render_3d_line(point_to_vector(corners[i]), point_to_vector(corners[j]), WHITE);
-                self.0.render_3d_line(point_to_vector(corners[i + 4]), point_to_vector(corners[j + 4]), WHITE);
-            }
+                let start = max;
+                let mut end = start;
+                end[i] = min[i];
 
-            for i in 0 .. 4 {
-                self.0.render_3d_line(point_to_vector(corners[i]), point_to_vector(corners[i + 4]), WHITE);
+                self.0.render_3d_line(start, end, WHITE);
             }
         }
     }

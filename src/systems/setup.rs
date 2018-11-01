@@ -1,5 +1,6 @@
 use super::*;
 use glium::glutin::{WindowEvent, MouseScrollDelta, dpi::LogicalPosition, ElementState, MouseButton, VirtualKeyCode, KeyboardInput};
+use ncollide3d::query::RayCast;
 
 pub struct EventHandlerSystem;
 
@@ -113,7 +114,6 @@ pub struct EntityUnderMouseSystem;
 impl<'a> System<'a> for EntityUnderMouseSystem {
     type SystemData = (
         Entities<'a>,
-        Read<'a, Camera>,
         Read<'a, MouseRay>,
         Read<'a, Meshes>,
         Write<'a, EntityUnderMouse>,
@@ -123,22 +123,20 @@ impl<'a> System<'a> for EntityUnderMouseSystem {
         ReadStorage<'a, Model>
     );
 
-    fn run(&mut self, (entities, camera, ray, meshes, mut entity, pos, rot, size, model): Self::SystemData) {
+    fn run(&mut self, (entities, ray, meshes, mut entity, pos, rot, size, model): Self::SystemData) {
         entity.0 = (&entities, &pos, &rot, &size, &model).join()
             .filter_map(|(entity, pos, rot, size, model)| {
-                let transform = make_transform(pos.0, rot.0, size.0);
+                let mut ray = ray.0;
+                ray.origin /= size.0;
 
-                let mesh = meshes.get_mesh(*model);
-                
-                let bound: Aabb3<f32> = mesh.compute_bound();
+                let iso = make_iso(pos.0 / size.0, rot.0);
 
-                if !bound.intersects_transformed(&ray.0, &transform) {
-                    return None;
-                }
-
-                mesh.intersection_transformed(&ray.0, &transform)
-                    .map(point_to_vector)
-                    .map(|intersection| (entity, intersection, camera.position().distance2(intersection)))
+                meshes.get_mesh(*model)
+                    .toi_with_ray(&iso, &ray, true)
+                    .map(|f| {
+                        let point = ray.origin + ray.dir * f;
+                        (entity, Vector3::new(point.x, point.y, point.z) * size.0, f)
+                    })
             })
             .min_by(|(_, _, distance_a), (_, _, distance_b)| cmp_floats(*distance_a, *distance_b))
             .map(|(entity, intersection, _)| (entity, intersection));

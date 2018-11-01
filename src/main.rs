@@ -31,6 +31,8 @@ extern crate noise;
 #[macro_use]
 extern crate newtype_proxy;
 extern crate tint;
+extern crate nalgebra;
+extern crate ncollide3d;
 
 use rand::*;
 use glium::*;

@@ -50,10 +50,6 @@ pub fn vector_to_point(vector: Vector3<f32>) -> Point3<f32> {
     Point3::new(vector.x, vector.y, vector.z)
 }
 
-pub fn point_to_vector(point: Point3<f32>) -> Vector3<f32> {
-    Vector3::new(point.x, point.y, point.z)
-}
-
 pub fn vector_to_array(vector: Vector3<f32>) -> [f32; 3] {
     vector.into()
 }
@@ -172,7 +168,27 @@ pub fn avg<I: Iterator<Item = Vector3<f32>>>(iterator: I) -> Option<Vector3<f32>
     }
 }
 
-pub fn make_transform(pos: Vector3<f32>, rot: Quaternion<f32>, size: f32) -> Matrix4<f32> {
-    let rot: Matrix4<f32> = rot.into();
-    Matrix4::from_translation(pos) * rot * Matrix4::from_scale(size)
+pub fn vector_to_na_vector(vector: Vector3<f32>) -> nalgebra::Vector3<f32> {
+    nalgebra::Vector3::new(vector.x, vector.y, vector.z)
+}
+
+pub fn point_to_na_point(point: Point3<f32>) -> nalgebra::Point3<f32> {
+    nalgebra::Point3::new(point.x, point.y, point.z)
+}
+
+pub fn make_iso(pos: Vector3<f32>, rot: Quaternion<f32>) -> nalgebra::Isometry3<f32> {
+    let quat = if rot == Quaternion::zero() {
+        nalgebra::Quaternion::identity()
+    } else {
+        nalgebra::Quaternion::new(rot.s, rot.v.x, rot.v.y, rot.v.z)
+    };
+
+    nalgebra::Isometry3::from_parts(
+        nalgebra::Translation3::new(pos.x, pos.y, pos.z),
+        nalgebra::Unit::new_normalize(quat)
+    )
+}
+
+pub fn na_point_to_vector(point: nalgebra::Point3<f32>) -> Vector3<f32> {
+    Vector3::new(point.x, point.y, point.z)
 }

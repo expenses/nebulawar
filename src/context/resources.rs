@@ -11,9 +11,10 @@ use glium::texture::*;
 use std::io;
 use failure;
 use specs::*;
-use collision::primitive::ConvexPolyhedron;
 use cgmath::Vector2;
 use arrayvec::*;
+use ncollide3d::shape::TriMesh;
+use nalgebra::Point3;
 
 const NORMAL: [f32; 3] = [0.0, 0.0, 1.0];
 
@@ -127,15 +128,15 @@ pub struct ObjModel {
 }
 
 impl ObjModel {
-    fn new(display: &Display, model: &[u8], image: &[u8]) -> io::Result<(Self, ConvexPolyhedron<f32>)> {
+    fn new(display: &Display, model: &[u8], image: &[u8]) -> io::Result<(Self, TriMesh<f32>)> {
         let vertices = load_wavefront(model);
 
         let points: Vec<_> = vertices.iter()
-            .map(|vertex| vector_to_point(vertex.position.into()))
+            .map(|vertex| Point3::new(vertex.position[0], vertex.position[1], vertex.position[2]))
             .collect();
 
         let faces = (0 .. vertices.len() / 3)
-            .map(|i| (i * 3, i * 3 + 1, i * 3 + 2))
+            .map(|i| Point3::new(i * 3, i * 3 + 1, i * 3 + 2))
             .collect();
 
         Ok((
@@ -143,12 +144,12 @@ impl ObjModel {
                 vertices: VertexBuffer::new(display, &vertices).unwrap(),
                 texture: load_image(display, image)
             },
-            ConvexPolyhedron::new_with_faces(points, faces)
+            TriMesh::new(points, faces, None)
         ))
     }
 }
 
-pub type MeshArray = ArrayVec<[ConvexPolyhedron<f32>; 6]>;
+pub type MeshArray = ArrayVec<[TriMesh<f32>; 6]>;
 type Models = ArrayVec<[ObjModel; 6]>;
 
 pub struct Resources {

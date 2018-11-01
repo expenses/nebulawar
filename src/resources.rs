@@ -4,8 +4,10 @@ use glium::glutin::*;
 use ships::*;
 use odds::vec::*;
 use context;
-use collision::{ComputeBound, Aabb3, Aabb, Discrete};
-use collision::primitive::ConvexPolyhedron;
+use ncollide3d::shape::*;
+use ncollide3d::query::Ray;
+use ncollide3d::bounding_volume::*;
+use util::*;
 
 #[derive(Component, Default, NewtypeProxy)]
 pub struct Secs(pub f32);
@@ -76,13 +78,13 @@ pub struct LogItem {
 }
 
 #[derive(Component, NewtypeProxy)]
-pub struct MouseRay(pub collision::Ray<f32, Point3<f32>, Vector3<f32>>);
+pub struct MouseRay(pub Ray<f32>);
 
 impl Default for MouseRay {
     fn default() -> Self {
-        MouseRay(collision::Ray::new(
-            Point3::new(0.0, 0.0, 0.0),
-            Vector3::zero()
+        MouseRay(Ray::new(
+            nalgebra::Point3::new(0.0, 0.0, 0.0),
+            nalgebra::Vector3::zero()
         ))
     }
 }
@@ -105,18 +107,26 @@ impl Meshes {
         }
     }
 
-    pub fn get_mesh(&self, model: context::Model) -> &ConvexPolyhedron<f32> {
+    pub fn get_mesh(&self, model: context::Model) -> &TriMesh<f32> {
         &self.meshes[model as usize]
     }
 
-    pub fn bbox(&self, model: context::Model, transform: Matrix4<f32>) -> Aabb3<f32> {
-        let bbox: Aabb3<f32> = self.get_mesh(model).compute_bound();
-        bbox.transform(&transform)
+    pub fn get_bbox(&self, model: context::Model, pos: Vector3<f32>, rot: Quaternion<f32>, size: f32) -> AABB<f32> {
+        let bbox: AABB<f32> = self.get_mesh(model).bounding_volume(&make_iso(Vector3::zero(), rot));
+
+        let pos = vector_to_na_vector(pos);
+
+        AABB::new(*bbox.mins() * size + pos, *bbox.maxs() * size + pos)
     }
 
-    pub fn intersects(&self, model_a: context::Model, transform_a: Matrix4<f32>, model_b: context::Model, transform_b: Matrix4<f32>) -> bool {
-        let bb_a = self.bbox(model_a, transform_a);
-        let bb_b = self.bbox(model_b, transform_b);
+    pub fn intersects(
+        &self,
+        model_a: context::Model, pos_a: Vector3<f32>, rot_a: Quaternion<f32>, size_a: f32,
+        model_b: context::Model, pos_b: Vector3<f32>, rot_b: Quaternion<f32>, size_b: f32
+    ) -> bool {
+        
+        let bb_a = self.get_bbox(model_a, pos_a, rot_a, size_a);
+        let bb_b = self.get_bbox(model_b, pos_b, rot_b, size_b);
 
         bb_a.intersects(&bb_b)
     }

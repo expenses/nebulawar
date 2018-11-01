@@ -3,12 +3,14 @@ use components::{self, *};
 use context::*;
 use camera::*;
 use ships::*;
-use cgmath::{Vector3, MetricSpace};
+use cgmath::{Vector3, MetricSpace, Zero, Quaternion};
 use util::*;
-use collision::*;
 use controls::Controls;
 use resources::*;
 use star_system::*;
+use ncollide3d::query::RayCast;
+use ncollide3d::shape::Plane;
+use nalgebra::Unit;
 
 mod rendering;
 mod storage;
@@ -316,8 +318,12 @@ impl<'a> System<'a> for RightClickInteractionSystem {
 
             order.command = Some(Command::GoToAnd(entity, interaction));
         } else {
-            order.command = Plane::new(UP, -plane.0).intersection(&ray.0)
-                .map(|point| Command::MoveTo(point_to_vector(point)));
+            let iso = make_iso(Vector3::new(0.0, plane.0, 0.0), Quaternion::zero());
+
+            order.command = Plane::new(Unit::new_normalize(vector_to_na_vector(UP)))
+                .toi_with_ray(&iso, &ray.0, true)
+                .map(|toi| ray.0.origin + ray.0.dir * toi)
+                .map(|point| Command::MoveTo(Vector3::new(point.x, point.y, point.z)));
 
             order.to_move = ordering.collect();
         }

@@ -55,6 +55,9 @@ tint = "*"
 # Incase I need to debug an uninitialized component
 shred = {version = "*", features = ["nightly"], optional = true}
 
+nalgebra = "*"
+ncollide3d = "*"
+
 [features]
 default = ['embed_resources']
 

@@ -172,18 +172,13 @@ impl<'a> System<'a> for KamikazeSystem {
                 let entity_size = size.get(entity).unwrap().0;
                 let entity_model = model.get(entity).unwrap();
 
-                let entity_transform = make_transform(entity_pos, entity_rot, entity_size);
-
-
                 if entities.is_alive(target.entity) {
                     let target_pos = position.get(target.entity).unwrap().0;
                     let target_rot = rotation.get(target.entity).unwrap().0;
                     let target_size = size.get(target.entity).unwrap().0;
                     let target_model = model.get(target.entity).unwrap();
 
-                    let target_transform = make_transform(target_pos, target_rot, target_size);
-
-                    if meshes.intersects(*entity_model, entity_transform, *target_model, target_transform) {
+                    if meshes.intersects(*entity_model, entity_pos, entity_rot, entity_size, *target_model, target_pos, target_rot, target_size) {
                         health.get_mut(target.entity).unwrap().0 -= 25.0;
                         health.get_mut(entity).unwrap().0 = 0.0;
                     } else {
