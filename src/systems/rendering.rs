@@ -4,7 +4,7 @@ use components;
 use context::*;
 use circle_size;
 use super::*;
-use cgmath::{Matrix4, Zero};
+use cgmath::Matrix4;
 
 pub struct ObjectRenderer<'a>(pub &'a mut Context);
 
@@ -164,8 +164,8 @@ impl<'a> System<'a> for RenderDebug<'a> {
         Entities<'a>,
         Read<'a, Camera>,
         Read<'a, EntityUnderMouse>,
-        Read<'a, StarSystem>,
-        Read<'a, MouseRay>,
+        Read<'a, Debug>,
+        Read<'a, ScreenDimensions>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Velocity>,
         ReadStorage<'a, SeekForce>,
@@ -173,17 +173,15 @@ impl<'a> System<'a> for RenderDebug<'a> {
         ReadStorage<'a, FrictionForce>
     );
 
-    fn run(&mut self, (entities, camera, entity, system, ray, pos, vel, seek, avoid, friction): Self::SystemData) {
-        if !self.0.is_debugging() {
+    fn run(&mut self, (entities, camera, entity, debug, screen_dims, pos, vel, seek, avoid, friction): Self::SystemData) {
+        if !debug.0 {
             return;
         }
 
         if let Some((_, point)) = entity.0 {
-            self.0.render_model(Model::Asteroid, point, Quaternion::zero(), 1.0, &camera, &system);
-        }
-
-        if let Some(point) = Plane::new(UP, 0.0).intersection(&ray.0).map(point_to_vector) {
-            self.0.render_model(Model::Asteroid, point, Quaternion::zero(), 1.0, &camera, &system);
+            if let Some((x, y, _)) = camera.screen_position(point, screen_dims.0) {
+                self.0.render_circle(x, y, 10.0, [1.0; 4]);
+            }
         }
 
         let scale = 1000.0;
@@ -217,11 +215,12 @@ pub struct RenderSystem<'a>(pub &'a mut Context);
 impl<'a> System<'a> for RenderSystem<'a> {
     type SystemData = (
         Read<'a, Camera>,
+        Read<'a, Debug>,
         Read<'a, StarSystem>
     );
 
-    fn run(&mut self, (camera, system): Self::SystemData) {
-        self.0.render_skybox(&system, &camera);
+    fn run(&mut self, (camera, debug, system): Self::SystemData) {
+        self.0.render_skybox(&system, &camera, debug.0);
         self.0.render_stars(&system, &camera);
 
         let offset = system.light * BACKGROUND_DISTANCE;

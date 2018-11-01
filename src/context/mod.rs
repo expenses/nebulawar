@@ -85,7 +85,6 @@ pub struct Context {
     
     smoke_buffer: Vec<Vertex>,
 
-    debug: bool,
     pub gui: Gui
 }
 
@@ -118,7 +117,6 @@ impl Context {
             lines_3d_buffer: Vec::new(),
             smoke_buffer: Vec::new(),
             
-            debug: false,
             gui: Gui::new(DEFAULT_WIDTH, DEFAULT_HEIGHT)
         }
     }
@@ -143,7 +141,7 @@ impl Context {
         let vertices = VertexBuffer::new(&self.display, &self.lines_3d_buffer).unwrap();
         let indices = NoIndices(PrimitiveType::LinesList);
 
-        let params = self.draw_params();
+        let params = Self::draw_params();
         self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
 
         self.lines_3d_buffer.clear();
@@ -170,7 +168,7 @@ impl Context {
 
     pub fn render_billboard(&mut self, matrix: Matrix4<f32>, image: Image, camera: &Camera, system: &StarSystem) {
         let uniforms = self.uniforms(matrix, camera, system, &self.resources.image, Mode::Shadeless);
-        let params = self.draw_params();
+        let params = Self::draw_params();
 
         let mut vertices = BILLBOARD_VERTICES;
 
@@ -196,19 +194,23 @@ impl Context {
         let params = DrawParameters {
             polygon_mode: PolygonMode::Point,
             point_size: Some(2.0 * self.dpi()),
-            .. Self::draw_params(self)
+            .. Self::draw_params()
         };
 
         self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
     }
 
-    pub fn render_skybox(&mut self, system: &StarSystem, camera: &Camera) {
+    pub fn render_skybox(&mut self, system: &StarSystem, camera: &Camera, debug: bool) {
         let uniforms = self.background_uniforms(camera, system, Mode::VertexColoured);
 
         let vertices = VertexBuffer::new(&self.display, &system.background).unwrap();
         let indices = NoIndices(PrimitiveType::TrianglesList);
 
-        let params = self.draw_params();
+        let mut params = Self::draw_params();
+
+        if debug {
+            params.polygon_mode = PolygonMode::Line;
+        }
 
         self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
     }
@@ -220,7 +222,7 @@ impl Context {
                 test: DepthTest::IfLess,
                 .. Default::default()
             },
-            .. Self::draw_params(self)
+            .. Self::draw_params()
         };
 
         let buffer = VertexBuffer::new(&self.display, &self.smoke_buffer).unwrap();
@@ -276,7 +278,7 @@ impl Context {
         let model = &self.resources.models[model as usize];
 
         let uniforms = self.uniforms(position, camera, system, &model.texture, Mode::Normal);
-        let params = self.draw_params();
+        let params = Self::draw_params();
 
         self.target.draw(&model.vertices, &NoIndices(PrimitiveType::TrianglesList), &self.program, &uniforms, &params).unwrap();
     }
@@ -312,10 +314,8 @@ impl Context {
         self.display.gl_window().get_hidpi_factor() as f32
     }
 
-    // todo: move screen dims into systems so the pers matrix can be generated
-
-    fn draw_params(&self) -> DrawParameters<'static> {
-        let mut params = DrawParameters {
+    fn draw_params() -> DrawParameters<'static> {
+        DrawParameters {
             depth: Depth {
                 test: DepthTest::IfLess,
                 write: true,
@@ -324,13 +324,7 @@ impl Context {
             backface_culling: BackfaceCullingMode::CullCounterClockwise,
             blend: Blend::alpha_blending(),
             .. Default::default()
-        };
-
-        if self.debug {
-            params.polygon_mode = PolygonMode::Line;
         }
-
-        params
     }
 
     pub fn render_3d_lines<I: Iterator<Item=Vector3<f32>>>(&mut self, iterator: I, colour: [f32; 3]) {
@@ -346,14 +340,6 @@ impl Context {
 
             last = Some(vertex);
         }
-    }
-
-    pub fn toggle_debug(&mut self) {
-        self.debug = !self.debug;
-    }
-
-    pub fn is_debugging(&self) -> bool {
-        self.debug
     }
 
     pub fn render_image(&mut self, image: Image, x: f32, y: f32, width: f32, height: f32, overlay: [f32; 4]) {

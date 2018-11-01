@@ -87,3 +87,6 @@ impl Default for MouseRay {
 
 #[derive(Component, Default)]
 pub struct ScreenDimensions(pub (f32, f32));
+
+#[derive(Component, Default)]
+pub struct Debug(pub bool);

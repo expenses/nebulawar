@@ -261,6 +261,7 @@ fn create_world() -> World {
     world.add_resource(MouseRay::default());
     world.add_resource(specs::saveload::U64MarkerAllocator::new());
     world.add_resource(ScreenDimensions((0.0, 0.0)));
+    world.add_resource(Debug(false));
     
     world.register::<SeekPosition>();
     world.register::<SeekForce>();

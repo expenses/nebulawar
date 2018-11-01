@@ -164,6 +164,8 @@ impl<'a> System<'a> for KamikazeSystem {
                         } else {
                             seek.insert(entity, SeekPosition::to_point(target_pos.0, false)).unwrap();
                         }
+                    } else {
+                        seek.remove(entity);
                     }
                 }
             }
