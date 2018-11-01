@@ -3,7 +3,7 @@ mod resources;
 
 use self::lines::*;
 
-pub use self::resources::*;
+pub use self::resources::{Image, Model, MeshArray, Resources, BILLBOARD_VERTICES};
 pub const WHITE: [f32; 3] = [1.0; 3];
 
 use cgmath::*;
@@ -23,7 +23,6 @@ use *;
 
 use runic;
 use pedot::*;
-use collision::primitive::ConvexPolyhedron;
 
 // ** Line Rendering Woes **
 // rendering in 2d: doesnt work with rest of scene, rendering lines that go behind the camera is hard
@@ -89,7 +88,7 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(events_loop: &EventsLoop) -> Self {
+    pub fn new(events_loop: &EventsLoop) -> (Self, MeshArray) {
         let window = glutin::WindowBuilder::new()
             .with_dimensions(LogicalSize::new(DEFAULT_WIDTH.into(), DEFAULT_HEIGHT.into()))
             .with_title("Fleet Commander");
@@ -106,19 +105,24 @@ impl Context {
                 None
         ).unwrap();
 
-        Self {
-            resources: Resources::new(&display).unwrap(),
-            target: display.draw(),
-            lines: LineRenderer::new(&display),
-            text_program: runic::default_program(&display).unwrap(),
-            display, program,
-            
-            text_buffer: Vec::new(),
-            lines_3d_buffer: Vec::new(),
-            smoke_buffer: Vec::new(),
-            
-            gui: Gui::new(DEFAULT_WIDTH, DEFAULT_HEIGHT)
-        }
+        let (resources, meshes) = Resources::new(&display).unwrap();
+
+        (
+            Self {
+                resources,
+                target: display.draw(),
+                lines: LineRenderer::new(&display),
+                text_program: runic::default_program(&display).unwrap(),
+                display, program,
+                
+                text_buffer: Vec::new(),
+                lines_3d_buffer: Vec::new(),
+                smoke_buffer: Vec::new(),
+                
+                gui: Gui::new(DEFAULT_WIDTH, DEFAULT_HEIGHT)
+            },
+            meshes
+        )
     }
 
     pub fn copy_event(&mut self, event: &WindowEvent) {
@@ -344,10 +348,6 @@ impl Context {
 
     pub fn render_image(&mut self, image: Image, x: f32, y: f32, width: f32, height: f32, overlay: [f32; 4]) {
         self.lines.render_image(image, x, y, width, height, overlay, &mut self.target, &self.display, &self.resources)
-    }
-
-    pub fn collision_mesh(&self, model: Model) -> &ConvexPolyhedron<f32> {
-        &self.resources.models[model as usize].collision_mesh
     }
 }
 

@@ -73,7 +73,7 @@ impl Game {
 
         add_starting_entities(&mut world);
 
-        let dispatcher = specs::DispatcherBuilder::new()
+        let builder = specs::DispatcherBuilder::new()
             .with(EventHandlerSystem, "events", &[])
             .with(SeekSystem, "seek", &[])
             .with(AvoidanceSystem, "avoidance", &[])
@@ -87,6 +87,7 @@ impl Game {
             .with(TickTimedEntities, "tick_timed", &["events"])
             .with(TestDeleteSystem, "test_delete", &["events"])
             .with(SpinSystem, "spin", &["events"])
+            .with(MiddleClickSystem, "middle_click", &["events"])
     
             .with(MergeForceSystem, "merge", &["events", "seek", "avoidance", "friction"])
 
@@ -95,13 +96,33 @@ impl Game {
 
             .with(ShipMovementSystem, "ship_movement", &["apply"])
             .with(SpawnSmokeSystem, "smoke", &["apply"])
+            .with(AveragePositionSystem, "avg_pos", &["apply"])
+            .with(DragSelectSystem, "drag", &["apply"])
+            .with(ShootStuffSystem, "shooting", &["apply"])
+            .with(KamikazeSystem, "kamikaze", &["apply"])
+            .with(StepCameraSystem, "camera", &["apply"])
+
             .with(FinishSeekSystem, "finish_seek", &["apply", "set_rotation"])
+
+            .with(EntityUnderMouseSystem, "mouse_entity", &["mouse_ray", "apply", "set_rotation", "spin"])
+
+            .with(RightClickInteractionSystem, "right_click_interaction", &["mouse_entity"])
+            .with(LeftClickSystem, "left_click", &["mouse_entity"])
+
+            .with(RightClickSystem, "right_click", &["right_click_interaction"])
             
-            .build();
+            .with(DestroyShips, "destroy_ships", &["kamikaze"]);
+
+        builder.print_par_seq();
+
+
+        let (context, meshes) = context::Context::new(events_loop);
+
+        world.add_resource(Meshes(meshes));
 
         Self {
-            context: context::Context::new(events_loop),
-            world, dispatcher
+            context, world,
+            dispatcher: builder.build()
         }
     }
 
@@ -110,17 +131,6 @@ impl Game {
         *self.world.write_resource() = ScreenDimensions(self.context.screen_dimensions());
 
         self.dispatcher.dispatch(&self.world.res);
-
-        EntityUnderMouseSystem      (&self.context).run_now(&self.world.res);
-        AveragePositionSystem                      .run_now(&self.world.res);
-        RightClickInteractionSystem                .run_now(&self.world.res);
-        MiddleClickSystem                          .run_now(&self.world.res);
-        LeftClickSystem                            .run_now(&self.world.res);
-        DragSelectSystem                           .run_now(&self.world.res);
-        RightClickSystem                           .run_now(&self.world.res);
-        ShootStuffSystem                           .run_now(&self.world.res);
-        KamikazeSystem.run_now(&self.world.res);
-        StepCameraSystem                           .run_now(&self.world.res);
 
         let controls: Controls = {
             let controls: Fetch<Controls> = self.world.read_resource();
@@ -134,9 +144,7 @@ impl Game {
             LoadSystem.run_now(&self.world.res);
         }
         
-        UpdateControlsSystem                       .run_now(&self.world.res);
-
-        DestroyShips.run_now(&self.world.res);
+        UpdateControlsSystem.run_now(&self.world.res);
 
         self.world.maintain();
     }
@@ -144,7 +152,6 @@ impl Game {
     fn render(&mut self) {
         self.context.clear();
 
-        
         RenderCommandPaths  (&mut self.context).run_now(&self.world.res);
         RenderSystem        (&mut self.context).run_now(&self.world.res);
         ObjectRenderer      (&mut self.context).run_now(&self.world.res); 

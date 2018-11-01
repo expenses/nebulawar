@@ -13,6 +13,7 @@ use failure;
 use specs::*;
 use collision::primitive::ConvexPolyhedron;
 use cgmath::Vector2;
+use arrayvec::*;
 
 const NORMAL: [f32; 3] = [0.0, 0.0, 1.0];
 
@@ -122,12 +123,11 @@ pub enum Model {
 
 pub struct ObjModel {
     pub vertices: VertexBuffer<Vertex>,
-    pub collision_mesh: ConvexPolyhedron<f32>,
     pub texture: SrgbTexture2d
 }
 
 impl ObjModel {
-    fn new(display: &Display, model: &[u8], image: &[u8]) -> io::Result<Self> {
+    fn new(display: &Display, model: &[u8], image: &[u8]) -> io::Result<(Self, ConvexPolyhedron<f32>)> {
         let vertices = load_wavefront(model);
 
         let points: Vec<_> = vertices.iter()
@@ -138,35 +138,54 @@ impl ObjModel {
             .map(|i| (i * 3, i * 3 + 1, i * 3 + 2))
             .collect();
 
-        Ok(Self {
-            vertices: VertexBuffer::new(display, &vertices).unwrap(),
-            collision_mesh: ConvexPolyhedron::new_with_faces(points, faces),
-            texture: load_image(display, image)
-        })
+        Ok((
+            Self {
+                vertices: VertexBuffer::new(display, &vertices).unwrap(),
+                texture: load_image(display, image)
+            },
+            ConvexPolyhedron::new_with_faces(points, faces)
+        ))
     }
 }
 
+pub type MeshArray = ArrayVec<[ConvexPolyhedron<f32>; 6]>;
+type Models = ArrayVec<[ObjModel; 6]>;
+
 pub struct Resources {
-    pub models: [ObjModel; 6],
+    pub models: Models,
     pub image: SrgbTexture2d,
     pub billboard: VertexBuffer<Vertex>,
     pub font: runic::CachedFont<'static>
 }
 
 impl Resources {
-    pub fn new(display: &Display) -> Result<Self, failure::Error> {
-        Ok(Self {
-            models: [
-                ObjModel::new(display, load_resource!("models/fighter.obj"),  load_resource!("models/fighter.png"))?,
-                ObjModel::new(display, load_resource!("models/tanker.obj"),   load_resource!("models/tanker.png"))?,
-                ObjModel::new(display, load_resource!("models/carrier.obj"),  load_resource!("models/carrier.png"))?,
-                ObjModel::new(display, load_resource!("models/asteroid.obj"), load_resource!("models/asteroid.png"))?,
-                ObjModel::new(display, load_resource!("models/miner.obj"),    load_resource!("models/miner.png"))?,
-                ObjModel::new(display, load_resource!("models/missile.obj"),  load_resource!("models/missile.png"))?
-            ],
-            image: load_image(display, load_resource!("output/packed.png")),
-            font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display)?,
-            billboard: VertexBuffer::new(display, &BILLBOARD_VERTICES).unwrap()
-        })
+    pub fn new(display: &Display) -> Result<(Self, MeshArray), failure::Error> {
+        let mut meshes = MeshArray::new();
+        let mut models = Models::new();
+
+        add_model(&mut meshes, &mut models, display, load_resource!("models/fighter.obj"),  load_resource!("models/fighter.png"))?;
+        add_model(&mut meshes, &mut models, display, load_resource!("models/tanker.obj"),   load_resource!("models/tanker.png"))?;
+        add_model(&mut meshes, &mut models, display, load_resource!("models/carrier.obj"),  load_resource!("models/carrier.png"))?;
+        add_model(&mut meshes, &mut models, display, load_resource!("models/asteroid.obj"), load_resource!("models/asteroid.png"))?;
+        add_model(&mut meshes, &mut models, display, load_resource!("models/miner.obj"),    load_resource!("models/miner.png"))?;
+        add_model(&mut meshes, &mut models, display, load_resource!("models/missile.obj"),  load_resource!("models/missile.png"))?;
+
+        Ok((
+            Self {
+                models,
+                image: load_image(display, load_resource!("output/packed.png")),
+                font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display)?,
+                billboard: VertexBuffer::new(display, &BILLBOARD_VERTICES).unwrap(),
+            },
+            meshes
+        ))
     }
+}
+
+pub fn add_model(meshes: &mut MeshArray, models: &mut Models, display: &Display, obj: &[u8], png: &[u8]) -> Result<(), failure::Error> {
+    let (object, mesh) = ObjModel::new(display, obj, png)?;
+    models.push(object);
+    meshes.push(mesh);
+
+    Ok(())
 }

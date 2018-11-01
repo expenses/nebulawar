@@ -108,13 +108,14 @@ impl<'a> System<'a> for SetMouseRay {
     }
 }
 
-pub struct EntityUnderMouseSystem<'a>(pub &'a Context);
+pub struct EntityUnderMouseSystem;
 
-impl<'a> System<'a> for EntityUnderMouseSystem<'a> {
+impl<'a> System<'a> for EntityUnderMouseSystem {
     type SystemData = (
         Entities<'a>,
         Read<'a, Camera>,
         Read<'a, MouseRay>,
+        Read<'a, Meshes>,
         Write<'a, EntityUnderMouse>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, components::Rotation>,
@@ -122,14 +123,14 @@ impl<'a> System<'a> for EntityUnderMouseSystem<'a> {
         ReadStorage<'a, Model>
     );
 
-    fn run(&mut self, (entities, camera, ray, mut entity, pos, rot, size, model): Self::SystemData) {
+    fn run(&mut self, (entities, camera, ray, meshes, mut entity, pos, rot, size, model): Self::SystemData) {
         entity.0 = (&entities, &pos, &rot, &size, &model).join()
             .filter_map(|(entity, pos, rot, size, model)| {
                 let rotation: Matrix4<f32> = rot.0.into();
 
                 let transform = Matrix4::from_translation(pos.0) * rotation * Matrix4::from_scale(size.0);
 
-                let mesh = self.0.collision_mesh(*model);
+                let mesh = meshes.get_mesh(*model);
                 
                 let bound: Aabb3<f32> = mesh.compute_bound();
 

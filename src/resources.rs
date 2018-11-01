@@ -4,6 +4,7 @@ use glium::glutin::*;
 use ships::*;
 use odds::vec::*;
 use context;
+use collision::primitive::ConvexPolyhedron;
 
 #[derive(Component, Default, NewtypeProxy)]
 pub struct Secs(pub f32);
@@ -90,3 +91,12 @@ pub struct ScreenDimensions(pub (f32, f32));
 
 #[derive(Component, Default)]
 pub struct Debug(pub bool);
+
+#[derive(Component, Default)]
+pub struct Meshes(pub context::MeshArray);
+
+impl Meshes {
+    pub fn get_mesh(&self, model: context::Model) -> &ConvexPolyhedron<f32> {
+        &self.0[model as usize]
+    }
+}
