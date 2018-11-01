@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::unreadable_literal))]
+
 use glium::*;
 use genmesh;
 use obj::*;

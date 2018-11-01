@@ -1,6 +1,5 @@
 use components;
 use specs::{*, saveload::*, error::*};
-use state::*;
 use context::{Model, Image};
 use std::fs::*;
 use super::*;

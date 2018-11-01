@@ -3,7 +3,6 @@ use specs::*;
 use components;
 use context::*;
 use circle_size;
-use state::*;
 use super::*;
 use cgmath::{Matrix4, Zero};
 

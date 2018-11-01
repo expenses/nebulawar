@@ -38,27 +38,26 @@ use glutin::*;
 use glutin::dpi::*;
 use std::time::*;
 use specs::{World, RunNow};
-use specs::shred::{Fetch, FetchMut, Dispatcher};
+use specs::shred::{Fetch, Dispatcher};
 
 mod camera;
 mod util;
 mod context;
 mod ships;
 mod controls;
-mod state;
+mod star_system;
 mod components;
 mod systems;
 mod entities;
 mod tests;
 mod resources;
 
-use state::*;
+use star_system::*;
 use controls::*;
 use components::*;
 use systems::*;
 use util::*;
 use ships::*;
-use systems::focus_on_selected;
 use entities::*;
 use resources::*;
 
@@ -103,47 +102,6 @@ impl Game {
         Self {
             context: context::Context::new(events_loop),
             world, dispatcher
-        }
-    }
-
-    fn handle_mouse_button(&mut self, button: MouseButton, pressed: bool) {
-        let mut controls: FetchMut<Controls> = self.world.write_resource();
-
-        match button {
-            MouseButton::Left => controls.handle_left(pressed),
-            MouseButton::Right => controls.handle_right(pressed),
-            MouseButton::Middle => controls.handle_middle(pressed),
-            _ => {}
-        }
-    }
-
-    fn handle_kp2(&mut self, key: VirtualKeyCode, pressed: bool) {
-        let mut controls: FetchMut<Controls> = self.world.write_resource();
-
-        match key {
-            VirtualKeyCode::Left   | VirtualKeyCode::A      => controls.left     = pressed,
-            VirtualKeyCode::Right  | VirtualKeyCode::D      => controls.right    = pressed,
-            VirtualKeyCode::Up     | VirtualKeyCode::W      => controls.forwards = pressed,
-            VirtualKeyCode::Down   | VirtualKeyCode::S      => controls.back     = pressed,
-            VirtualKeyCode::LShift | VirtualKeyCode::T      => controls.shift    = pressed,
-            VirtualKeyCode::Back   | VirtualKeyCode::Delete => controls.delete   = pressed,
-            VirtualKeyCode::Z => controls.save = pressed,
-            VirtualKeyCode::L => controls.load = pressed,
-            _ => {}
-        }
-    }
-
-    fn handle_keypress(&mut self, key: VirtualKeyCode, pressed: bool) {
-        // todo: move this stuff into ecs
-
-
-        match key {
-            VirtualKeyCode::C => focus_on_selected(&mut self.world),
-            VirtualKeyCode::P if pressed => self.world.write_resource::<Paused>().switch(),
-            VirtualKeyCode::Slash if pressed => self.context.toggle_debug(),
-            VirtualKeyCode::Comma if pressed => self.world.write_resource::<Formation>().rotate_left(),
-            VirtualKeyCode::Period if pressed => self.world.write_resource::<Formation>().rotate_right(),
-            _ => self.handle_kp2(key, pressed)
         }
     }
 
@@ -236,12 +194,6 @@ fn main() {
 
             match event {
                 glutin::WindowEvent::CloseRequested => closed = true,
-                glutin::WindowEvent::MouseInput {state, button, ..} => {
-                    game.handle_mouse_button(button, state == ElementState::Pressed);
-                },
-                glutin::WindowEvent::KeyboardInput {input: KeyboardInput {state, virtual_keycode: Some(key), ..}, ..} => {
-                    game.handle_keypress(key, state == ElementState::Pressed);
-                },
                 event => game.world.write_resource::<Events>().push(event)
             }
         });
