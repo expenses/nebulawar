@@ -113,8 +113,7 @@ impl Game {
             
             .with(DestroyShips, "destroy_ships", &["kamikaze"]);
 
-        builder.print_par_seq();
-
+        info!("Dispatcher graph:\n{:?}", builder);
 
         let (context, meshes) = context::Context::new(events_loop);
 

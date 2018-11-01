@@ -183,21 +183,13 @@ fn seek_and_arrival_force(pos: Vector3<f32>, vel: Vector3<f32>, seek_pos: &SeekP
 }
 
 fn avoidance_force<I: Iterator<Item=(Vector3<f32>, f32)>>(pos: Vector3<f32>, vel: Vector3<f32>, size: f32, iterator: I, max_speed: f32, max_force: f32) -> Vector3<f32> {
-    let mut sum = Vector3::zero();
-    let mut count = 0;
-
-    for (p, _, distance) in iterator
+    let iterator = iterator
         .map(|(p, s)| (p, s, pos.distance(p)))
         .filter(|(_, s, distance)| *distance > 0.0 && *distance < (size + s))
-    {
-        
-        let diff = (pos - p).normalize_to(1.0 / distance);
-        sum += diff;
-        count += 1;
-    }
+        .map(|(p, _, distance)| (pos - p).normalize_to(1.0 / distance));
 
-    if count > 0 {
-        let desired = sum.normalize_to(max_speed);
+    if let Some(avg) = avg(iterator) {
+        let desired = avg.normalize_to(max_speed);
         calc_force(vel, desired, max_force)
     } else {
         Vector3::zero()

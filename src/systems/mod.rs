@@ -250,7 +250,7 @@ impl<'a> System<'a> for StepCameraSystem {
             .filter(|(_, selectable)| selectable.camera_following)
             .map(|(pos, _)| pos.0);
 
-        if let Some(position) = avg_position(iterator) {
+        if let Some(position) = avg(iterator) {
             camera.move_towards(position);
         }
     }

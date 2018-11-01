@@ -89,7 +89,7 @@ impl<'a> System<'a> for AveragePositionSystem {
             .filter(|(_, selectable, side)| selectable.selected && **side == Side::Friendly)
             .map(|(pos, _, _)| pos.0);
 
-        avg_pos.0 = avg_position(iterator);
+        avg_pos.0 = avg(iterator);
     }
 }
 
