@@ -17,7 +17,7 @@ arrayvec = "*"
 # Easier matrices stuff
 cgmath = "*"
 # collision detection extension for cgmath
-collision = "*"
+collision = {git = "https://github.com/expenses/collision-rs", branch = "public-simplex-processors"}
 # 2d ui rendering (circles etc)
 lyon = "*"
 # text rendering (waiting on: me being lazy)
@@ -40,8 +40,8 @@ log = "*"
 # 'retain_mut'
 odds = {version = "*", features = ["std-vec"]}
 # ECS (waiting on: saveload stuff)
-specs = {git = "https://github.com/expenses/specs", features = ["serde"], branch="better_entity_serialization_errors"}
-specs-derive = {git = "https://github.com/expenses/specs", branch="better_entity_serialization_errors"}
+specs = {git = "https://github.com/expenses/specs", features = ["serde"], branch = "better_entity_serialization_errors"}
+specs-derive = {git = "https://github.com/expenses/specs", branch = "better_entity_serialization_errors"}
 
 # Triangulation
 spade = "*"

@@ -5,6 +5,7 @@ use ships::*;
 use odds::vec::*;
 use context;
 use collision::primitive::ConvexPolyhedron;
+use collision::algorithm::minkowski::*;
 
 #[derive(Component, Default, NewtypeProxy)]
 pub struct Secs(pub f32);
@@ -92,11 +93,30 @@ pub struct ScreenDimensions(pub (f32, f32));
 #[derive(Component, Default)]
 pub struct Debug(pub bool);
 
-#[derive(Component, Default)]
-pub struct Meshes(pub context::MeshArray);
+#[derive(Component)]
+pub struct Meshes {
+    meshes: context::MeshArray,
+    gjk: GJK<SimplexProcessor3<f32>, EPA3<f32>, f32>
+}
 
 impl Meshes {
+    pub fn new(meshes: context::MeshArray) -> Self {
+        Self {
+            meshes,
+            gjk: GJK::new()
+        }
+    }
+
     pub fn get_mesh(&self, model: context::Model) -> &ConvexPolyhedron<f32> {
-        &self.0[model as usize]
+        &self.meshes[model as usize]
+    }
+}
+
+impl Default for Meshes {
+    fn default() -> Self {
+        Self {
+            meshes: context::MeshArray::default(),
+            gjk: GJK::new()
+        }
     }
 }

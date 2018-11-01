@@ -101,7 +101,7 @@ impl Game {
             .with(ShootStuffSystem, "shooting", &["apply"])
             .with(KamikazeSystem, "kamikaze", &["apply"])
             .with(StepCameraSystem, "camera", &["apply"])
-            
+
             .with(FinishSeekSystem, "finish_seek", &["apply", "set_rotation"])
 
             .with(EntityUnderMouseSystem, "mouse_entity", &["mouse_ray", "apply", "set_rotation", "spin"])
@@ -118,7 +118,7 @@ impl Game {
 
         let (context, meshes) = context::Context::new(events_loop);
 
-        world.add_resource(Meshes(meshes));
+        world.add_resource(Meshes::new(meshes));
 
         Self {
             context, world,
