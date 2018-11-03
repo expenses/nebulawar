@@ -81,7 +81,7 @@ impl<'a> System<'a> for ShootStuffSystem {
                     .with(MaxSpeed(5.0), &mut speed)
                     .with(Health(1.0), &mut health)
                     .with(NoCollide, &mut nocollide)
-                    .with(ExplosionSize(5.0), &mut explosion_size)
+                    .with(ExplosionSize(10.0), &mut explosion_size)
                     .marked(&mut markers, &mut allocator)
                     .build();
             }
@@ -205,15 +205,15 @@ impl<'a> System<'a> for DestroyShips {
         WriteStorage<'a, Position>,
         WriteStorage<'a, Size>,
         WriteStorage<'a, TimeLeft>,
-        WriteStorage<'a, Image>,
         WriteStorage<'a, NoCollide>,
+        WriteStorage<'a, Explosion>,
 
         WriteStorage<'a, U64Marker>,
         
         ReadStorage<'a, Parent>
     );
 
-    fn run(&mut self, (entities, mut allocator, health, explosion_size, mut position, mut size, mut time, mut image, mut nocollide, mut markers, parents): Self::SystemData) {
+    fn run(&mut self, (entities, mut allocator, health, explosion_size, mut position, mut size, mut time, mut nocollide, mut explosion, mut markers, parents): Self::SystemData) {
         for (entity, health) in (&entities, &health).join() {
             if health.0 <= 0.0 {
                 delete_entity(entity, &entities, &parents);
@@ -222,7 +222,7 @@ impl<'a> System<'a> for DestroyShips {
                         .or(size.get(entity).map(|size| size.0 * 2.0))
                         .unwrap_or(10.0);
                     
-                    create_explosion(pos.0, explosion_size, &entities, &mut position, &mut size, &mut time, &mut image, &mut nocollide, &mut markers, &mut allocator);
+                    create_explosion(pos.0, explosion_size, &entities, &mut position, &mut size, &mut time, &mut nocollide, &mut explosion, &mut markers, &mut allocator);
                 }
             }
         }
@@ -231,15 +231,44 @@ impl<'a> System<'a> for DestroyShips {
 
 fn create_explosion(
     position: Vector3<f32>, explosion_size: f32,
-    entities: &Entities, pos: &mut WriteStorage<Position>, size: &mut WriteStorage<Size>, time: &mut WriteStorage<TimeLeft>, image: &mut WriteStorage<Image>, nocollide: &mut WriteStorage<NoCollide>,
+    entities: &Entities, pos: &mut WriteStorage<Position>, size: &mut WriteStorage<Size>, time: &mut WriteStorage<TimeLeft>, nocollide: &mut WriteStorage<NoCollide>, explosion: &mut WriteStorage<Explosion>,
     markers: &mut WriteStorage<U64Marker>, allocator: &mut Write<U64MarkerAllocator>
 ) -> Entity {
     entities.build_entity()
         .with(Position(position), pos)
         .with(Size(explosion_size), size)
-        .with(TimeLeft(2.0), time)
-        .with(Image::Star, image)
+        .with(TimeLeft(1.0), time)
         .with(NoCollide, nocollide)
+        .with(Explosion, explosion)
         .marked(markers, allocator)
         .build()
+}
+
+pub struct StepExplosion;
+
+impl<'a> System<'a> for StepExplosion {
+    type SystemData = (
+        Entities<'a>,
+        ReadStorage<'a, TimeLeft>,
+        ReadStorage<'a, Explosion>,
+        WriteStorage<'a, Image>,
+    );
+
+    fn run(&mut self, (entities, time, explosion, mut image): Self::SystemData) {
+        for (entity, _) in (&entities, &explosion).join() {
+            let time = time.get(entity).unwrap().0;
+
+            let percentage = time / 1.0;
+
+            let im = if percentage > 2.0 / 3.0 {
+                Image::Explosion1
+            } else if percentage > 1.0 / 3.0 {
+                Image::Explosion2
+            } else {
+                Image::Explosion3
+            };
+
+            image.insert(entity, im).unwrap();
+        }
+    }
 }

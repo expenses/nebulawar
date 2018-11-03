@@ -331,25 +331,25 @@ impl<'a> System<'a> for RenderBillboards<'a> {
     );
 
     fn run(&mut self, (camera, pos, size, image): Self::SystemData) {
+        let cam_pos = camera.position();
         let rotation = look_at(-camera.direction());
 
-        let len = (&pos, &size, &image).join().count() * 6;
+        let mut billboards: Vec<_> = (&pos, &size, &image).join().collect();
+        billboards.sort_unstable_by(|a, b| cmp_floats(-a.0.distance2(cam_pos), -b.0.distance2(cam_pos)));
 
-        let iterator = (&pos, &size, &image).join()
+        let iterator = billboards.iter()
             .flat_map(|(pos, size, image)| {
                 iter_owned(BILLBOARD_VERTICES).map(move |v| (v, pos.0, size.0, image))
             })
             .map(|(mut v, pos, size, image)| {
                 let mut p: Vector3<f32> = v.position.into();
-                p *= size;
-                p = rotation * p;
-                p += pos;
+                p = (rotation * p) * size + pos;
                 v.position = p.into();
                 v.texture = image.translate(v.texture);
                 v
             });
 
-        self.0.render_smoke(iterator, len);
+        self.0.render_billboards(iterator, billboards.len() * 6);
     }
 }
 
@@ -366,15 +366,15 @@ impl<'a> System<'a> for FlushUI<'a> {
     }
 }
 
-pub struct FlushSmoke<'a>(pub &'a mut Context);
+pub struct FlushBillboards<'a>(pub &'a mut Context);
 
-impl<'a> System<'a> for FlushSmoke<'a> {
+impl<'a> System<'a> for FlushBillboards<'a> {
     type SystemData = (
         Read<'a, Camera>,
         Read<'a, StarSystem>
     );
 
     fn run(&mut self, (camera, system): Self::SystemData) {
-        self.0.flush_smoke(&system, &camera);
+        self.0.flush_billboards(&system, &camera);
     }
 }

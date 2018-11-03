@@ -19,15 +19,28 @@ fn main() {
         .. Default::default()
     });
 
-    packer.pack_own("star".to_string(), load_image("resources/star.png"));
-    packer.pack_own("smoke".to_string(), load_image("resources/smoke.png"));
-    packer.pack_own("mine".to_string(), load_image("resources/mine.png"));
-    packer.pack_own("move".to_string(), load_image("resources/move.png"));
-    packer.pack_own("attack".to_string(), load_image("resources/attack.png"));
+    packer.pack_own("Star".to_string(), load_image("resources/star.png"));
+    packer.pack_own("Smoke".to_string(), load_image("resources/smoke.png"));
+    packer.pack_own("Mine".to_string(), load_image("resources/mine.png"));
+    packer.pack_own("Move".to_string(), load_image("resources/move.png"));
+    packer.pack_own("Attack".to_string(), load_image("resources/attack.png"));
+    packer.pack_own("Explosion1".to_string(), load_image("resources/explosion/1.png"));
+    packer.pack_own("Explosion2".to_string(), load_image("resources/explosion/2.png"));
+    packer.pack_own("Explosion3".to_string(), load_image("resources/explosion/3.png"));
 
     let mut scope = Scope::new();
 
     {
+        {
+            let image_enum = scope.new_enum("Image")
+                .derive("Copy, Clone, Component, Serialize, Deserialize, PartialEq")
+                .vis("pub");
+
+            for (name, _) in packer.get_frames() {
+                image_enum.push_variant(Variant::new(name));
+            }
+        }
+
         let impl_block = scope.new_impl("Image");    
 
         let mut offset_match_block = Block::new("match self");
@@ -39,25 +52,37 @@ fn main() {
             let height = packer.height() as f32;
 
             dimensions_match_block.line(&format!(
-                "Image::{} => Vector2::new({:?}, {:?}),",
-                capitalize(name), frame.frame.w as f32 / width, frame.frame.h as f32 / height
+                "Image::{} => ({:?}, {:?}),",
+                name, frame.frame.w as f32 / width, frame.frame.h as f32 / height
             ));
 
             offset_match_block.line(&format!(
-                "Image::{} => Vector2::new({:?}, {:?}),",
-                capitalize(name), frame.frame.x as f32 / width, frame.frame.y as f32 / height
+                "Image::{} => ({:?}, {:?}),",
+                name, frame.frame.x as f32 / width, frame.frame.y as f32 / height
             ));
         }
 
         impl_block.new_fn("dimensions")
             .arg_self()
-            .ret("Vector2<f32>")
+            .ret("(f32, f32)")
             .push_block(dimensions_match_block);
 
         impl_block.new_fn("offset")
             .arg_self()
-            .ret("Vector2<f32>")
+            .ret("(f32, f32)")
             .push_block(offset_match_block);
+
+        impl_block.new_fn("translate")
+            .arg_self()
+            .vis("pub")
+            .arg("uv", "[f32; 2]")
+            .ret("[f32; 2]")
+            .line("let (offset_x, offset_y) = self.offset();")
+            .line("let (dim_x, dim_y) = self.dimensions();")
+            .line("[
+                offset_x + uv[0] * dim_x,
+                1.0 - (offset_y + uv[1] * dim_y)
+            ]");
     }
 
     let out_dir = std::env::var("OUT_DIR").unwrap();
@@ -72,8 +97,4 @@ fn main() {
     let exporter = ImageExporter::export(&packer).unwrap();
     let mut file = File::create("resources/output/packed.png").unwrap();
     exporter.write_to(&mut file, image::PNG).unwrap();
-}
-
-fn capitalize(string: &str) -> String {
-    string[0..1].to_uppercase() + &string[1..]
 }

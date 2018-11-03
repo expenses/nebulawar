@@ -119,6 +119,15 @@ impl Meshes {
         AABB::new(*bbox.mins() * size + pos, *bbox.maxs() * size + pos)
     }
 
+    fn get_mesh_at_size(&self, model: context::Model, size: f32) -> TriMesh<f32> {
+        let mut vertices = self.get_mesh(model).vertices().clone();
+        vertices.iter_mut().for_each(|vertex| *vertex *= size);
+
+        let indices = self.get_mesh(model).indices().clone();
+
+        TriMesh::new(vertices, indices, None)
+    }
+
     pub fn intersects(
         &self,
         model_a: context::Model, pos_a: Vector3<f32>, rot_a: Quaternion<f32>, size_a: f32,
@@ -128,7 +137,16 @@ impl Meshes {
         let bb_a = self.get_bbox(model_a, pos_a, rot_a, size_a);
         let bb_b = self.get_bbox(model_b, pos_b, rot_b, size_b);
 
-        bb_a.intersects(&bb_b)
+        if !bb_a.intersects(&bb_b) {
+            return false;
+        }
+
+        ncollide3d::query::distance(
+            &make_iso(pos_a, rot_a),
+            &self.get_mesh_at_size(model_a, size_a),
+            &make_iso(pos_b, rot_b),
+            &self.get_mesh_at_size(model_b, size_b)
+        ) == 0.0
     }
 }
 

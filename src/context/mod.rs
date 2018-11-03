@@ -216,15 +216,9 @@ impl Context {
         self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
     }
 
-    pub fn flush_smoke(&mut self, system: &StarSystem, camera: &Camera) {
+    pub fn flush_billboards(&mut self, system: &StarSystem, camera: &Camera) {
         let uniforms = self.uniforms(Matrix4::identity(), camera, system, &self.resources.image, Mode::Shadeless);
-        let params = DrawParameters {
-            depth: Depth {
-                test: DepthTest::IfLess,
-                .. Default::default()
-            },
-            .. Self::draw_params()
-        };
+        let params = Self::draw_params();
 
         let buffer = VertexBuffer::new(&self.display, &self.smoke_buffer).unwrap();
 
@@ -239,7 +233,7 @@ impl Context {
         self.smoke_buffer.clear();
     }
 
-    pub fn render_smoke<I: Iterator<Item=Vertex>>(&mut self, iterator: I, len: usize) {
+    pub fn render_billboards<I: Iterator<Item=Vertex>>(&mut self, iterator: I, len: usize) {
         if len > self.smoke_buffer.len() {
             let difference = len - self.smoke_buffer.len();
             self.smoke_buffer.reserve(difference);
@@ -267,6 +261,7 @@ impl Context {
             perspective: matrix_to_array(self.perspective_matrix()),
             light_direction: vector_to_array(system.light),
             tex: Sampler::new(texture).minify_filter(MinifySamplerFilter::Nearest).magnify_filter(MagnifySamplerFilter::Nearest),
+            ambient_colour: system.ambient_colour,
             mode: mode as i32
         }
     }

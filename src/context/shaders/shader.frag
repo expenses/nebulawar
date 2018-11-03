@@ -6,6 +6,7 @@ in vec3 o_normal;
 
 out vec4 colour;
 uniform vec3 light_direction;
+uniform vec3 ambient_colour;
 uniform sampler2D tex;
 uniform int mode;
 
@@ -18,7 +19,9 @@ const int SHADELESS = 2;
 const int WHITE = 3;
 const int VERTEX_COLOURED = 4;
 
-const float MIN_LIGHT = 0.1;
+const float AMBIENT_STRENGTH = 1.0;
+const vec3 LIGHT_COLOUR = vec3(1.0, 1.0, 1.0);
+const float MIN_DIFFUSE = 0.1;
 
 void main() {
     vec4 texture_colour = texture(tex, v_texture);
@@ -30,12 +33,17 @@ void main() {
     } else if (mode == WHITE) {
         colour = vec4(vec3(1.0), v_texture.x);
     } else {
+        // Ambient
+        vec3 ambient = ambient_colour * AMBIENT_STRENGTH; 
+
+        // Diffuse
+        vec3 norm = normalize(v_normal);
         vec3 light_dir = normalize(light_direction);  
 
-        float brightness = dot(normalize(v_normal), normalize(light_dir));
-        
-        float norm_brightness = mix(MIN_LIGHT, 1.0, max(brightness, 0.0));
+        float diff = max(dot(norm, light_dir), MIN_DIFFUSE);
+        vec3 diffuse = diff * LIGHT_COLOUR;
 
-        colour = vec4(norm_brightness * texture_colour.rgb, texture_colour.a);
+        vec3 result = (ambient + diffuse) * texture_colour.rgb;
+        colour = vec4(result, 1.0);
     }
 }

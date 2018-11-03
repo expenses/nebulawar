@@ -35,7 +35,8 @@ pub struct StarSystem {
     pub location: Vector2<f32>,
     pub stars: Vec<context::Vertex>,
     pub light: Vector3<f32>,
-    pub background: Vec<context::Vertex>
+    pub background: Vec<context::Vertex>,
+    pub ambient_colour: [f32; 3]
 }
 
 impl StarSystem {
@@ -64,10 +65,10 @@ impl StarSystem {
             add_asteroid(rng, world);
         }
 
+        let (background, ambient_colour) = make_background(rng);
+
         Self {
-            light,
-            background: make_background(rng),
-            stars, location
+            light, background, stars, location, ambient_colour
         }
     }
 }
@@ -78,13 +79,14 @@ impl Default for StarSystem {
             location: Vector2::zero(),
             stars: Vec::new(),
             light: Vector3::zero(),
-            background: Vec::new()
+            background: Vec::new(),
+            ambient_colour: [0.0; 3]
         }
     }
 }
 
 // https://www.redblobgames.com/x/1842-delaunay-voronoi-sphere/#delaunay
-fn make_background(rng: &mut ThreadRng) -> Vec<context::Vertex> {
+fn make_background(rng: &mut ThreadRng) -> (Vec<context::Vertex>, [f32; 3]) {
     let nebula_colour = Colour::new(rng.gen_range(0.0, 360.0), 1.0, rng.gen_range(0.5, 1.0), 1.0).from_hsv();
     let nebula_colour = Vector3::new(nebula_colour.red as f32, nebula_colour.green as f32, nebula_colour.blue as f32);
     let colour_mod = rng.gen_range(-0.5, 1.0);
@@ -107,7 +109,7 @@ fn make_background(rng: &mut ThreadRng) -> Vec<context::Vertex> {
         // make a triangle to the target point
         .flat_map(|edge| iter_owned([target_point, *edge.to(), *edge.from()]));
 
-    let vertices = dlt.triangles()
+    let vertices: Vec<_> = dlt.triangles()
         // flat map to vertices
         .flat_map(|face| iter_owned(face.as_triangle()))
         .map(|vertex| *vertex)
@@ -123,7 +125,9 @@ fn make_background(rng: &mut ThreadRng) -> Vec<context::Vertex> {
         // collect into vec
         .collect();
 
-    vertices
+    let ambient = avg(vertices.iter().map(|vertex| vertex.normal.into()));
+
+    (vertices, ambient.unwrap().into())
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]

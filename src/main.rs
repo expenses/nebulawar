@@ -71,10 +71,6 @@ struct Game {
 
 impl Game {
     fn new(mut world: World, events_loop: &EventsLoop) -> Self {
-        
-
-        add_starting_entities(&mut world);
-
         let builder = DispatcherBuilder::new()
             .with(EventHandlerSystem, "events", &[])
             .with(SeekSystem, "seek", &[])
@@ -117,6 +113,8 @@ impl Game {
             
             .with(DestroyShips, "destroy_ships", &["kamikaze"])
 
+            .with(StepExplosion, "step_explosion", &["destroy_ships"])
+
             .with(UpdateControlsSystem, "update_controls", &["left_click", "right_click", "middle_click", "drag"]);
 
         info!("Dispatcher graph:\n{:?}", builder);
@@ -147,7 +145,7 @@ impl Game {
         RenderSystem        (&mut self.context).run_now(&self.world.res);
         ObjectRenderer      (&mut self.context).run_now(&self.world.res); 
         RenderBillboards    (&mut self.context).run_now(&self.world.res);
-        FlushSmoke          (&mut self.context).run_now(&self.world.res); 
+        FlushBillboards     (&mut self.context).run_now(&self.world.res); 
         RenderDebug         (&mut self.context).run_now(&self.world.res);
         RenderSelected      (&mut self.context).run_now(&self.world.res);
         RenderMovementPlane (&mut self.context).run_now(&self.world.res);
@@ -250,6 +248,7 @@ fn create_world() -> World {
     world.register::<Health>();
     world.register::<NoCollide>();
     world.register::<ExplosionSize>();
+    world.register::<Explosion>();
 
     // Temp generated stuff
     
@@ -275,6 +274,8 @@ fn create_world() -> World {
     use cgmath::Vector2;
     let system = StarSystem::new(Vector2::new(rng.gen_range(-1.0, 1.0), rng.gen_range(-1.0, 1.0)), &mut rng, &mut world);
     world.add_resource(system);
+
+    add_starting_entities(&mut world, &mut rng);
 
     world
 }

@@ -11,7 +11,6 @@ use glium::texture::*;
 use std::io;
 use failure;
 use specs::*;
-use cgmath::Vector2;
 use arrayvec::*;
 use ncollide3d::shape::TriMesh;
 use nalgebra::Point3;
@@ -91,23 +90,6 @@ pub fn load_wavefront(data: &[u8]) ->  Vec<Vertex> {
             }
         })
         .collect()
-}
-
-#[derive(Copy, Clone, Component, Serialize, Deserialize, PartialEq)]
-pub enum Image {
-    Star,
-    Smoke,
-    Move,
-    Mine,
-    Attack
-}
-
-impl Image {
-    pub fn translate(self, uv: [f32; 2]) -> [f32; 2] {
-        let mut uv: Vector2<f32> = uv.into();
-        uv = Vector2::new(uv.x * self.dimensions().x, uv.y * self.dimensions().y);
-        (self.offset() + uv).into()
-    }
 }
 
 include!(concat!(env!("OUT_DIR"), "/packed_textures.rs"));

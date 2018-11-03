@@ -71,9 +71,8 @@ pub struct ObjectSpin {
 
 impl ObjectSpin {
     pub fn random(rng: &mut ThreadRng) -> Self {
-        let initial = uniform_sphere_distribution(rng);
-
         use cgmath::Rotation;
+        let initial = uniform_sphere_distribution(rng);
 
         Self {
             initial_rotation: Quaternion::between_vectors(UP, initial),
@@ -230,3 +229,7 @@ pub struct NoCollide;
 
 #[derive(Component, ConvertSaveload)]
 pub struct ExplosionSize(pub f32);
+
+#[derive(Component, Default, Serialize, Deserialize, Clone)]
+#[storage(NullStorage)]
+pub struct Explosion;

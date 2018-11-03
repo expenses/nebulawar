@@ -1,12 +1,13 @@
 use components::*;
 use specs::{World, Builder, Entity};
 use ships::*;
-use cgmath::{Vector3, Quaternion, Zero};
+use cgmath::{Vector3, Quaternion, Zero, Rotation};
 use rand::*;
 use context::*;
 use specs::saveload::*;
+use util::*;
 
-pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, side: Side) -> Entity {
+pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, rotation: Quaternion<f32>, side: Side) -> Entity {
     let components = tag.default_components(0);
 
     let mut entity = world.create_entity()
@@ -16,7 +17,7 @@ pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, sid
         .with(MaxSpeed(components.thrust() / tag.mass()))
         .with(Health(tag.mass()))
         .with(tag)
-        .with(Rotation(Quaternion::zero()))
+        .with(Rotation(rotation))
         .with(Commands(Vec::new()))
         // todo: make materials optional
         .with(Materials(StoredResource::empty(500.0)))
@@ -69,8 +70,8 @@ pub fn add_asteroid(rng: &mut ThreadRng, world: &mut World) {
         .build();
 }
 
-pub fn add_starting_entities(world: &mut World) {
-    let carrier = create_ship(world, ShipType::Carrier, Vector3::new(0.0, 0.0, 1.0), Side::Friendly);
+pub fn add_starting_entities(world: &mut World, rng: &mut ThreadRng) {
+    let carrier = create_ship(world, ShipType::Carrier, Vector3::new(0.0, 0.0, 1.0), Quaternion::zero(), Side::Friendly);
 
     for _ in 0 .. 45 {
         create_person(carrier, world, Occupation::Worker);
@@ -88,7 +89,7 @@ pub fn add_starting_entities(world: &mut World) {
         create_person(carrier, world, Occupation::Government);
     }
 
-    let tanker = create_ship(world, ShipType::Tanker, Vector3::new(0.0, 0.0, -20.0), Side::Friendly);
+    let tanker = create_ship(world, ShipType::Tanker, Vector3::new(0.0, 0.0, -20.0), Quaternion::zero(), Side::Friendly);
 
     for _ in 0 .. 10 {
         create_person(tanker, world, Occupation::Worker);
@@ -96,13 +97,13 @@ pub fn add_starting_entities(world: &mut World) {
     
     for i in 0 .. 50 {
         let x = (50.0 - i as f32) * 3.0;
-        let fighter = create_ship(world, ShipType::Fighter, Vector3::new(x, 5.0, 0.0), Side::Friendly);
+        let fighter = create_ship(world, ShipType::Fighter, Vector3::new(x, 5.0, 0.0), Quaternion::zero(), Side::Friendly);
         create_person(fighter, world, Occupation::Pilot);
     }
 
     for i in 0 .. 2 {
-        create_ship(world, ShipType::Miner, Vector3::new(0.0, 2.5 - i as f32 * 15.0, 30.0), Side::Friendly);
+        create_ship(world, ShipType::Miner, Vector3::new(0.0, 2.5 - i as f32 * 15.0, 30.0), Quaternion::zero(), Side::Friendly);
     }
 
-    create_ship(world, ShipType::Carrier, Vector3::new(100.0, 0.0, 100.0), Side::Enemy);
+    create_ship(world, ShipType::Carrier, Vector3::new(100.0, 0.0, 100.0), Quaternion::between_vectors(UP, uniform_sphere_distribution(rng)), Side::Enemy);
 }
