@@ -10,10 +10,6 @@ uniform vec3 ambient_colour;
 uniform sampler2D tex;
 uniform int mode;
 
-float map(float min, float max, float value) {
-    return value * (max - min) + min;
-}
-
 const int NORMAL = 1;
 const int SHADELESS = 2;
 const int WHITE = 3;

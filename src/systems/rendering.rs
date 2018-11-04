@@ -334,8 +334,11 @@ impl<'a> System<'a> for RenderBillboards<'a> {
         let cam_pos = camera.position();
         let rotation = look_at(-camera.direction());
 
+        //let pred = |point: &Position| (rotation * (cam_pos - point.0)).z;
+        let pred = |point: &Position| -point.distance2(cam_pos);
+
         let mut billboards: Vec<_> = (&pos, &size, &image).join().collect();
-        billboards.sort_unstable_by(|a, b| cmp_floats(-a.0.distance2(cam_pos), -b.0.distance2(cam_pos)));
+        billboards.sort_unstable_by(|a, b| cmp_floats(pred(a.0), pred(b.0)));
 
         let iterator = billboards.iter()
             .flat_map(|(pos, size, image)| {
