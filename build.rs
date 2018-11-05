@@ -27,6 +27,9 @@ fn main() {
     packer.pack_own("Explosion1".to_string(), load_image("resources/explosion/1.png"));
     packer.pack_own("Explosion2".to_string(), load_image("resources/explosion/2.png"));
     packer.pack_own("Explosion3".to_string(), load_image("resources/explosion/3.png"));
+    packer.pack_own("Explosion4".to_string(), load_image("resources/explosion/4.png"));
+    packer.pack_own("Explosion5".to_string(), load_image("resources/explosion/5.png"));
+    packer.pack_own("Explosion6".to_string(), load_image("resources/explosion/6.png"));
 
     let mut scope = Scope::new();
 

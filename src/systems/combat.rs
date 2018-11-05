@@ -260,12 +260,18 @@ impl<'a> System<'a> for StepExplosion {
 
             let percentage = time / 1.0;
 
-            let im = if percentage > 2.0 / 3.0 {
+            let im = if percentage > 5.0 / 6.0 {
                 Image::Explosion1
-            } else if percentage > 1.0 / 3.0 {
+            } else if percentage > 4.0 / 6.0 {
                 Image::Explosion2
-            } else {
+            } else if percentage > 3.0 / 6.0 {
                 Image::Explosion3
+            } else if percentage > 2.0 / 6.0 {
+                Image::Explosion4
+            } else if percentage > 1.0 / 6.0 {
+                Image::Explosion5
+            } else {
+                Image::Explosion6
             };
 
             image.insert(entity, im).unwrap();
