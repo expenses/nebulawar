@@ -18,7 +18,8 @@ use {
     camera::*,
     *,
     runic,
-    pedot::*
+    pedot::*,
+    std::f32::consts::PI
 };
 
 // ** Line Rendering Woes **
@@ -284,12 +285,28 @@ impl Context {
         self.text_buffer.extend(iterator);
     }
 
-    pub fn render_rect(&mut self, top_left: (f32, f32), bottom_right: (f32, f32)) {
-        self.lines.render_rect(top_left, bottom_right);
+    pub fn render_circle(&mut self, position: Vector3<f32>, size: f32, colour: [f32; 3], camera: &Camera) {
+        let points = 20;
+
+        let rotation = look_at(-camera.direction());
+
+        let iterator = (0 .. points)
+            .chain(iter_owned([0]))
+            .map(|point| {
+                let percentage = point as f32 / PI;
+
+                position + rotation * Vector3::new(
+                    percentage.sin() * size,
+                    percentage.cos() * size,
+                    0.0
+                )
+            });
+
+        self.render_3d_lines(iterator, colour);
     }
 
-    pub fn render_circle(&mut self, x: f32, y: f32, radius: f32, colour: [f32; 4]) {
-        self.lines.render_circle(x, y, radius, colour);
+    pub fn render_rect(&mut self, top_left: (f32, f32), bottom_right: (f32, f32)) {
+        self.lines.render_rect(top_left, bottom_right);
     }
 
     pub fn screen_dimensions(&self) -> (f32, f32) {

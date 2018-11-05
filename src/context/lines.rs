@@ -114,16 +114,7 @@ impl LineRenderer {
             &mut BuffersBuilder::new(&mut self.vertex_buffers, Constructor::new([1.0; 4]))
         );
     }
-
-    pub fn render_circle(&mut self, x: f32, y: f32, radius: f32, colour: [f32; 4]) {        
-        stroke_circle(
-            point(x, y),
-            radius,
-            &self.stroke_options,
-            &mut BuffersBuilder::new(&mut self.vertex_buffers, Constructor::new(colour))
-        );
-    }
-
+    
     pub fn render_image(&self, image: Image, x: f32, y: f32, width: f32, height: f32, overlay: [f32; 4], target: &mut Frame, display: &Display, resources: &Resources) {
         let dimensions = display.gl_window().get_inner_size().unwrap();
 

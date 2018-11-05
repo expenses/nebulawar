@@ -204,11 +204,6 @@ fn main() {
     }
 }
 
-// todo: redo circle drawing
-fn circle_size(z: f32) -> f32 {
-    FAR / 2.0 * (1.0 - z)
-}
-
 fn create_world() -> World {
     let mut world = World::new();
     

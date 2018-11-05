@@ -2,7 +2,6 @@ use util::*;
 use specs::*;
 use components;
 use context::*;
-use circle_size;
 use super::*;
 use cgmath::Matrix4;
 
@@ -31,20 +30,17 @@ impl<'a> System<'a> for RenderSelected<'a> {
     type SystemData = (
         Entities<'a>,
         Read<'a, Camera>,
-        Read<'a, ScreenDimensions>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Selectable>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, Side>
     );
 
-    fn run(&mut self, (entities, camera, screen_dims, pos, selectable, size, side): Self::SystemData) {
+    fn run(&mut self, (entities, camera, pos, selectable, size, side): Self::SystemData) {
         for (entity, pos, selectable, side) in (&entities, &pos, &selectable, &side).join() {
             if selectable.selected {
-                if let Some((x, y, z)) = camera.screen_position(pos.0, screen_dims.0) {
-                    let size = size.get(entity).map(|size| size.0).unwrap_or(1.0);
-                    self.0.render_circle(x, y, circle_size(z) * size, side.colour());
-                }
+                let size = size.get(entity).map(|size| size.0).unwrap_or(1.0);
+                self.0.render_circle(pos.0, size, side.colour(), &camera);
             }
         }
     }
@@ -173,7 +169,6 @@ impl<'a> System<'a> for RenderDebug<'a> {
         Read<'a, Camera>,
         Read<'a, EntityUnderMouse>,
         Read<'a, Debug>,
-        Read<'a, ScreenDimensions>,
         Read<'a, Meshes>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, components::Rotation>,
@@ -185,15 +180,13 @@ impl<'a> System<'a> for RenderDebug<'a> {
         ReadStorage<'a, FrictionForce>
     );
 
-    fn run(&mut self, (entities, camera, entity, debug, screen_dims, meshes, pos, rot, size, model, vel, seek, avoid, friction): Self::SystemData) {
+    fn run(&mut self, (entities, camera, entity, debug, meshes, pos, rot, size, model, vel, seek, avoid, friction): Self::SystemData) {
         if !debug.0 {
             return;
         }
 
         if let Some((_, point)) = entity.0 {
-            if let Some((x, y, _)) = camera.screen_position(point, screen_dims.0) {
-                self.0.render_circle(x, y, 10.0, [1.0; 4]);
-            }
+            self.0.render_circle(point, 10.0, [1.0; 3], &camera);
         }
 
         let scale = 1000.0;
