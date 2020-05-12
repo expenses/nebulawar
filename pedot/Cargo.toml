@@ -1,0 +1,8 @@
+[package]
+name = "pedot"
+version = "0.1.0"
+authors = ["Ashley <expenses@airmail.cc>"]
+
+[dependencies]
+glium = "*"
+derive_is_enum_variant = "*"

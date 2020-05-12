@@ -6,57 +6,55 @@ description = "A game"
 
 [dependencies]
 # OpenGL
-glium = "*"
+glium = "0.27.0"
 # model/uv loading
-obj = {version = "*", features = ["genmesh"]}
-genmesh = "*"
+obj = { version = "0.10.0", features = ["genmesh"] }
+genmesh = "0.6.2"
 # image loading (we only need pngs)
-image = {version = "*", default-features = false, features = ["png_codec"]}
+image = { version = "0.23.4", default-features = false, features = ["png"] }
 # Useful wrapper around arrays
-arrayvec = "*"
+arrayvec = "0.5.1"
 # Easier matrices stuff
-cgmath = "*"
+cgmath = "0.17.0"
 # collision detection extension for cgmath
-collision = {git = "https://github.com/expenses/collision-rs", branch = "public-simplex-processors"}
+#collision = {git = "https://github.com/expenses/collision-rs", branch = "public-simplex-processors"}
+collision = "0.20.1"
 # 2d ui rendering (circles etc)
-lyon = "*"
+lyon = "0.15.8"
 # text rendering (waiting on: me being lazy)
-runic = {git = "https://github.com/expenses/runic"}
+runic = { path = "runic" }
 # lazy derive
-derive_is_enum_variant = "*"
+derive_is_enum_variant = "0.1.1"
 # Randomness
-rand = "0.5"
+rand = "0.7.3"
 # Serialization
-serde = "*"
-serde_derive = "*"
-bincode = "*"
+serde = "1.0.110"
+serde_derive = "1.0.110"
+bincode = "1.2.1"
 # UI (waiting on: me adding features)
-pedot = {git = "https://github.com/expenses/pedot"}
+pedot = { path = "pedot" }
 # error handling
-failure = "*"
+failure = "0.1.8"
 # logging (dont need extra stuff)
-env_logger = {version = "*", default-features = false}
-log = "*"
+env_logger = { version = "0.7.1", default-features = false }
+log = "0.4.8"
 # 'retain_mut'
-odds = {version = "*", features = ["std-vec"]}
+odds = { version = "0.4.0", features = ["std-vec"] }
 # ECS (waiting on: saveload stuff)
 specs = {git = "https://github.com/expenses/specs", features = ["serde"], branch = "better_entity_serialization_errors"}
 specs-derive = {git = "https://github.com/expenses/specs", branch = "better_entity_serialization_errors"}
 
 # Triangulation
-spade = "*"
+spade = "1.8.2"
 # Noise (waiting on: image being optional)
 noise = {git = "https://github.com/Razaekel/noise-rs", branch = "develop", default-features = false}
 # easier newtype structs (waiting on: deref mut)
 newtype-proxy = {git = "https://github.com/expenses/newtype-proxy", branch = "deref_mut"}
 # HSV
-tint = "*"
+tint = "1.0.1"
 
-# Incase I need to debug an uninitialized component
-shred = {version = "*", features = ["nightly"], optional = true}
-
-nalgebra = "*"
-ncollide3d = "*"
+nalgebra = "0.21.0"
+ncollide3d = "0.23.0"
 
 [features]
 default = ['embed_resources']
@@ -69,6 +67,6 @@ identifier = "io.github.expenses.fleet_commander"
 icon = ["resources/ui/mine.png"]
 
 [build-dependencies]
-texture_packer = "*"
-image = {version = "*", default-features = false, features = ["png_codec"]}
+texture_packer = "0.21.1"
+image = { version = "0.23.4", default-features = false, features = ["png"] }
 codegen = { git = "https://github.com/carllerche/codegen" }

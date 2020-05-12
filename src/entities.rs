@@ -2,7 +2,7 @@ use components::*;
 use specs::{World, Builder, Entity};
 use ships::*;
 use cgmath::{Vector3, Quaternion, Zero, Rotation};
-use rand::*;
+use super::*;
 use context::*;
 use specs::saveload::*;
 use util::*;

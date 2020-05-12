@@ -5,6 +5,7 @@ use std::ops::*;
 use std::collections::*;
 use rand::*;
 use rand::distributions::*;
+use rand::rngs::*;
 use std::cmp::*;
 
 pub const BACKGROUND_DISTANCE: f32 = 10000.0;

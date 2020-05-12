@@ -39,7 +39,7 @@ pub struct RightClickOrder {
 pub struct AveragePosition(pub Option<Vector3<f32>>);
 
 #[derive(Component, Default, NewtypeProxy)]
-pub struct Events(pub Vec<WindowEvent>);
+pub struct Events(pub Vec<event::WindowEvent<'static>>);
 
 #[derive(Component, Default, Clone, Serialize, Deserialize)]
 pub struct MovementPlane(pub f32);

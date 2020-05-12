@@ -1,7 +1,7 @@
 use specs::{*, saveload::*, error::*};
 use cgmath::*;
 use util::*;
-use rand::ThreadRng;
+use rand::rngs::ThreadRng;
 use ships::*;
 use serde::*;
 

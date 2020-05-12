@@ -35,9 +35,10 @@ extern crate nalgebra;
 extern crate ncollide3d;
 
 use rand::*;
+use rand::rngs::*;
 use glium::*;
 use glutin::*;
-use glutin::dpi::*;
+use glutin::dpi::{LogicalSize};
 use std::time::*;
 use specs::{World, RunNow};
 use specs::shred::{Dispatcher, DispatcherBuilder};
@@ -70,7 +71,7 @@ struct Game {
 }
 
 impl Game {
-    fn new(mut world: World, events_loop: &EventsLoop) -> Self {
+    fn new(mut world: World, events_loop: &event_loop::EventLoop<()>) -> Self {
         let builder = DispatcherBuilder::new()
             .with(EventHandlerSystem, "events", &[])
             .with(SeekSystem, "seek", &[])
@@ -177,7 +178,7 @@ impl Game {
 fn main() {
     env_logger::init();
 
-    let mut events_loop = EventsLoop::new();
+    let mut events_loop = event_loop::EventLoop::new();
     
     let mut game = Game::new(create_world(), &events_loop);
 
@@ -185,11 +186,11 @@ fn main() {
 
     let mut closed = false;
     while !closed {
-        events_loop.poll_events(|event| if let glutin::Event::WindowEvent {event, ..} = event {
+        events_loop.poll_events(|event| if let glutin::event::Event::WindowEvent {event, ..} = event {
             game.context.copy_event(&event);
 
             match event {
-                glutin::WindowEvent::CloseRequested => closed = true,
+                glutin::event::WindowEvent::CloseRequested => closed = true,
                 event => game.world.write_resource::<Events>().push(event)
             }
         });

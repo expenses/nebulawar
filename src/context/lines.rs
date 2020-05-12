@@ -41,7 +41,7 @@ impl Constructor {
     }
 }
 
-impl VertexConstructor<FillVertex, Vertex2d> for Constructor {
+impl FillVertexConstructor<Vertex2d> for Constructor {
     fn new_vertex(&mut self, vertex: FillVertex) -> Vertex2d {
         Vertex2d {
             position: vertex.position.to_array(),
@@ -50,7 +50,7 @@ impl VertexConstructor<FillVertex, Vertex2d> for Constructor {
         }
     }
 }
-impl VertexConstructor<StrokeVertex, Vertex2d> for Constructor {
+impl StrokeVertexConstructor<Vertex2d> for Constructor {
     fn new_vertex(&mut self, vertex: StrokeVertex) -> Vertex2d {
         Vertex2d {
             position: vertex.position.to_array(),

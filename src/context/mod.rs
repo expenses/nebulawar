@@ -86,9 +86,9 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(events_loop: &EventsLoop) -> (Self, MeshArray) {
-        let window = glutin::WindowBuilder::new()
-            .with_dimensions(LogicalSize::new(DEFAULT_WIDTH.into(), DEFAULT_HEIGHT.into()))
+    pub fn new(events_loop: &event_loop::EventLoop<()>) -> (Self, MeshArray) {
+        let window = glutin::window::WindowBuilder::new()
+            .with_inner_size(LogicalSize::new(DEFAULT_WIDTH.into(), DEFAULT_HEIGHT.into()))
             .with_title("Fleet Commander");
         let context = glutin::ContextBuilder::new()
             .with_multisampling(16)
@@ -123,7 +123,7 @@ impl Context {
         )
     }
 
-    pub fn copy_event(&mut self, event: &WindowEvent) {
+    pub fn copy_event(&mut self, event: &event::WindowEvent) {
         self.gui.update(event);
     }
 

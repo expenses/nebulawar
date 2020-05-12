@@ -1,5 +1,8 @@
 use super::*;
-use glium::glutin::{WindowEvent, MouseScrollDelta, dpi::LogicalPosition, ElementState, MouseButton, VirtualKeyCode, KeyboardInput};
+use glium::glutin::{
+    event::{WindowEvent, ElementState, MouseButton, VirtualKeyCode, KeyboardInput, MouseScrollDelta},
+    dpi::LogicalPosition
+};
 use ncollide3d::query::RayCast;
 
 pub struct EventHandlerSystem;
