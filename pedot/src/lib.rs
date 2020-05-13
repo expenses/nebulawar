@@ -4,6 +4,7 @@ extern crate derive_is_enum_variant;
 
 use glium::*;
 use glutin::*;
+use glutin::event::*;
 use glutin::dpi::*;
 
 use std::ops::*;
@@ -52,11 +53,11 @@ impl Gui {
 
     pub fn update(&mut self, event: &WindowEvent) {
         match *event {
-            WindowEvent::Resized(LogicalSize {width, height}) => {
+            WindowEvent::Resized(PhysicalSize {width, height}) => {
                 self.screen_width = width as f32;
                 self.screen_height = height as f32;
             },
-            WindowEvent::CursorMoved {position: LogicalPosition {x, y}, ..} => {
+            WindowEvent::CursorMoved {position: PhysicalPosition {x, y}, ..} => {
                 self.mouse_x = x as f32;
                 self.mouse_y = y as f32;
             },

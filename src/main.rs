@@ -173,6 +173,10 @@ impl Game {
             self.print_error(&error);
         }
     }
+
+    fn request_redraw(&self) {
+        self.context.request_redraw();
+    }
 }
 
 fn main() {
@@ -184,25 +188,27 @@ fn main() {
 
     let mut time = Instant::now();
 
-    let mut closed = false;
-    while !closed {
-        events_loop.poll_events(|event| if let glutin::event::Event::WindowEvent {event, ..} = event {
+    events_loop.run(move |event, _, control_flow| match event {
+        glutin::event::Event::WindowEvent {event, ..} => {
             game.context.copy_event(&event);
 
             match event {
-                glutin::event::WindowEvent::CloseRequested => closed = true,
-                event => game.world.write_resource::<Events>().push(event)
+                glutin::event::WindowEvent::CloseRequested => *control_flow = glutin::event_loop::ControlFlow::Exit,
+                event => game.world.write_resource::<Events>().push(event.to_static().unwrap())
             }
-        });
-
-        let now = Instant::now();
+        },
+        glutin::event::Event::MainEventsCleared => {
+            let now = Instant::now();
         
-        let secs = now.duration_since(time).subsec_nanos() as f32 / 10.0_f32.powi(9);
-        time = now;
+            let secs = now.duration_since(time).subsec_nanos() as f32 / 10.0_f32.powi(9);
+            time = now;
 
-        game.update(secs);
-        game.render();
-    }
+            game.update(secs);
+            game.request_redraw();
+        },
+        glutin::event::Event::RedrawRequested(_) => game.render(),
+        _ => {}
+    });
 }
 
 fn create_world() -> World {

@@ -120,12 +120,7 @@ impl Meshes {
     }
 
     fn get_mesh_at_size(&self, model: context::Model, size: f32) -> TriMesh<f32> {
-        let mut vertices = self.get_mesh(model).vertices().clone();
-        vertices.iter_mut().for_each(|vertex| *vertex *= size);
-
-        let indices = self.get_mesh(model).indices().clone();
-
-        TriMesh::new(vertices, indices, None)
+        self.get_mesh(model).clone().scaled(&nalgebra::Vector3::new(size, size, size))
     }
 
     pub fn intersects(

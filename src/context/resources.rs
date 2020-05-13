@@ -60,7 +60,7 @@ macro_rules! load_resource {
 }
 
 pub fn load_image(display: &Display, data: &[u8]) -> SrgbTexture2d {
-    let image = image::load_from_memory_with_format(data, image::ImageFormat::PNG).unwrap().to_rgba();
+    let image = image::load_from_memory(data).unwrap().to_rgba();
     let image_dimensions = image.dimensions();
     let image = RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
     SrgbTexture2d::new(display, image).unwrap()
@@ -69,15 +69,15 @@ pub fn load_image(display: &Display, data: &[u8]) -> SrgbTexture2d {
 // Returns a vertex buffer that should be rendered as `TrianglesList`.
 pub fn load_wavefront(data: &[u8]) ->  Vec<Vertex> {
     let mut data = io::BufReader::new(data);
-    let data = Obj::load_buf(&mut data).unwrap();
+    let data = ObjData::load_buf(&mut data).unwrap();
 
-    let Obj {texture, normal, position, objects, ..} = data;
+    let ObjData {texture, normal, position, objects, ..} = data;
 
     objects.into_iter()
         .flat_map(|object| object.groups)
         .flat_map(|group| group.polys)
         .flat_map(|polygon| {
-            match polygon {
+            match polygon.into_genmesh() {
                 genmesh::Polygon::PolyTri(genmesh::Triangle { x: v1, y: v2, z: v3 }) => iter_owned([v1, v2, v3]),
                 genmesh::Polygon::PolyQuad(_) => unimplemented!("Quad polygons not supported, use triangles instead.")
             }

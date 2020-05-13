@@ -4,5 +4,5 @@ version = "0.1.0"
 authors = ["Ashley <expenses@airmail.cc>"]
 
 [dependencies]
-glium = "*"
-derive_is_enum_variant = "*"
+glium = "0.27.0"
+derive_is_enum_variant = "0.1.1"

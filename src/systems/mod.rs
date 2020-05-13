@@ -321,7 +321,7 @@ impl<'a> System<'a> for RightClickInteractionSystem {
             let iso = make_iso(Vector3::new(0.0, plane.0, 0.0), Quaternion::zero());
 
             order.command = Plane::new(Unit::new_normalize(vector_to_na_vector(UP)))
-                .toi_with_ray(&iso, &ray.0, true)
+                .toi_with_ray(&iso, &ray.0, 1000000.0, true)
                 .map(|toi| ray.0.origin + ray.0.dir * toi)
                 .map(|point| Command::MoveTo(Vector3::new(point.x, point.y, point.z)));
 

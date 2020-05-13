@@ -1,7 +1,7 @@
 use super::*;
 use glium::glutin::{
     event::{WindowEvent, ElementState, MouseButton, VirtualKeyCode, KeyboardInput, MouseScrollDelta},
-    dpi::LogicalPosition
+    dpi::{LogicalPosition, PhysicalPosition}
 };
 use ncollide3d::query::RayCast;
 
@@ -21,7 +21,7 @@ impl<'a> System<'a> for EventHandlerSystem {
 
     fn run(&mut self, (mut events, mut camera, mut plane, mut controls, mut paused, mut formation, mut debug, mut selectable): Self::SystemData) {
         events.drain(..).for_each(|event| match event {
-            WindowEvent::CursorMoved {position: LogicalPosition {x, y}, ..} => {
+            WindowEvent::CursorMoved {position: PhysicalPosition {x, y}, ..} => {
                 let (x, y) = (x as f32, y as f32);
                 let (mouse_x, mouse_y) = controls.mouse();
                 let (delta_x, delta_y) = (x - mouse_x, y - mouse_y);
@@ -135,7 +135,7 @@ impl<'a> System<'a> for EntityUnderMouseSystem {
                 let iso = make_iso(pos.0 / size.0, rot.0);
 
                 meshes.get_mesh(*model)
-                    .toi_with_ray(&iso, &ray, true)
+                    .toi_with_ray(&iso, &ray, 1000000.0, true)
                     .map(|f| {
                         let point = ray.origin + ray.dir * f;
                         (entity, Vector3::new(point.x, point.y, point.z) * size.0, f)

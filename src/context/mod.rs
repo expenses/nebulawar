@@ -88,7 +88,7 @@ pub struct Context {
 impl Context {
     pub fn new(events_loop: &event_loop::EventLoop<()>) -> (Self, MeshArray) {
         let window = glutin::window::WindowBuilder::new()
-            .with_inner_size(LogicalSize::new(DEFAULT_WIDTH.into(), DEFAULT_HEIGHT.into()))
+            .with_inner_size(LogicalSize::new(DEFAULT_WIDTH, DEFAULT_HEIGHT))
             .with_title("Fleet Commander");
         let context = glutin::ContextBuilder::new()
             .with_multisampling(16)
@@ -310,7 +310,7 @@ impl Context {
     }
 
     pub fn screen_dimensions(&self) -> (f32, f32) {
-        let dimensions = self.display.gl_window().get_inner_size().unwrap();
+        let dimensions = (**self.display.gl_window()).window().inner_size();
         (dimensions.width as f32, dimensions.height as f32)
     }
 
@@ -324,7 +324,7 @@ impl Context {
     }
 
     fn dpi(&self) -> f32 {
-        self.display.gl_window().get_hidpi_factor() as f32
+        (**self.display.gl_window()).window().scale_factor() as f32
     }
 
     fn draw_params() -> DrawParameters<'static> {
@@ -361,6 +361,10 @@ impl Context {
 
     pub fn render_image(&mut self, image: Image, x: f32, y: f32, width: f32, height: f32, overlay: [f32; 4]) {
         self.lines.render_image(image, x, y, width, height, overlay, &mut self.target, &self.display, &self.resources)
+    }
+
+    pub fn request_redraw(&self) {
+        (**self.display.gl_window()).window().request_redraw();
     }
 }
 

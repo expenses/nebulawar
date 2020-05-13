@@ -5,7 +5,6 @@ use lyon::tessellation::geometry_builder::*;
 use lyon::math::*;
 use lyon::lyon_tessellation::*;
 use lyon::lyon_tessellation::basic_shapes::*;
-use self::tessellation::{FillVertex, StrokeVertex};
 
 use super::*;
 
@@ -42,18 +41,18 @@ impl Constructor {
 }
 
 impl FillVertexConstructor<Vertex2d> for Constructor {
-    fn new_vertex(&mut self, vertex: FillVertex) -> Vertex2d {
+    fn new_vertex(&mut self, point: Point, _: FillAttributes) -> Vertex2d {
         Vertex2d {
-            position: vertex.position.to_array(),
+            position: point.to_array(),
             colour: self.colour,
             uv: [0.0; 2]
         }
     }
 }
 impl StrokeVertexConstructor<Vertex2d> for Constructor {
-    fn new_vertex(&mut self, vertex: StrokeVertex) -> Vertex2d {
+    fn new_vertex(&mut self, point: Point, _: StrokeAttributes) -> Vertex2d {
         Vertex2d {
-            position: vertex.position.to_array(),
+            position: point.to_array(),
             colour: self.colour,
             uv: [0.0; 2]
         }
@@ -80,7 +79,7 @@ impl LineRenderer {
     }
 
     pub fn flush(&mut self, target: &mut Frame, display: &Display) {
-        let dimensions = display.gl_window().get_inner_size().unwrap();
+        let dimensions = (**display.gl_window()).window().inner_size();
 
         let uniforms = uniform!{
             window_dimensions: [dimensions.width as f32, dimensions.height as f32],
@@ -116,7 +115,7 @@ impl LineRenderer {
     }
     
     pub fn render_image(&self, image: Image, x: f32, y: f32, width: f32, height: f32, overlay: [f32; 4], target: &mut Frame, display: &Display, resources: &Resources) {
-        let dimensions = display.gl_window().get_inner_size().unwrap();
+        let dimensions = (**display.gl_window()).window().inner_size();
 
         let uniforms = uniform!{
             window_dimensions: [dimensions.width as f32, dimensions.height as f32],
