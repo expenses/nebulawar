@@ -83,7 +83,6 @@ impl LineRenderer {
 
         let uniforms = uniform!{
             window_dimensions: [dimensions.width as f32, dimensions.height as f32],
-            draw_image: false
         };
 
         let draw_params = DrawParameters {
@@ -122,7 +121,6 @@ impl LineRenderer {
             image: Sampler::new(&resources.image)
                 .minify_filter(MinifySamplerFilter::Nearest)
                 .magnify_filter(MagnifySamplerFilter::Nearest),
-            draw_image: true
         };
 
         let draw_params = DrawParameters {

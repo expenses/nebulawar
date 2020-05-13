@@ -5,15 +5,9 @@ in vec2 v_uv;
 
 out vec4 colour;
 
-uniform bool draw_image;
 uniform sampler2D image;
 
 void main() {
-    if (draw_image) {
-        vec4 image_colour = texture(image, v_uv);
-
-        colour = mix(image_colour, vec4(v_colour.rgb, 1.0), v_colour.a);
-    } else {
-        colour = v_colour;
-    }
+    vec4 image_colour = texture(image, v_uv);
+    colour = mix(image_colour, vec4(v_colour.rgb, 1.0), v_colour.a);
 }

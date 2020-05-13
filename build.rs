@@ -55,24 +55,26 @@ fn main() {
             let height = packer.height() as f32;
 
             dimensions_match_block.line(&format!(
-                "Image::{} => ({:?}, {:?}),",
+                "Image::{} => [{:?}, {:?}],",
                 name, frame.frame.w as f32 / width, frame.frame.h as f32 / height
             ));
 
             offset_match_block.line(&format!(
-                "Image::{} => ({:?}, {:?}),",
+                "Image::{} => [{:?}, {:?}],",
                 name, frame.frame.x as f32 / width, frame.frame.y as f32 / height
             ));
         }
 
         impl_block.new_fn("dimensions")
             .arg_self()
-            .ret("(f32, f32)")
+            .vis("pub")
+            .ret("[f32; 2]")
             .push_block(dimensions_match_block);
 
         impl_block.new_fn("offset")
             .arg_self()
-            .ret("(f32, f32)")
+            .vis("pub")
+            .ret("[f32; 2]")
             .push_block(offset_match_block);
 
         impl_block.new_fn("translate")
@@ -80,11 +82,11 @@ fn main() {
             .vis("pub")
             .arg("uv", "[f32; 2]")
             .ret("[f32; 2]")
-            .line("let (offset_x, offset_y) = self.offset();")
-            .line("let (dim_x, dim_y) = self.dimensions();")
+            .line("let offset = self.offset();")
+            .line("let dim = self.dimensions();")
             .line("[
-                offset_x + uv[0] * dim_x,
-                1.0 - (offset_y + uv[1] * dim_y)
+                offset[0] + uv[0] * dim[0],
+                1.0 - (offset[1] + uv[1] * dim[1])
             ]");
     }
 

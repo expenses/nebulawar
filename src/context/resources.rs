@@ -94,7 +94,7 @@ pub fn load_wavefront(data: &[u8]) ->  Vec<Vertex> {
 
 include!(concat!(env!("OUT_DIR"), "/packed_textures.rs"));
 
-#[derive(Serialize, Deserialize, Component, Copy, Clone)]
+#[derive(Serialize, Deserialize, Component, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum Model {
     Fighter = 0,
     Tanker = 1,

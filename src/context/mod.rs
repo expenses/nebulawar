@@ -80,7 +80,7 @@ pub struct Context {
     text_buffer: Vec<runic::Vertex>,
     lines_3d_buffer: Vec<Vertex>,
     
-    smoke_buffer: Vec<Vertex>,
+    smoke_buffer: Vec<InstanceVertex>,
 
     pub gui: Gui
 }
@@ -133,7 +133,6 @@ impl Context {
 
     fn flush_3d_lines(&mut self, camera: &Camera, system: &StarSystem) {
         let uniforms = uniform!{
-            model: matrix_to_array(Matrix4::identity()),
             view: matrix_to_array(camera.view_matrix()),
             perspective: matrix_to_array(self.perspective_matrix()),
             light_direction: vector_to_array(system.light),
@@ -144,7 +143,10 @@ impl Context {
         let indices = NoIndices(PrimitiveType::LinesList);
 
         let params = Self::draw_params();
-        self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
+        let instances = [InstanceVertex::new(Matrix4::identity())];
+        let instance_buffer = VertexBuffer::new(&self.display, &instances).unwrap();
+
+        self.target.draw((&vertices, instance_buffer.per_instance().unwrap()), &indices, &self.program, &uniforms, &params).unwrap();
 
         self.lines_3d_buffer.clear();
     }
@@ -169,22 +171,12 @@ impl Context {
     }
 
     pub fn render_billboard(&mut self, matrix: Matrix4<f32>, image: Image, camera: &Camera, system: &StarSystem) {
-        let uniforms = self.uniforms(matrix, camera, system, &self.resources.image, Mode::Shadeless);
-        let params = Self::draw_params();
-
-        let mut vertices = BILLBOARD_VERTICES;
-
-        for mut vertex in vertices.iter_mut() {
-            vertex.texture = image.translate(vertex.texture);
-        }
-
-        self.target.draw(
-            &VertexBuffer::new(&self.display, &vertices).unwrap(),
-            &NoIndices(PrimitiveType::TrianglesList),
-            &self.program,
-            &uniforms,
-            &params
-        ).unwrap();
+        let vertex = InstanceVertex {
+            instance_pos: matrix.into(),
+            uv_dimensions: image.dimensions().into(),
+            uv_offset: image.offset().into()
+        };
+        self.smoke_buffer.push(vertex);
     }
 
     pub fn render_stars(&mut self, system: &StarSystem, camera: &Camera) {
@@ -199,7 +191,10 @@ impl Context {
             .. Self::draw_params()
         };
 
-        self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
+        let instances = [InstanceVertex::new(Matrix4::identity())];
+        let instance_buffer = VertexBuffer::new(&self.display, &instances).unwrap();
+
+        self.target.draw((&vertices, instance_buffer.per_instance().unwrap()), &indices, &self.program, &uniforms, &params).unwrap();
     }
 
     pub fn render_skybox(&mut self, system: &StarSystem, camera: &Camera, debug: bool) {
@@ -214,27 +209,24 @@ impl Context {
             params.polygon_mode = PolygonMode::Line;
         }
 
-        self.target.draw(&vertices, &indices, &self.program, &uniforms, &params).unwrap();
+        let instances = [InstanceVertex::new(Matrix4::identity())];
+        let instance_buffer = VertexBuffer::new(&self.display, &instances).unwrap();
+
+        self.target.draw((&vertices, instance_buffer.per_instance().unwrap()), &indices, &self.program, &uniforms, &params).unwrap();
     }
 
     pub fn flush_billboards(&mut self, system: &StarSystem, camera: &Camera) {
-        let uniforms = self.uniforms(Matrix4::identity(), camera, system, &self.resources.image, Mode::Shadeless);
+        let uniforms = self.uniforms(camera, system, &self.resources.image, Mode::Shadeless);
         let params = Self::draw_params();
 
         let buffer = VertexBuffer::new(&self.display, &self.smoke_buffer).unwrap();
-
-        self.target.draw(
-            &buffer,
-            &NoIndices(PrimitiveType::TrianglesList),
-            &self.program,
-            &uniforms,
-            &params
-        ).unwrap();
+        
+        self.target.draw((&VertexBuffer::new(&self.display, &BILLBOARD_VERTICES).unwrap(), buffer.per_instance().unwrap()), &NoIndices(PrimitiveType::TrianglesList), &self.program, &uniforms, &params).unwrap();
 
         self.smoke_buffer.clear();
     }
 
-    pub fn render_billboards<I: Iterator<Item=Vertex>>(&mut self, iterator: I, len: usize) {
+    pub fn render_billboards<I: Iterator<Item=InstanceVertex>>(&mut self, iterator: I, len: usize) {
         if len > self.smoke_buffer.len() {
             let difference = len - self.smoke_buffer.len();
             self.smoke_buffer.reserve(difference);
@@ -247,7 +239,6 @@ impl Context {
 
     pub fn background_uniforms<'a>(&self, camera: &Camera, system: &StarSystem, mode: Mode) -> impl Uniforms + 'a {
         uniform! {
-            model: matrix_to_array(Matrix4::identity()),
             view: matrix_to_array(camera.view_matrix_only_direction()),
             perspective: matrix_to_array(self.perspective_matrix()),
             light_direction: vector_to_array(system.light),
@@ -255,9 +246,8 @@ impl Context {
         }
     }
 
-    pub fn uniforms<'a>(&self, position: Matrix4<f32>, camera: &Camera, system: &StarSystem, texture: &'a SrgbTexture2d, mode: Mode) -> impl Uniforms + 'a {
+    pub fn uniforms<'a>(&self, camera: &Camera, system: &StarSystem, texture: &'a SrgbTexture2d, mode: Mode) -> impl Uniforms + 'a {
         uniform!{
-            model: matrix_to_array(position),
             view: matrix_to_array(camera.view_matrix()),
             perspective: matrix_to_array(self.perspective_matrix()),
             light_direction: vector_to_array(system.light),
@@ -267,17 +257,15 @@ impl Context {
         }
     }
 
-    pub fn render_model(&mut self, model: Model, location: Vector3<f32>, rotation: Quaternion<f32>, size: f32, camera: &Camera, system: &StarSystem) {
-        let scale = Matrix4::from_scale(size);
-        let rotation: Matrix4<f32> = rotation.into();
-        let position = Matrix4::from_translation(location) * rotation * scale;
-
+    pub fn render_model(&mut self, model: Model, info: &[InstanceVertex], camera: &Camera, system: &StarSystem) {
         let model = &self.resources.models[model as usize];
 
-        let uniforms = self.uniforms(position, camera, system, &model.texture, Mode::Normal);
+        let uniforms = self.uniforms(camera, system, &model.texture, Mode::Normal);
         let params = Self::draw_params();
 
-        self.target.draw(&model.vertices, &NoIndices(PrimitiveType::TrianglesList), &self.program, &uniforms, &params).unwrap();
+        let buffer = VertexBuffer::new(&self.display, &info).unwrap();
+        
+        self.target.draw((&model.vertices, buffer.per_instance().unwrap()), &NoIndices(PrimitiveType::TrianglesList), &self.program, &uniforms, &params).unwrap();
     }
 
     pub fn render_text(&mut self, text: &str, x: f32, y: f32) {
@@ -367,6 +355,26 @@ impl Context {
         (**self.display.gl_window()).window().request_redraw();
     }
 }
+
+#[derive(Clone, Copy, Debug)]
+pub struct InstanceVertex {
+    pub instance_pos: [[f32; 4]; 4],
+    pub uv_offset: [f32; 2],
+    pub uv_dimensions: [f32; 2]
+}
+
+impl InstanceVertex {
+    pub fn new(matrix: Matrix4<f32>) -> Self {
+        Self {
+            instance_pos: matrix.into(),
+            uv_offset: [0.0; 2],
+            uv_dimensions: [1.0; 2]
+        }
+    }
+}
+
+implement_vertex!(InstanceVertex, instance_pos, uv_offset, uv_dimensions);
+
 
 impl Drop for Context {
     fn drop(&mut self) {

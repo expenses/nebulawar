@@ -18,8 +18,19 @@ impl<'a> System<'a> for ObjectRenderer<'a> {
     );
 
     fn run(&mut self, (camera, system, pos, rot, size, model): Self::SystemData) {
+        let mut sorted = std::collections::HashMap::new();
+
         for (pos, rot, size, model) in (&pos, &rot, &size, &model).join() {
-            self.0.render_model(*model, pos.0, rot.0, size.0, &camera, &system);
+            sorted.entry(*model).or_insert_with(Vec::new).push({
+                let scale = Matrix4::from_scale(size.0);
+                let rotation: Matrix4<f32> = rot.0.into();
+                let position = Matrix4::from_translation(pos.0) * rotation * scale;
+                InstanceVertex::new(position)
+            });
+        }
+
+        for (model, instances) in sorted.iter() {
+            self.0.render_model(*model, instances, &camera, &system);
         }
     }
 }
@@ -334,18 +345,18 @@ impl<'a> System<'a> for RenderBillboards<'a> {
         billboards.sort_unstable_by(|a, b| cmp_floats(pred(a.0), pred(b.0)));
 
         let iterator = billboards.iter()
-            .flat_map(|(pos, size, image)| {
-                iter_owned(BILLBOARD_VERTICES).map(move |v| (v, pos.0, size.0, image))
-            })
-            .map(|(mut v, pos, size, image)| {
-                let mut p: Vector3<f32> = v.position.into();
-                p = (rotation * p) * size + pos;
-                v.position = p.into();
-                v.texture = image.translate(v.texture);
-                v
+            .map(|(pos, size, image)| {
+                let scale = Matrix4::from_scale(size.0);
+                let rotation: Matrix4<f32> = rotation.into();
+                let position = Matrix4::from_translation(pos.0) * rotation * scale;
+                InstanceVertex {
+                    instance_pos: position.into(),
+                    uv_offset: image.offset(),
+                    uv_dimensions: image.dimensions(),
+                }
             });
 
-        self.0.render_billboards(iterator, billboards.len() * 6);
+        self.0.render_billboards(iterator, billboards.len());
     }
 }
 
