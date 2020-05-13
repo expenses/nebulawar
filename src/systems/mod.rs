@@ -202,12 +202,6 @@ impl<'a> System<'a> for RightClickSystem {
     }
 }
 
-pub fn focus_on_selected(world: &mut World) {
-    world.exec(|mut selectable: WriteStorage<Selectable>| {
-        (&mut selectable).join().for_each(|selectable| selectable.camera_following = selectable.selected)
-    });
-}
-
 pub struct StepCameraSystem;
     
 impl<'a> System<'a> for StepCameraSystem {

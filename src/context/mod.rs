@@ -217,7 +217,8 @@ impl Context {
 
     pub fn flush_billboards(&mut self, system: &StarSystem, camera: &Camera) {
         let uniforms = self.uniforms(camera, system, &self.resources.image, Mode::Shadeless);
-        let params = Self::draw_params();
+        let mut params = Self::draw_params();
+        params.depth = Depth::default();
 
         let buffer = VertexBuffer::new(&self.display, &self.smoke_buffer).unwrap();
         

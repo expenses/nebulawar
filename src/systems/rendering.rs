@@ -231,7 +231,7 @@ impl<'a> System<'a> for RenderDebug<'a> {
             let max = na_point_to_vector(*bbox.maxs());
 
             for i in 0 .. 3 {
-                let mut start = min;
+                let start = min;
                 let mut end = start;
                 end[i] = max[i];
                 self.0.render_3d_line(start, end, WHITE);
@@ -339,7 +339,7 @@ impl<'a> System<'a> for RenderBillboards<'a> {
         let rotation = look_at(-camera.direction());
 
         //let pred = |point: &Position| (rotation * (cam_pos - point.0)).z;
-        let pred = |point: &Position| -point.distance2(cam_pos);
+        let pred = |point: &Position| point.distance2(cam_pos);
 
         let mut billboards: Vec<_> = (&pos, &size, &image).join().collect();
         billboards.sort_unstable_by(|a, b| cmp_floats(pred(a.0), pred(b.0)));

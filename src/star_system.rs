@@ -21,10 +21,10 @@ impl SystemType {
         let num = rng.gen_range(0, 100);
 
         match num {
-            0 ... 29 => SystemType::Asteroids,
-            30 ... 59 => SystemType::Planetoid,
-            60 ... 89 => SystemType::Nebula,
-            90 ... 100 => SystemType::BlackHole,
+            0 ..= 29 => SystemType::Asteroids,
+            30 ..= 59 => SystemType::Planetoid,
+            60 ..= 89 => SystemType::Nebula,
+            90 ..= 100 => SystemType::BlackHole,
             _ => unreachable!()
         }
     }

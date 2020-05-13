@@ -15,7 +15,7 @@ pub struct Camera {
 
 impl Camera {
     // the camera cannot go up to a latitude of a full half pi because they it starts to flip over, so go to 99%.
-    const MAX_VERTICALITY: f32 = FRAC_PI_2 * 0.99;
+    const MAX_VERTICALITY: f32 = FRAC_PI_2 - f32::EPSILON;
 
     const MIN_ZOOM: f32 = 2.0;
     const MAX_ZOOM: f32 = 100.0;

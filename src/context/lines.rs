@@ -110,7 +110,7 @@ impl LineRenderer {
             point(left, bottom),
             &self.stroke_options,
             &mut BuffersBuilder::new(&mut self.vertex_buffers, Constructor::new([1.0; 4]))
-        );
+        ).unwrap();
     }
     
     pub fn render_image(&self, image: Image, x: f32, y: f32, width: f32, height: f32, overlay: [f32; 4], target: &mut Frame, display: &Display, resources: &Resources) {
