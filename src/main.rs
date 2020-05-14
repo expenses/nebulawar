@@ -1,7 +1,6 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::type_complexity))]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
 
-extern crate glium;
 extern crate obj;
 extern crate genmesh;
 extern crate image;
@@ -9,7 +8,6 @@ extern crate arrayvec;
 extern crate cgmath;
 extern crate lyon;
 extern crate collision;
-extern crate runic;
 #[macro_use]
 extern crate derive_is_enum_variant;
 extern crate rand;
@@ -17,7 +15,6 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate bincode;
-extern crate pedot;
 extern crate failure;
 #[macro_use]
 extern crate log;
@@ -33,12 +30,16 @@ extern crate newtype_proxy;
 extern crate tint;
 extern crate nalgebra;
 extern crate ncollide3d;
+extern crate wgpu;
+extern crate winit;
+extern crate futures;
+extern crate zerocopy;
 
 use rand::*;
 use rand::rngs::*;
-use glium::*;
-use glutin::*;
-use glutin::dpi::{LogicalSize};
+use winit::*;
+use winit::*;
+use winit::dpi::{LogicalSize};
 use std::time::*;
 use specs::{World, RunNow};
 use specs::shred::{Dispatcher, DispatcherBuilder};
@@ -71,10 +72,10 @@ struct Game {
 }
 
 impl Game {
-    fn new(mut world: World, events_loop: &event_loop::EventLoop<()>) -> Self {
+    async fn new(mut world: World, events_loop: &event_loop::EventLoop<()>) -> Self {
         let builder = DispatcherBuilder::new()
             .with(EventHandlerSystem, "events", &[])
-            .with(SeekSystem, "seek", &[])
+            /*.with(SeekSystem, "seek", &[])
             .with(AvoidanceSystem, "avoidance", &[])
             .with(FrictionSystem, "friction", &[])
 
@@ -100,10 +101,10 @@ impl Game {
             .with(AveragePositionSystem, "avg_pos", &["apply"])
             .with(DragSelectSystem, "drag", &["apply"])
             .with(ShootStuffSystem, "shooting", &["apply"])
-            .with(KamikazeSystem, "kamikaze", &["apply"])
-            .with(StepCameraSystem, "camera", &["apply"])
+            .with(KamikazeSystem, "kamikaze", &["apply"])*/
+            .with(StepCameraSystem, "camera", &[])
 
-            .with(FinishSeekSystem, "finish_seek", &["apply", "set_rotation"])
+            /*.with(FinishSeekSystem, "finish_seek", &["apply", "set_rotation"])
 
             .with(EntityUnderMouseSystem, "mouse_entity", &["mouse_ray", "apply", "set_rotation", "spin"])
 
@@ -114,13 +115,13 @@ impl Game {
             
             .with(DestroyShips, "destroy_ships", &["kamikaze"])
 
-            .with(StepExplosion, "step_explosion", &["destroy_ships"])
+            .with(StepExplosion, "step_explosion", &["destroy_ships"])*/
 
-            .with(UpdateControlsSystem, "update_controls", &["left_click", "right_click", "middle_click", "drag"]);
+            .with(UpdateControlsSystem, "update_controls", &[]);
 
         info!("Dispatcher graph:\n{:?}", builder);
 
-        let (context, meshes) = context::Context::new(events_loop);
+        let (context, meshes) = context::Context::new(events_loop).await;
 
         world.add_resource(Meshes::new(meshes));
 
@@ -132,7 +133,7 @@ impl Game {
 
     fn update(&mut self, secs: f32) {
         *self.world.write_resource() = Secs(secs);
-        *self.world.write_resource() = ScreenDimensions(self.context.screen_dimensions());
+        //*self.world.write_resource() = ScreenDimensions(self.context.screen_dimensions());
 
         self.dispatcher.dispatch(&self.world.res);
 
@@ -140,12 +141,10 @@ impl Game {
     }
 
     fn render(&mut self) {
-        self.context.clear();
-
-        RenderCommandPaths  (&mut self.context).run_now(&self.world.res);
-        RenderSystem        (&mut self.context).run_now(&self.world.res);
-        ObjectRenderer      (&mut self.context).run_now(&self.world.res); 
-        RenderBillboards    (&mut self.context).run_now(&self.world.res);
+        /*RenderCommandPaths  (&mut self.context).run_now(&self.world.res);
+        RenderSystem        (&mut self.context).run_now(&self.world.res);*/
+        ObjectRenderer.run_now(&self.world.res); 
+        /*RenderBillboards    (&mut self.context).run_now(&self.world.res);
         FlushBillboards     (&mut self.context).run_now(&self.world.res); 
         RenderDebug         (&mut self.context).run_now(&self.world.res);
         RenderSelected      (&mut self.context).run_now(&self.world.res);
@@ -154,9 +153,11 @@ impl Game {
         RenderLogSystem     (&mut self.context).run_now(&self.world.res);
         RenderDragSelection (&mut self.context).run_now(&self.world.res);
         FlushUI             (&mut self.context).run_now(&self.world.res);
-        RenderMouse         (&mut self.context).run_now(&self.world.res);
+        RenderMouse         (&mut self.context).run_now(&self.world.res);*/
 
-        self.context.finish();
+
+        let (camera, system, mut buffers): (specs::Read<camera::Camera>, specs::Read<star_system::StarSystem>, specs::Write<context::Buffers>) = self.world.system_data();
+        self.context.render(&mut buffers, wgpu::Color {r: 0.0, g: 0.0, b: 0.0, a: 1.0}, &camera, &system);
     }
 
     fn print_error<E: failure::Fail>(&mut self, error: &E) {
@@ -179,26 +180,48 @@ impl Game {
     }
 }
 
+use std::alloc::System;
+
+#[global_allocator]
+static GLOBAL: System = System;
+
+
 fn main() {
+    #[cfg(feature = "native")]
+    futures::executor::block_on(run());
+    #[cfg(feature = "wasm")]
+    wasm_bindgen_futures::spawn_local(run());
+}
+
+async fn run() {
+    #[cfg(feature = "native")]
     env_logger::init();
+    #[cfg(feature = "wasm")]
+    {
+        console_error_panic_hook::set_once();
+        console_log::init_with_level(log::Level::Trace).unwrap();
+    }
 
     let mut events_loop = event_loop::EventLoop::new();
     
-    let mut game = Game::new(create_world(), &events_loop);
+    let mut game = Game::new(create_world(), &events_loop).await;
 
-    let mut time = Instant::now();
+    let mut time = wasm_timer::Instant::now();
 
     events_loop.run(move |event, _, control_flow| match event {
-        glutin::event::Event::WindowEvent {event, ..} => {
+        winit::event::Event::WindowEvent {event, ..} => {
             game.context.copy_event(&event);
 
             match event {
-                glutin::event::WindowEvent::CloseRequested => *control_flow = glutin::event_loop::ControlFlow::Exit,
+                winit::event::WindowEvent::CloseRequested => *control_flow = winit::event_loop::ControlFlow::Exit,
+                winit::event::WindowEvent::Resized(size) => {
+                    game.context.resize(size.width, size.height);
+                }
                 event => game.world.write_resource::<Events>().push(event.to_static().unwrap())
             }
         },
-        glutin::event::Event::MainEventsCleared => {
-            let now = Instant::now();
+        winit::event::Event::MainEventsCleared => {
+            let now = wasm_timer::Instant::now();
         
             let secs = now.duration_since(time).subsec_nanos() as f32 / 10.0_f32.powi(9);
             time = now;
@@ -206,7 +229,7 @@ fn main() {
             game.update(secs);
             game.request_redraw();
         },
-        glutin::event::Event::RedrawRequested(_) => game.render(),
+        winit::event::Event::RedrawRequested(_) => game.render(),
         _ => {}
     });
 }
@@ -223,6 +246,7 @@ fn create_world() -> World {
     world.add_resource(Log(Vec::new()));
     world.add_resource(MovementPlane(0.0));
     world.add_resource(Debug(false));
+    world.add_resource(context::Buffers::default());
 
     world.register::<Position>();
     world.register::<Velocity>();

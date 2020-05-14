@@ -6,8 +6,6 @@ description = "A game"
 edition = "2018"
 
 [dependencies]
-# OpenGL
-glium = "0.27.0"
 # model/uv loading
 obj = { version = "0.10.0", features = ["genmesh"] }
 genmesh = "0.6.2"
@@ -23,17 +21,17 @@ collision = "0.20.1"
 # 2d ui rendering (circles etc)
 lyon = "0.15.8"
 # text rendering (waiting on: me being lazy)
-runic = { path = "runic" }
+#runic = { path = "runic" }
 # lazy derive
 derive_is_enum_variant = "0.1.1"
 # Randomness
-rand = "0.7.3"
+rand = { version = "0.7.3", features = ["wasm-bindgen"] }
 # Serialization
 serde = "1.0.110"
 serde_derive = "1.0.110"
 bincode = "1.2.1"
 # UI (waiting on: me adding features)
-pedot = { path = "pedot" }
+#pedot = { path = "pedot" }
 # error handling
 failure = "0.1.8"
 # logging (dont need extra stuff)
@@ -42,7 +40,7 @@ log = "0.4.8"
 # 'retain_mut'
 odds = { version = "0.4.0", features = ["std-vec"] }
 # ECS (waiting on: saveload stuff)
-specs = {git = "https://github.com/expenses/specs", features = ["serde"], branch = "better_entity_serialization_errors"}
+specs = {git = "https://github.com/expenses/specs", default-features = false, features = ["serde"], branch = "better_entity_serialization_errors"}
 specs-derive = {git = "https://github.com/expenses/specs", branch = "better_entity_serialization_errors"}
 
 # Triangulation
@@ -56,9 +54,20 @@ tint = "1.0.1"
 
 nalgebra = "0.21.0"
 ncollide3d = "0.23.0"
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs" }
+winit = "0.22.1"
+futures = "0.3.5"
+zerocopy = "0.3.0"
+console_log = "0.2.0"
+console_error_panic_hook = "0.1.6"
+web-sys = "0.3.39"
+wasm-bindgen-futures = "0.4.12"
+wasm-timer = "0.2.4"
 
 [features]
-default = ['embed_resources']
+default = ['embed_resources', "native"]
+native = []
+wasm = ["winit/web-sys"]
 
 embed_resources = []
 

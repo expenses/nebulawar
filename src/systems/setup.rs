@@ -1,5 +1,5 @@
 use super::*;
-use glium::glutin::{
+use winit::{
     event::{WindowEvent, ElementState, MouseButton, VirtualKeyCode, KeyboardInput, MouseScrollDelta},
     dpi::{LogicalPosition, PhysicalPosition}
 };

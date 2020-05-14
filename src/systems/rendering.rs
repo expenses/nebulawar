@@ -5,36 +5,30 @@ use crate::context::*;
 use super::*;
 use cgmath::Matrix4;
 
-pub struct ObjectRenderer<'a>(pub &'a mut Context);
+pub struct ObjectRenderer;
 
-impl<'a> System<'a> for ObjectRenderer<'a> {
+impl<'a> System<'a> for ObjectRenderer {
     type SystemData = (
         Read<'a, Camera>,
         Read<'a, StarSystem>,
+        Write<'a, Buffers>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, components::Rotation>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, Model>
     );
 
-    fn run(&mut self, (camera, system, pos, rot, size, model): Self::SystemData) {
-        let mut sorted = std::collections::HashMap::new();
-
+    fn run(&mut self, (camera, system, mut buffers, pos, rot, size, model): Self::SystemData) {
         for (pos, rot, size, model) in (&pos, &rot, &size, &model).join() {
-            sorted.entry(*model).or_insert_with(Vec::new).push({
-                let scale = Matrix4::from_scale(size.0);
-                let rotation: Matrix4<f32> = rot.0.into();
-                let position = Matrix4::from_translation(pos.0) * rotation * scale;
-                InstanceVertex::new(position)
-            });
-        }
-
-        for (model, instances) in sorted.iter() {
-            self.0.render_model(*model, instances, &camera, &system);
+            let scale = Matrix4::from_scale(size.0);
+            let rotation: Matrix4<f32> = rot.0.into();
+            let position = Matrix4::from_translation(pos.0) * rotation * scale;
+            let instance = InstanceVertex::new(position);
+            buffers.push_model(*model, instance);
         }
     }
 }
-
+/*
 pub struct RenderSelected<'a>(pub &'a mut Context);
 
 impl<'a> System<'a> for RenderSelected<'a> {
@@ -385,3 +379,4 @@ impl<'a> System<'a> for FlushBillboards<'a> {
         self.0.flush_billboards(&system, &camera);
     }
 }
+*/

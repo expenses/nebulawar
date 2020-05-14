@@ -1,19 +1,18 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::unreadable_literal))]
 
-use glium::*;
+use winit::*;
 use genmesh;
 use obj::*;
 use crate::context::Vertex;
 use image;
-use runic;
 use crate::util::*;
-use glium::texture::*;
 use std::io;
 use failure;
 use specs::*;
 use arrayvec::*;
 use ncollide3d::shape::TriMesh;
 use nalgebra::Point3;
+use zerocopy::*;
 
 const NORMAL: [f32; 3] = [0.0, 0.0, 1.0];
 
@@ -59,11 +58,46 @@ macro_rules! load_resource {
     })
 }
 
-pub fn load_image(display: &Display, data: &[u8]) -> SrgbTexture2d {
-    let image = image::load_from_memory(data).unwrap().to_rgba();
-    let image_dimensions = image.dimensions();
-    let image = RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
-    SrgbTexture2d::new(display, image).unwrap()
+pub fn load_image(encoder: &mut wgpu::CommandEncoder, device: &wgpu::Device, bytes: &[u8]) -> wgpu::TextureView {
+    let image = image::load_from_memory_with_format(bytes, image::ImageFormat::Png).unwrap()
+        .into_rgba();
+
+    let temp_buf =
+        device.create_buffer_with_data(&*image, wgpu::BufferUsage::COPY_SRC);
+
+    let texture_extent = wgpu::Extent3d {
+        width: image.width(),
+        height: image.height(),
+        depth: 1,
+    };
+
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        size: texture_extent,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
+        label: Some("Hectic Texture"),
+    });
+
+    encoder.copy_buffer_to_texture(
+        wgpu::BufferCopyView {
+            buffer: &temp_buf,
+            offset: 0,
+            bytes_per_row: 4 * image.width(),
+            rows_per_image: 0,
+        },
+        wgpu::TextureCopyView {
+            texture: &texture,
+            mip_level: 0,
+            array_layer: 0,
+            origin: wgpu::Origin3d::ZERO,
+        },
+        texture_extent,
+    );
+
+    texture.create_default_view()
 }
 
 // Returns a vertex buffer that should be rendered as `TrianglesList`.
@@ -105,12 +139,13 @@ pub enum Model {
 }
 
 pub struct ObjModel {
-    pub vertices: VertexBuffer<Vertex>,
-    pub texture: SrgbTexture2d
+    pub vertices: wgpu::Buffer,
+    pub texture: wgpu::TextureView,
+    pub vertices_len: usize,
 }
 
 impl ObjModel {
-    fn new(display: &Display, model: &[u8], image: &[u8]) -> io::Result<(Self, TriMesh<f32>)> {
+    fn new(encoder: &mut wgpu::CommandEncoder, device: &wgpu::Device, model: &[u8], image: &[u8]) -> io::Result<(Self, TriMesh<f32>)> {
         let vertices = load_wavefront(model);
 
         let points: Vec<_> = vertices.iter()
@@ -123,8 +158,9 @@ impl ObjModel {
 
         Ok((
             Self {
-                vertices: VertexBuffer::new(display, &vertices).unwrap(),
-                texture: load_image(display, image)
+                vertices_len: vertices.len(),
+                vertices: device.create_buffer_with_data(vertices.as_bytes(), wgpu::BufferUsage::VERTEX),
+                texture: load_image(encoder, device, image),
             },
             TriMesh::new(points, faces, None)
         ))
@@ -136,37 +172,37 @@ type Models = ArrayVec<[ObjModel; 6]>;
 
 pub struct Resources {
     pub models: Models,
-    pub image: SrgbTexture2d,
-    pub billboard: VertexBuffer<Vertex>,
-    pub font: runic::CachedFont<'static>
+    pub image: wgpu::TextureView,
+    pub billboard: wgpu::Buffer,
+    //pub font: runic::CachedFont<'static>
 }
 
 impl Resources {
-    pub fn new(display: &Display) -> Result<(Self, MeshArray), failure::Error> {
+    pub fn new(encoder: &mut wgpu::CommandEncoder, device: &wgpu::Device) -> Result<(Self, MeshArray), failure::Error> {
         let mut meshes = MeshArray::new();
         let mut models = Models::new();
 
-        add_model(&mut meshes, &mut models, display, load_resource!("models/fighter.obj"),  load_resource!("models/fighter.png"))?;
-        add_model(&mut meshes, &mut models, display, load_resource!("models/tanker.obj"),   load_resource!("models/tanker.png"))?;
-        add_model(&mut meshes, &mut models, display, load_resource!("models/carrier.obj"),  load_resource!("models/carrier.png"))?;
-        add_model(&mut meshes, &mut models, display, load_resource!("models/asteroid.obj"), load_resource!("models/asteroid.png"))?;
-        add_model(&mut meshes, &mut models, display, load_resource!("models/miner.obj"),    load_resource!("models/miner.png"))?;
-        add_model(&mut meshes, &mut models, display, load_resource!("models/missile.obj"),  load_resource!("models/missile.png"))?;
+        add_model(&mut meshes, &mut models, encoder, device, load_resource!("models/fighter.obj"),  load_resource!("models/fighter.png"))?;
+        add_model(&mut meshes, &mut models, encoder, device, load_resource!("models/tanker.obj"),   load_resource!("models/tanker.png"))?;
+        add_model(&mut meshes, &mut models, encoder, device, load_resource!("models/carrier.obj"),  load_resource!("models/carrier.png"))?;
+        add_model(&mut meshes, &mut models, encoder, device, load_resource!("models/asteroid.obj"), load_resource!("models/asteroid.png"))?;
+        add_model(&mut meshes, &mut models, encoder, device, load_resource!("models/miner.obj"),    load_resource!("models/miner.png"))?;
+        add_model(&mut meshes, &mut models, encoder, device, load_resource!("models/missile.obj"),  load_resource!("models/missile.png"))?;
 
         Ok((
             Self {
                 models,
-                image: load_image(display, load_resource!("output/packed.png")),
-                font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display)?,
-                billboard: VertexBuffer::new(display, &BILLBOARD_VERTICES).unwrap(),
+                image: load_image(encoder, device, load_resource!("output/packed.png")),
+                //font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display)?,
+                billboard: device.create_buffer_with_data(BILLBOARD_VERTICES.as_bytes(), wgpu::BufferUsage::VERTEX),
             },
             meshes
         ))
     }
 }
 
-pub fn add_model(meshes: &mut MeshArray, models: &mut Models, display: &Display, obj: &[u8], png: &[u8]) -> Result<(), failure::Error> {
-    let (object, mesh) = ObjModel::new(display, obj, png)?;
+pub fn add_model(meshes: &mut MeshArray, models: &mut Models, encoder: &mut wgpu::CommandEncoder, device: &wgpu::Device, obj: &[u8], png: &[u8]) -> Result<(), failure::Error> {
+    let (object, mesh) = ObjModel::new(encoder, device, obj, png)?;
     models.push(object);
     meshes.push(mesh);
 

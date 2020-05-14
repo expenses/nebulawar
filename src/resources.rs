@@ -1,6 +1,6 @@
 use specs::*;
 use cgmath::*;
-use glium::glutin::*;
+use winit::*;
 use crate::ships::*;
 use odds::vec::*;
 use crate::context;
@@ -63,11 +63,11 @@ impl Log {
     }
 
     pub fn render(&self, context: &mut context::Context) {
-        let (_, height) = context.screen_dimensions();
+        /*let (_, height) = context.screen_dimensions();
 
         for (i, item) in self.iter().enumerate() {
             context.render_text(&item.content, 10.0, height - 30.0 - i as f32 * 20.0);
-        }
+        }*/
     }
 }
 
