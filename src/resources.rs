@@ -1,13 +1,13 @@
 use specs::*;
 use cgmath::*;
 use glium::glutin::*;
-use ships::*;
+use crate::ships::*;
 use odds::vec::*;
-use context;
+use crate::context;
 use ncollide3d::shape::*;
 use ncollide3d::query::Ray;
 use ncollide3d::bounding_volume::*;
-use util::*;
+use crate::util::*;
 
 #[derive(Component, Default, NewtypeProxy)]
 pub struct Secs(pub f32);

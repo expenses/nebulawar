@@ -3,6 +3,7 @@ name = "fleet_commander"
 version = "0.1.0"
 authors = ["Expenses <expenses@airmail.cc>"]
 description = "A game"
+edition = "2018"
 
 [dependencies]
 # OpenGL

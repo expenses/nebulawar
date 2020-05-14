@@ -1,6 +1,6 @@
-use components;
+use crate::components;
 use specs::{*, saveload::*, error::*};
-use context::{Model, Image};
+use crate::context::{Model, Image};
 use std::fs::*;
 use super::*;
 

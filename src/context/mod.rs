@@ -15,12 +15,17 @@ use {
         texture::*
     },
     cgmath::*,
-    camera::*,
-    *,
+    crate::camera::*,
+    crate::util::*,
+    crate::star_system::*,
     runic,
     pedot::*,
     std::f32::consts::PI
 };
+
+use glutin::event;
+use glutin::event_loop;
+use glutin::dpi::LogicalSize;
 
 // ** Line Rendering Woes **
 // rendering in 2d: doesnt work with rest of scene, rendering lines that go behind the camera is hard

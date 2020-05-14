@@ -1,7 +1,7 @@
 use cgmath::Vector3;
-use context::*;
+use crate::context::*;
 use specs::{DenseVecStorage, Component, Entity, ReadStorage, error::*, saveload::*};
-use components::*;
+use crate::components::*;
 
 pub mod components;
 mod storage;

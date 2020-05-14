@@ -55,14 +55,14 @@ mod entities;
 mod tests;
 mod resources;
 
-use star_system::*;
+use crate::star_system::*;
 use controls::*;
-use components::*;
+use crate::components::*;
 use systems::*;
-use util::*;
-use ships::*;
+use crate::util::*;
+use crate::ships::*;
 use entities::*;
-use resources::*;
+use crate::resources::*;
 
 struct Game {
     context: context::Context,

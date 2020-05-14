@@ -1,8 +1,8 @@
 use cgmath::*;
 use super::*;
 use specs::{DenseVecStorage, World, Component};
-use context;
-use util::*;
+use crate::context;
+use crate::util::*;
 use entities::*;
 use spade;
 use spade::delaunay::FloatDelaunayTriangulation;

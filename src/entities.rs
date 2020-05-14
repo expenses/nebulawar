@@ -1,11 +1,11 @@
-use components::*;
+use crate::components::*;
 use specs::{World, Builder, Entity};
-use ships::*;
+use crate::ships::*;
 use cgmath::{Vector3, Quaternion, Zero, Rotation};
 use super::*;
-use context::*;
+use crate::context::*;
 use specs::saveload::*;
-use util::*;
+use crate::util::*;
 
 pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, rotation: Quaternion<f32>, side: Side) -> Entity {
     let components = tag.default_components(0);

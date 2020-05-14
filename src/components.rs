@@ -1,8 +1,8 @@
 use specs::{*, saveload::*, error::*};
 use cgmath::*;
-use util::*;
+use crate::util::*;
 use rand::rngs::ThreadRng;
-use ships::*;
+use crate::ships::*;
 use serde::*;
 
 #[derive(Component, NewtypeProxy, Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]

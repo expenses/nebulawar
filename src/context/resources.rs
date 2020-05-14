@@ -3,10 +3,10 @@
 use glium::*;
 use genmesh;
 use obj::*;
-use context::Vertex;
+use crate::context::Vertex;
 use image;
 use runic;
-use util::*;
+use crate::util::*;
 use glium::texture::*;
 use std::io;
 use failure;

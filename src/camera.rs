@@ -1,6 +1,6 @@
 use cgmath::*;
 use std::f32::consts::*;
-use util::*;
+use crate::util::*;
 use specs::*;
 use ncollide3d::query::Ray;
 

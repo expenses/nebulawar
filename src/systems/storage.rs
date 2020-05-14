@@ -1,5 +1,5 @@
 use specs::*;
-use ships::StoredResource;
+use crate::ships::StoredResource;
 use super::*;
 
 impl<'a> StorageGetter for WriteStorage<'a, Materials> {

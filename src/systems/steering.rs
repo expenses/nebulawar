@@ -1,6 +1,6 @@
-use components;
+use crate::components;
 use specs::*;
-use util::*;
+use crate::util::*;
 use cgmath::{InnerSpace, Vector3, Zero};
 use super::*;
 
