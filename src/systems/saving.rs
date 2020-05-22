@@ -1,8 +1,9 @@
 use crate::components;
-use specs::{*, saveload::*, error::*};
+use specs::{*, saveload::*, error::*, saveload::MarkerAllocator as _};
 use crate::context::{Model, Image};
 use std::fs::*;
 use super::*;
+use crate::{Marker, MarkerAllocator};
 
 type ComponentsA<'a> = (
     WriteStorage<'a, Position>,
@@ -34,8 +35,8 @@ type ComponentsB<'a> = (
     WriteStorage<'a, Explosion>
 );
 
-type ComponentsASerialized = <ComponentsA<'static> as SerializeComponents<Error, U64Marker>>::Data;
-type ComponentsBSerialized = <ComponentsB<'static> as SerializeComponents<Error, U64Marker>>::Data;
+type ComponentsASerialized = <ComponentsA<'static> as SerializeComponents<Error, Marker>>::Data;
+type ComponentsBSerialized = <ComponentsB<'static> as SerializeComponents<Error, Marker>>::Data;
 
 pub struct SaveSystem;
 
@@ -56,7 +57,7 @@ impl<'a> System<'a> for SaveSystem {
         ComponentsA<'a>,
         ComponentsB<'a>,
         
-        ReadStorage<'a, U64Marker>
+        ReadStorage<'a, Marker>
     );
 
     fn run(&mut self, (
@@ -73,7 +74,7 @@ impl<'a> System<'a> for SaveSystem {
 
         let comp_a = (&entities, &markers).join()
             .map(|(entity, marker)| (marker, comp_a.serialize_entity(entity, ids)))
-            .map(|(marker, result): (&U64Marker, Result<ComponentsASerialized, Error>)| {
+            .map(|(marker, result): (&Marker, Result<ComponentsASerialized, Error>)| {
                 EntityData {
                     marker: *marker,
                     components: result.unwrap()
@@ -83,7 +84,7 @@ impl<'a> System<'a> for SaveSystem {
 
         let comp_b = (&entities, &markers).join()
             .map(|(entity, marker)| (marker, comp_b.serialize_entity(entity, ids)))
-            .map(|(marker, result): (&U64Marker, Result<ComponentsBSerialized, Error>)| {
+            .map(|(marker, result): (&Marker, Result<ComponentsBSerialized, Error>)| {
                 EntityData {
                     marker: *marker,
                     components: result.unwrap()
@@ -116,7 +117,7 @@ impl<'a> System<'a> for LoadSystem {
     type SystemData = (
         Entities<'a>,
         Read<'a, Controls>,
-        Write<'a, U64MarkerAllocator>,
+        Write<'a, MarkerAllocator>,
 
         Write<'a, Camera>,
         Write<'a, StarSystem>,
@@ -130,7 +131,7 @@ impl<'a> System<'a> for LoadSystem {
         ComponentsA<'a>,
         ComponentsB<'a>,
 
-        WriteStorage<'a, U64Marker>
+        WriteStorage<'a, Marker>
     );
 
     fn run(&mut self, (
@@ -181,6 +182,6 @@ struct GameData {
     plane: MovementPlane,
     debug: Debug,
 
-    comp_a: Vec<EntityData<U64Marker, ComponentsASerialized>>,
-    comp_b: Vec<EntityData<U64Marker, ComponentsBSerialized>>
+    comp_a: Vec<EntityData<Marker, ComponentsASerialized>>,
+    comp_b: Vec<EntityData<Marker, ComponentsBSerialized>>
 }

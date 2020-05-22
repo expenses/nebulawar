@@ -6,6 +6,7 @@ use super::*;
 use crate::context::*;
 use specs::saveload::*;
 use crate::util::*;
+use crate::Marker;
 
 pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, rotation: Quaternion<f32>, side: Side) -> Entity {
     let components = tag.default_components(0);
@@ -29,7 +30,7 @@ pub fn create_ship(world: &mut World, tag: ShipType, position: Vector3<f32>, rot
             time: 1.0,
             range: 50.0
         })
-        .marked::<U64Marker>();
+        .marked::<Marker>();
 
     if let Some(speed) = components.drill_speed() {
         entity = entity.with(DrillSpeed(speed));
@@ -45,7 +46,7 @@ pub fn create_person(parent: Entity, world: &mut World, occupation: Occupation) 
         .with(CreationTime::from_age(30))
         .with(occupation)
         .with(Parent(parent))
-        .marked::<U64Marker>()
+        .marked::<Marker>()
         .build();
 }
 
@@ -66,7 +67,7 @@ pub fn add_asteroid(rng: &mut ThreadRng, world: &mut World) {
         .with(Size(size))
         .with(Selectable::new(false))
         .with(Side::Neutral)
-        .marked::<U64Marker>()
+        .marked::<Marker>()
         .build();
 }
 

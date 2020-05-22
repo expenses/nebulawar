@@ -38,7 +38,7 @@ extern crate zerocopy;
 use rand::*;
 use rand::rngs::*;
 use winit::*;
-use specs::{World, RunNow};
+use specs::prelude::*;
 use specs::shred::{Dispatcher, DispatcherBuilder};
 
 mod camera;
@@ -61,6 +61,11 @@ use crate::util::*;
 use crate::ships::*;
 use entities::*;
 use crate::resources::*;
+
+pub struct SaveLoad;
+
+pub type Marker = specs::saveload::SimpleMarker<SaveLoad>;
+pub type MarkerAllocator = specs::saveload::SimpleMarkerAllocator::<SaveLoad>;
 
 struct Game {
     context: context::Context,
@@ -120,7 +125,7 @@ impl Game {
 
         let (context, meshes) = context::Context::new(events_loop).await;
 
-        world.add_resource(Meshes::new(meshes));
+        world.insert(Meshes::new(meshes));
 
         Self {
             context, world,
@@ -132,23 +137,23 @@ impl Game {
         *self.world.write_resource() = Secs(secs);
         *self.world.write_resource() = ScreenDimensions(self.context.screen_dimensions());
 
-        self.dispatcher.dispatch(&self.world.res);
+        self.dispatcher.dispatch(&self.world);
 
         self.world.maintain();
     }
 
     fn render(&mut self) {
-        RenderCommandPaths.run_now(&self.world.res);
-        RenderSystem.run_now(&self.world.res);
-        ObjectRenderer.run_now(&self.world.res); 
-        RenderBillboards.run_now(&self.world.res);
-        RenderDebug.run_now(&self.world.res);
-        RenderSelected.run_now(&self.world.res);
-        RenderMovementPlane.run_now(&self.world.res);
-        RenderUI            .run_now(&self.world.res);
-        RenderLogSystem     .run_now(&self.world.res);
-        RenderDragSelection .run_now(&self.world.res);
-        RenderMouse         .run_now(&self.world.res);
+        RenderCommandPaths.run_now(&self.world);
+        RenderSystem.run_now(&self.world);
+        ObjectRenderer.run_now(&self.world); 
+        RenderBillboards.run_now(&self.world);
+        RenderDebug.run_now(&self.world);
+        RenderSelected.run_now(&self.world);
+        RenderMovementPlane.run_now(&self.world);
+        RenderUI            .run_now(&self.world);
+        RenderLogSystem     .run_now(&self.world);
+        RenderDragSelection .run_now(&self.world);
+        RenderMouse         .run_now(&self.world);
 
 
         let (camera, system, mut buffers, mut line_buffers): (
@@ -237,16 +242,16 @@ fn create_world() -> World {
     
     // Stuff to save
     
-    world.add_resource(Time(0.0));
-    world.add_resource(Formation::default());
-    world.add_resource(camera::Camera::default());
-    world.add_resource(Paused(false));
-    world.add_resource(Log(Vec::new()));
-    world.add_resource(MovementPlane(0.0));
-    world.add_resource(Debug(false));
-    world.add_resource(Help(true));
-    world.add_resource(context::Buffers::default());
-    world.add_resource(context::LineBuffers::default());
+    world.insert(Time(0.0));
+    world.insert(Formation::default());
+    world.insert(camera::Camera::default());
+    world.insert(Paused(false));
+    world.insert(Log(Vec::new()));
+    world.insert(MovementPlane(0.0));
+    world.insert(Debug(false));
+    world.insert(Help(true));
+    world.insert(context::Buffers::default());
+    world.insert(context::LineBuffers::default());
 
     world.register::<Position>();
     world.register::<Velocity>();
@@ -278,28 +283,28 @@ fn create_world() -> World {
 
     // Temp generated stuff
     
-    world.add_resource(Secs(0.0));
-    world.add_resource(RightClickOrder::default());
-    world.add_resource(EntityUnderMouse(None));
-    world.add_resource(Controls::default());
-    world.add_resource(AveragePosition(None));
-    world.add_resource(Events(Vec::new()));
-    world.add_resource(MouseRay::default());
-    world.add_resource(specs::saveload::U64MarkerAllocator::new());
-    world.add_resource(ScreenDimensions::default());
+    world.insert(Secs(0.0));
+    world.insert(RightClickOrder::default());
+    world.insert(EntityUnderMouse(None));
+    world.insert(Controls::default());
+    world.insert(AveragePosition(None));
+    world.insert(Events(Vec::new()));
+    world.insert(MouseRay::default());
+    world.insert(MarkerAllocator::new());
+    world.insert(ScreenDimensions::default());
     
     world.register::<SeekPosition>();
     world.register::<SeekForce>();
     world.register::<AvoidanceForce>();
     world.register::<FrictionForce>();
 
-    world.register::<specs::saveload::U64Marker>();
+    world.register::<Marker>();
 
     let mut rng = rand::thread_rng();
 
     use cgmath::Vector2;
     let system = StarSystem::new(Vector2::new(rng.gen_range(-1.0, 1.0), rng.gen_range(-1.0, 1.0)), &mut rng, &mut world);
-    world.add_resource(system);
+    world.insert(system);
 
     add_starting_entities(&mut world, &mut rng);
 

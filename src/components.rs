@@ -1,4 +1,4 @@
-use specs::{*, saveload::*, error::*};
+use specs::{prelude::*, saveload::*, error::*};
 use cgmath::*;
 use crate::util::*;
 use rand::rngs::ThreadRng;
@@ -188,7 +188,7 @@ impl Commands {
 
 impl<M: Serialize + Marker> ConvertSaveload<M> for Commands {
     type Data = Vec<<Command as ConvertSaveload<M>>::Data>;
-    type Error = Error;
+    type Error = NoError;
 
     fn convert_into<F: FnMut(Entity) -> Option<M>>(&self, mut ids: F) -> Result<Self::Data, Self::Error> {
         self.0.iter().map(|command| command.convert_into(&mut ids)).collect()

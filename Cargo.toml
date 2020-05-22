@@ -40,13 +40,13 @@ log = "0.4.8"
 # 'retain_mut'
 odds = { version = "0.4.0", features = ["std-vec"] }
 # ECS (waiting on: saveload stuff)
-specs = {git = "https://github.com/expenses/specs", default-features = false, features = ["serde"], branch = "better_entity_serialization_errors"}
-specs-derive = {git = "https://github.com/expenses/specs", branch = "better_entity_serialization_errors"}
+specs = { version = "0.16.1", features = ["serde"] }
+specs-derive = "0.4.1"
 
 # Triangulation
 spade = "1.8.2"
 # Noise (waiting on: image being optional)
-noise = {git = "https://github.com/Razaekel/noise-rs", branch = "develop", default-features = false}
+noise = "0.6.0"
 # easier newtype structs (waiting on: deref mut)
 newtype-proxy = {git = "https://github.com/expenses/newtype-proxy", branch = "deref_mut"}
 # HSV
@@ -55,7 +55,7 @@ tint = "1.0.1"
 nalgebra = "0.21.0"
 ncollide3d = "0.23.0"
 wgpu = { git = "https://github.com/gfx-rs/wgpu-rs" }
-winit = "0.22.1"
+winit = "0.22.2"
 futures = "0.3.5"
 zerocopy = "0.3.0"
 console_log = "0.2.0"

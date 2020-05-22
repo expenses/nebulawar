@@ -21,7 +21,7 @@ fn test_velocity() {
         .with(Velocity(Vector3::new(-0.1, -0.1, -0.1)))
         .build();
 
-    ApplyVelocitySystem.run_now(&world.res);
+    ApplyVelocitySystem.run_now(&world);
 
     world.maintain();
 
@@ -37,7 +37,7 @@ fn test_saveload() {
         .with(Velocity(Vector3::new(1.0, 2.0, 3.0)))
         //.with(TimeLeft(2.0))
         //.with(DrillSpeed(9999999.233))
-        .marked::<U64Marker>()
+        .marked::<Marker>()
         .build();
 
     let mut controls = Controls::default();

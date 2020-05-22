@@ -1,5 +1,6 @@
 use super::*;
 use cgmath::Zero;
+use crate::{Marker, MarkerAllocator};
 
 pub struct TestDeleteSystem;
 
@@ -26,7 +27,7 @@ pub struct ShootStuffSystem;
 impl<'a> System<'a> for ShootStuffSystem {
     type SystemData = (
         Entities<'a>,
-        Write<'a, U64MarkerAllocator>,
+        Write<'a, MarkerAllocator>,
         WriteStorage<'a, CanAttack>,
         
         WriteStorage<'a, Position>,
@@ -44,7 +45,7 @@ impl<'a> System<'a> for ShootStuffSystem {
         WriteStorage<'a, NoCollide>,
         WriteStorage<'a, ExplosionSize>,
 
-        WriteStorage<'a, U64Marker>
+        WriteStorage<'a, Marker>
     );
 
     fn run(&mut self, (
@@ -115,7 +116,7 @@ impl<'a> System<'a> for SpawnSmokeSystem {
     type SystemData = (
         Entities<'a>,
         Read<'a, Paused>,
-        Write<'a, U64MarkerAllocator>,
+        Write<'a, MarkerAllocator>,
 
         WriteStorage<'a, SpawnSmoke>,
         ReadStorage<'a, Velocity>,
@@ -126,7 +127,7 @@ impl<'a> System<'a> for SpawnSmokeSystem {
         WriteStorage<'a, Image>,
         WriteStorage<'a, NoCollide>,
 
-        WriteStorage<'a, U64Marker>
+        WriteStorage<'a, Marker>
     );
 
     fn run(&mut self, (entities, paused, mut allocator, mut smoke, vel, mut pos, mut size, mut time, mut image, mut nocollide, mut markers): Self::SystemData) {
@@ -201,7 +202,7 @@ pub struct DestroyShips;
 impl<'a> System<'a> for DestroyShips {
     type SystemData = (
         Entities<'a>,
-        Write<'a, U64MarkerAllocator>,
+        Write<'a, MarkerAllocator>,
 
         ReadStorage<'a, Health>,
         ReadStorage<'a, ExplosionSize>,
@@ -212,7 +213,7 @@ impl<'a> System<'a> for DestroyShips {
         WriteStorage<'a, NoCollide>,
         WriteStorage<'a, Explosion>,
 
-        WriteStorage<'a, U64Marker>,
+        WriteStorage<'a, Marker>,
         
         ReadStorage<'a, Parent>
     );
@@ -236,7 +237,7 @@ impl<'a> System<'a> for DestroyShips {
 fn create_explosion(
     position: Vector3<f32>, explosion_size: f32,
     entities: &Entities, pos: &mut WriteStorage<Position>, size: &mut WriteStorage<Size>, time: &mut WriteStorage<TimeLeft>, nocollide: &mut WriteStorage<NoCollide>, explosion: &mut WriteStorage<Explosion>,
-    markers: &mut WriteStorage<U64Marker>, allocator: &mut Write<U64MarkerAllocator>
+    markers: &mut WriteStorage<Marker>, allocator: &mut Write<MarkerAllocator>
 ) -> Entity {
     entities.build_entity()
         .with(Position(position), pos)
