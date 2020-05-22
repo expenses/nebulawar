@@ -39,8 +39,8 @@ env_logger = { version = "0.7.1", default-features = false }
 log = "0.4.8"
 # 'retain_mut'
 odds = { version = "0.4.0", features = ["std-vec"] }
-# ECS (waiting on: saveload stuff)
-specs = { version = "0.16.1", features = ["serde"] }
+# ECS
+specs = { version = "0.16.1", default-features = false, features = ["serde"] }
 specs-derive = "0.4.1"
 
 # Triangulation
@@ -68,7 +68,7 @@ wgpu_glyph = { git = "https://github.com/expenses/wgpu_glyph", branch = "experim
 
 [features]
 default = ['embed_resources', "native"]
-native = []
+native = ["specs/parallel"]
 wasm = ["winit/web-sys"]
 
 embed_resources = []
