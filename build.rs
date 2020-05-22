@@ -1,11 +1,6 @@
-extern crate texture_packer;
-extern crate image;
-extern crate codegen;
-
 use texture_packer::{*, importer::*, exporter::*, texture::*};
 use codegen::*;
 use std::path::*;
-use std::fs::*;
 use image::DynamicImage;
 
 fn load_image(filename: &str) -> DynamicImage {
@@ -36,7 +31,7 @@ fn main() {
     {
         {
             let image_enum = scope.new_enum("Image")
-                .derive("Copy, Clone, Component, Serialize, Deserialize, PartialEq")
+                .derive("Copy, Clone, Component, Serialize, Deserialize, PartialEq, Debug")
                 .vis("pub");
 
             for (name, _) in packer.get_frames() {

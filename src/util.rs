@@ -3,7 +3,6 @@ use std::f32::consts::*;
 use arrayvec;
 use std::ops::*;
 use std::collections::*;
-use rand::*;
 use rand::distributions::*;
 use rand::rngs::*;
 use std::cmp::*;
@@ -43,16 +42,8 @@ pub fn screen_pos_to_opengl_pos(x: f32, y: f32, width: f32, height: f32) -> (f32
     )
 }
 
-pub fn matrix_to_array(matrix: Matrix4<f32>) -> [[f32; 4]; 4] {
-    matrix.into()
-}
-
 pub fn vector_to_point(vector: Vector3<f32>) -> Point3<f32> {
     Point3::new(vector.x, vector.y, vector.z)
-}
-
-pub fn vector_to_array(vector: Vector3<f32>) -> [f32; 3] {
-    vector.into()
 }
 
 pub fn iter_owned<T, A: arrayvec::Array<Item=T>>(array: A) -> arrayvec::IntoIter<A> {

@@ -76,7 +76,7 @@ impl<'a> System<'a> for ShootStuffSystem {
                     .with(TimeLeft(20.0), &mut time)
                     .with(Selectable::new(false), &mut selectable)
                     .with(Side::Friendly, &mut side)
-                    .with(SpawnSmoke, &mut smoke)
+                    .with(SpawnSmoke(0), &mut smoke)
                     .with(AttackTarget {entity: target_entity, kamikaze: true}, &mut target)
                     .with(MaxSpeed(5.0), &mut speed)
                     .with(Health(1.0), &mut health)
@@ -117,7 +117,7 @@ impl<'a> System<'a> for SpawnSmokeSystem {
         Read<'a, Paused>,
         Write<'a, U64MarkerAllocator>,
 
-        ReadStorage<'a, SpawnSmoke>,
+        WriteStorage<'a, SpawnSmoke>,
         ReadStorage<'a, Velocity>,
         
         WriteStorage<'a, Position>,
@@ -129,21 +129,25 @@ impl<'a> System<'a> for SpawnSmokeSystem {
         WriteStorage<'a, U64Marker>
     );
 
-    fn run(&mut self, (entities, paused, mut allocator, smoke, vel, mut pos, mut size, mut time, mut image, mut nocollide, mut markers): Self::SystemData) {
+    fn run(&mut self, (entities, paused, mut allocator, mut smoke, vel, mut pos, mut size, mut time, mut image, mut nocollide, mut markers): Self::SystemData) {
         if paused.0 {
             return;
         }
 
-        for (entity, vel, _) in (&entities, &vel, &smoke).join() {
+        for (entity, vel, mut smoke) in (&entities, &vel, &mut smoke).join() {
             if let Some(p) = pos.get(entity).map(|p| p.0) {
-                entities.build_entity()
-                    .with(Position(p - vel.0), &mut pos)
-                    .with(Size(2.0), &mut size)
-                    .with(TimeLeft(2.0), &mut time)
-                    .with(Image::Smoke, &mut image)
-                    .with(NoCollide, &mut nocollide)
-                    .marked(&mut markers, &mut allocator)
-                    .build();
+                if smoke.0 % 2 == 0 {
+                    entities.build_entity()
+                        .with(Position(p - vel.0), &mut pos)
+                        .with(Size(2.0), &mut size)
+                        .with(TimeLeft(2.0), &mut time)
+                        .with(Image::Smoke, &mut image)
+                        .with(NoCollide, &mut nocollide)
+                        .marked(&mut markers, &mut allocator)
+                        .build();
+                }
+
+                smoke.0 = (smoke.0 + 1) % 2;
             }
         }
     }

@@ -38,9 +38,6 @@ extern crate zerocopy;
 use rand::*;
 use rand::rngs::*;
 use winit::*;
-use winit::*;
-use winit::dpi::{LogicalSize};
-use std::time::*;
 use specs::{World, RunNow};
 use specs::shred::{Dispatcher, DispatcherBuilder};
 
@@ -75,7 +72,7 @@ impl Game {
     async fn new(mut world: World, events_loop: &event_loop::EventLoop<()>) -> Self {
         let builder = DispatcherBuilder::new()
             .with(EventHandlerSystem, "events", &[])
-            /*.with(SeekSystem, "seek", &[])
+            .with(SeekSystem, "seek", &[])
             .with(AvoidanceSystem, "avoidance", &[])
             .with(FrictionSystem, "friction", &[])
 
@@ -101,10 +98,10 @@ impl Game {
             .with(AveragePositionSystem, "avg_pos", &["apply"])
             .with(DragSelectSystem, "drag", &["apply"])
             .with(ShootStuffSystem, "shooting", &["apply"])
-            .with(KamikazeSystem, "kamikaze", &["apply"])*/
+            .with(KamikazeSystem, "kamikaze", &["apply"])
             .with(StepCameraSystem, "camera", &[])
 
-            /*.with(FinishSeekSystem, "finish_seek", &["apply", "set_rotation"])
+            .with(FinishSeekSystem, "finish_seek", &["apply", "set_rotation"])
 
             .with(EntityUnderMouseSystem, "mouse_entity", &["mouse_ray", "apply", "set_rotation", "spin"])
 
@@ -115,9 +112,9 @@ impl Game {
             
             .with(DestroyShips, "destroy_ships", &["kamikaze"])
 
-            .with(StepExplosion, "step_explosion", &["destroy_ships"])*/
+            .with(StepExplosion, "step_explosion", &["destroy_ships"])
 
-            .with(UpdateControlsSystem, "update_controls", &[]);
+            .with(UpdateControlsSystem, "update_controls", &["left_click", "middle_click", "right_click"]);
 
         info!("Dispatcher graph:\n{:?}", builder);
 
@@ -133,7 +130,7 @@ impl Game {
 
     fn update(&mut self, secs: f32) {
         *self.world.write_resource() = Secs(secs);
-        //*self.world.write_resource() = ScreenDimensions(self.context.screen_dimensions());
+        *self.world.write_resource() = ScreenDimensions(self.context.screen_dimensions());
 
         self.dispatcher.dispatch(&self.world.res);
 
@@ -141,23 +138,24 @@ impl Game {
     }
 
     fn render(&mut self) {
-        /*RenderCommandPaths  (&mut self.context).run_now(&self.world.res);
-        RenderSystem        (&mut self.context).run_now(&self.world.res);*/
+        RenderCommandPaths.run_now(&self.world.res);
+        RenderSystem.run_now(&self.world.res);
         ObjectRenderer.run_now(&self.world.res); 
-        /*RenderBillboards    (&mut self.context).run_now(&self.world.res);
-        FlushBillboards     (&mut self.context).run_now(&self.world.res); 
-        RenderDebug         (&mut self.context).run_now(&self.world.res);
-        RenderSelected      (&mut self.context).run_now(&self.world.res);
-        RenderMovementPlane (&mut self.context).run_now(&self.world.res);
-        RenderUI            (&mut self.context).run_now(&self.world.res);
-        RenderLogSystem     (&mut self.context).run_now(&self.world.res);
-        RenderDragSelection (&mut self.context).run_now(&self.world.res);
-        FlushUI             (&mut self.context).run_now(&self.world.res);
-        RenderMouse         (&mut self.context).run_now(&self.world.res);*/
+        RenderBillboards.run_now(&self.world.res);
+        RenderDebug.run_now(&self.world.res);
+        RenderSelected.run_now(&self.world.res);
+        RenderMovementPlane.run_now(&self.world.res);
+        RenderUI            .run_now(&self.world.res);
+        RenderLogSystem     .run_now(&self.world.res);
+        RenderDragSelection .run_now(&self.world.res);
+        RenderMouse         .run_now(&self.world.res);
 
 
-        let (camera, system, mut buffers): (specs::Read<camera::Camera>, specs::Read<star_system::StarSystem>, specs::Write<context::Buffers>) = self.world.system_data();
-        self.context.render(&mut buffers, wgpu::Color {r: 0.0, g: 0.0, b: 0.0, a: 1.0}, &camera, &system);
+        let (camera, system, mut buffers, mut line_buffers): (
+            specs::Read<camera::Camera>, specs::Read<star_system::StarSystem>,
+            specs::Write<context::Buffers>, specs::Write<context::LineBuffers>
+        ) = self.world.system_data();
+        self.context.render(&mut buffers, &mut line_buffers, wgpu::Color {r: 0.0, g: 0.0, b: 0.0, a: 1.0}, &camera, &system);
     }
 
     fn print_error<E: failure::Fail>(&mut self, error: &E) {
@@ -202,7 +200,7 @@ async fn run() {
         console_log::init_with_level(log::Level::Trace).unwrap();
     }
 
-    let mut events_loop = event_loop::EventLoop::new();
+    let events_loop = event_loop::EventLoop::new();
     
     let mut game = Game::new(create_world(), &events_loop).await;
 
@@ -246,7 +244,9 @@ fn create_world() -> World {
     world.add_resource(Log(Vec::new()));
     world.add_resource(MovementPlane(0.0));
     world.add_resource(Debug(false));
+    world.add_resource(Help(true));
     world.add_resource(context::Buffers::default());
+    world.add_resource(context::LineBuffers::default());
 
     world.register::<Position>();
     world.register::<Velocity>();
@@ -286,7 +286,7 @@ fn create_world() -> World {
     world.add_resource(Events(Vec::new()));
     world.add_resource(MouseRay::default());
     world.add_resource(specs::saveload::U64MarkerAllocator::new());
-    world.add_resource(ScreenDimensions((0.0, 0.0)));
+    world.add_resource(ScreenDimensions::default());
     
     world.register::<SeekPosition>();
     world.register::<SeekForce>();

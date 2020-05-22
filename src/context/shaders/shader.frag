@@ -9,8 +9,8 @@ layout(location = 0) out vec4 colour;
 layout(set = 0, binding = 0) uniform Uniforms {
     mat4 perspective;
     mat4 view;
-    vec3 light_direction;
-    vec3 ambient_colour;
+    vec4 light_direction;
+    vec4 ambient_colour;
     int mode;
 };
 layout(set = 0, binding = 1) uniform texture2D tex;
@@ -26,22 +26,6 @@ const vec3 LIGHT_COLOUR = vec3(1.0, 1.0, 1.0);
 const float MIN_DIFFUSE = 0.1;
 
 void main() {
-    /*vec3 c;
-
-    if (mode == 0) {
-        c = vec3(1.0, 0.0, 0.0);
-    } else if (mode == 1) {
-        c = vec3(1.0, 1.0, 0.0);
-    } else if (mode == 2) {
-        c = vec3(0.0, 1.0, 0.0);
-    } else if (mode == 3) {
-        c = vec3(0.0, 1.0, 1.0);
-    } else if (mode == 4) {
-        c = vec3(0.0, 0.0, 1.0);
-    }
-
-    colour = vec4(c, 1.0);*/
-
     vec4 texture_colour = texture(sampler2D(tex, samp), v_texture);
 
     if (mode == VERTEX_COLOURED) {
@@ -52,11 +36,11 @@ void main() {
         colour = vec4(vec3(1.0), v_texture.x);
     } else {
         // Ambient
-        vec3 ambient = ambient_colour * AMBIENT_STRENGTH; 
+        vec3 ambient = ambient_colour.xyz * AMBIENT_STRENGTH; 
 
         // Diffuse
         vec3 norm = normalize(v_normal);
-        vec3 light_dir = normalize(light_direction);  
+        vec3 light_dir = normalize(light_direction.xyz);  
 
         float diff = max(dot(norm, light_dir), MIN_DIFFUSE);
         vec3 diffuse = diff * LIGHT_COLOUR;

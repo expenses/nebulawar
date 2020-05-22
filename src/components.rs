@@ -211,8 +211,7 @@ pub struct CanAttack {
 }
 
 #[derive(Component, Serialize, Deserialize, Default)]
-#[storage(NullStorage)]
-pub struct SpawnSmoke;
+pub struct SpawnSmoke(pub u8);
 
 #[derive(Component, ConvertSaveload)]
 pub struct AttackTarget {

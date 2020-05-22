@@ -9,8 +9,6 @@ pub struct ObjectRenderer;
 
 impl<'a> System<'a> for ObjectRenderer {
     type SystemData = (
-        Read<'a, Camera>,
-        Read<'a, StarSystem>,
         Write<'a, Buffers>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, components::Rotation>,
@@ -18,7 +16,7 @@ impl<'a> System<'a> for ObjectRenderer {
         ReadStorage<'a, Model>
     );
 
-    fn run(&mut self, (camera, system, mut buffers, pos, rot, size, model): Self::SystemData) {
+    fn run(&mut self, (mut buffers, pos, rot, size, model): Self::SystemData) {
         for (pos, rot, size, model) in (&pos, &rot, &size, &model).join() {
             let scale = Matrix4::from_scale(size.0);
             let rotation: Matrix4<f32> = rot.0.into();
@@ -28,65 +26,82 @@ impl<'a> System<'a> for ObjectRenderer {
         }
     }
 }
-/*
-pub struct RenderSelected<'a>(pub &'a mut Context);
 
-impl<'a> System<'a> for RenderSelected<'a> {
+pub struct RenderSystem;
+
+impl<'a> System<'a> for RenderSystem {
+    type SystemData = (
+        Read<'a, Camera>,
+        Read<'a, StarSystem>,
+        Write<'a, Buffers>,
+    );
+
+    fn run(&mut self, (camera, system, mut buffers): Self::SystemData) {
+        let offset = system.light * BACKGROUND_DISTANCE;
+
+        let rotation: Matrix4<f32> = look_at(offset).into();
+        let matrix = Matrix4::from_translation(camera.position() + offset) * rotation * Matrix4::from_scale(BACKGROUND_DISTANCE / 10.0);
+
+        buffers.push_billboard(matrix, Image::Star);
+    }
+}
+
+pub struct RenderSelected;
+
+impl<'a> System<'a> for RenderSelected {
     type SystemData = (
         Entities<'a>,
         Read<'a, Camera>,
+        Write<'a, Buffers>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Selectable>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, Side>
     );
 
-    fn run(&mut self, (entities, camera, pos, selectable, size, side): Self::SystemData) {
+    fn run(&mut self, (entities, camera, mut buffers, pos, selectable, size, side): Self::SystemData) {
         for (entity, pos, selectable, side) in (&entities, &pos, &selectable, &side).join() {
             if selectable.selected {
                 let size = size.get(entity).map(|size| size.0).unwrap_or(1.0);
-                self.0.render_circle(pos.0, size, side.colour(), &camera);
+                buffers.push_circle(pos.0, size, side.colour(), &camera);
             }
         }
     }
 }
 
-pub struct RenderCommandPaths<'a>(pub &'a mut Context);
 
-impl<'a> System<'a> for RenderCommandPaths<'a> {
+pub struct RenderCommandPaths;
+
+impl<'a> System<'a> for RenderCommandPaths {
     type SystemData = (
+        Write<'a, Buffers>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Selectable>,
         ReadStorage<'a, Commands>
     );
 
-    fn run(&mut self, (positions, selectable, commands): Self::SystemData) {
+    fn run(&mut self, (mut buffers, positions, selectable, commands): Self::SystemData) {
         (&positions, &selectable, &commands).join()
             .filter(|(_, selectable, _)| selectable.selected)
             .for_each(|(pos, _, commands)| {
                 let points = iter_owned([pos.0])
                     .chain(commands.iter().filter_map(|command| command.point(&positions)));
 
-                self.0.render_3d_lines(points, WHITE);
+                buffers.push_3d_lines(points, WHITE);
             });
     }
 }
 
-pub struct RenderUI<'a>(pub &'a mut Context);
+pub struct RenderUI;
 
-impl<'a> RenderUI<'a> {
-    fn render_text(&mut self, text: &str, y: &mut f32) {
-        self.0.render_text(text, 10.0, *y);
-        *y += 30.0;
-    }
-}
-
-impl<'a> System<'a> for RenderUI<'a> {
+impl<'a> System<'a> for RenderUI {
     type SystemData = (
         Entities<'a>,
+        Write<'a, Buffers>,
         Read<'a, Time>,
         Read<'a, Formation>,
         Read<'a, Paused>,
+        Read<'a, Help>,
         ReadStorage<'a, ShipType>,
         ReadStorage<'a, Selectable>,
         ReadStorage<'a, Occupation>,
@@ -96,22 +111,46 @@ impl<'a> System<'a> for RenderUI<'a> {
         ReadStorage<'a, Health>
     );
 
-    fn run(&mut self, (entities, time, formation, paused, tag, selectable, occupation, parent, materials, mineable, health): Self::SystemData) {
+    fn run(&mut self, (entities, mut buffers, time, formation, paused, help, tag, selectable, occupation, parent, materials, mineable, health): Self::SystemData) {
         let y = &mut 10.0;
 
-        if paused.0 {
-            self.render_text("PAUSED", y);
+        let mut render_text = |text: &str|  {
+            buffers.push_text(text, 10.0, *y);
+            *y += 20.0;
+        };
+
+        if help.0 {
+            render_text("Controls:");
+            render_text("WASD to move camera");
+            render_text("Drag the right mouse button to rotate the camera");
+            render_text("Scroll with the mouse wheel to move the camera closer or further away");
+            render_text("Click or drag with the left mouse button to select ships");
+            render_text("Hold shift while clicking/dragging to add to the selection");
+            render_text("Press C or click the middle mouse button to center the camera on the selected ships");
+            render_text("Right click the mouse to order the ships to do something");
+            render_text("Holding shift while right clicking will queue orders");
+            render_text("Holding shift while moving the mouse up and down will move the plane of movement vertically");
+            render_text("Press , and . to rotate through the formation list");
+            render_text("Press P to pause/unpause");
+            render_text("Press / for the debug view");
+            render_text("Press H to toggle this text");
+            render_text("---------------------------");
         }
-        self.render_text(&format!("Time: {:.1}", time.0), y);
-        self.render_text(&format!("Population: {}", occupation.join().count()), y);
-        self.render_text(&format!("Formation: {:?}", *formation), y);
+
+        if paused.0 {
+            render_text("PAUSED");
+        }
+
+        render_text(&format!("Time: {:.1}", time.0));
+        render_text(&format!("Population: {}", occupation.join().count()));
+        render_text(&format!("Formation: {:?}", *formation));
 
         let (ships, ships_total) = summarize(tag.join());
 
-        self.render_text(&format!("Ship count: {}", ships_total), y);
+        render_text(&format!("Ship count: {}", ships_total));
 
         for (tag, num) in ships {
-            self.render_text(&format!("{:?}: {}", tag, num), y);
+            render_text(&format!("{:?}: {}", tag, num));
         }
 
         let entity = (&entities, &selectable).join()
@@ -120,18 +159,18 @@ impl<'a> System<'a> for RenderUI<'a> {
             .next();
 
         if let Some(entity) = entity {
-            self.render_text("---------------------", y);
+            render_text("---------------------");
 
             if let Some(health) = health.get(entity) {
-                self.render_text(&format!("Health: {}", health.0), y);
+                render_text(&format!("Health: {}", health.0));
             }
 
             if let Some(materials) = materials.get(entity) {
-                self.render_text(&format!("Materials: {}", materials.0), y);
+                render_text(&format!("Materials: {}", materials.0));
             }
 
             if let Some(mineable) = mineable.get(entity) {
-                self.render_text(&format!("Mineable Materials: {}", mineable.0), y);
+                render_text(&format!("Mineable Materials: {}", mineable.0));
             }
 
             let people = (&occupation, &parent).join()
@@ -140,37 +179,41 @@ impl<'a> System<'a> for RenderUI<'a> {
 
             let (people, total) = summarize(people);
 
-            self.render_text(&format!("Population: {}", total), y);
+            render_text(&format!("Population: {}", total));
             
             for (tag, num) in people {
-                self.render_text(&format!("{:?}: {}", tag, num), y);
+                render_text(&format!("{:?}: {}", tag, num));
             }
         }
     }
 }
 
-pub struct RenderMouse<'a>(pub &'a mut Context);
 
-impl<'a> System<'a> for RenderMouse<'a> {
+pub struct RenderMouse;
+
+impl<'a> System<'a> for RenderMouse {
     type SystemData = (
+        Write<'a, LineBuffers>,
         Read<'a, RightClickOrder>,
-        Read<'a, Controls>
+        Read<'a, Controls>,
+        Read<'a, ScreenDimensions>,
     );
 
-    fn run(&mut self, (order, controls): Self::SystemData) {
+    fn run(&mut self, (mut buffers, order, controls, screen_dims): Self::SystemData) {
         let (x, y) = controls.mouse();
 
         if let Some(Command::GoToAnd(_, interaction)) = order.command {
-            self.0.render_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4]);
+            buffers.push_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4], screen_dims.0.into());
         }
     }
 }
 
-pub struct RenderDebug<'a>(pub &'a mut Context);
+pub struct RenderDebug;
 
-impl<'a> System<'a> for RenderDebug<'a> {
+impl<'a> System<'a> for RenderDebug {
     type SystemData = (
         Entities<'a>,
+        Write<'a, Buffers>,
         Read<'a, Camera>,
         Read<'a, EntityUnderMouse>,
         Read<'a, Debug>,
@@ -185,13 +228,13 @@ impl<'a> System<'a> for RenderDebug<'a> {
         ReadStorage<'a, FrictionForce>
     );
 
-    fn run(&mut self, (entities, camera, entity, debug, meshes, pos, rot, size, model, vel, seek, avoid, friction): Self::SystemData) {
+    fn run(&mut self, (entities, mut buffers, camera, entity, debug, meshes, pos, rot, size, model, vel, seek, avoid, friction): Self::SystemData) {
         if !debug.0 {
             return;
         }
 
         if let Some((_, point)) = entity.0 {
-            self.0.render_circle(point, 10.0, [1.0; 3], &camera);
+            buffers.push_circle(point, 10.0, [1.0; 3], &camera);
         }
 
         let scale = 1000.0;
@@ -201,21 +244,21 @@ impl<'a> System<'a> for RenderDebug<'a> {
             let mut position = pos.0 + step;
 
             if let Some(seek) = seek.get(entity) {
-                self.0.render_3d_line(position, position + seek.0 * scale, [1.0, 0.0, 0.0]);
+                buffers.push_3d_line(position, position + seek.0 * scale, [1.0, 0.0, 0.0]);
                 position += step;
             }
 
             if let Some(avoid) = avoid.get(entity) {
-                self.0.render_3d_line(position, position + avoid.0 * scale, [0.0, 1.0, 0.0]);
+                buffers.push_3d_line(position, position + avoid.0 * scale, [0.0, 1.0, 0.0]);
                 position += step;
             }
 
             if let Some(friction) = friction.get(entity) {
-                self.0.render_3d_line(position, position + friction.0 * scale, [0.0, 0.0, 1.0]);
+                buffers.push_3d_line(position, position + friction.0 * scale, [0.0, 0.0, 1.0]);
                 position += step;
             }
 
-            self.0.render_3d_line(position, position + vel.0 * scale / 10.0, [0.0, 1.0, 1.0]);
+            buffers.push_3d_line(position, position + vel.0 * scale / 10.0, [0.0, 1.0, 1.0]);
 
             // render bbox
 
@@ -228,58 +271,38 @@ impl<'a> System<'a> for RenderDebug<'a> {
                 let start = min;
                 let mut end = start;
                 end[i] = max[i];
-                self.0.render_3d_line(start, end, WHITE);
+                buffers.push_3d_line(start, end, WHITE);
 
                 let start = max;
                 let mut end = start;
                 end[i] = min[i];
 
-                self.0.render_3d_line(start, end, WHITE);
+                buffers.push_3d_line(start, end, WHITE);
             }
         }
     }
 }
 
-pub struct RenderSystem<'a>(pub &'a mut Context);
 
-impl<'a> System<'a> for RenderSystem<'a> {
-    type SystemData = (
-        Read<'a, Camera>,
-        Read<'a, Debug>,
-        Read<'a, StarSystem>
-    );
+pub struct RenderDragSelection;
 
-    fn run(&mut self, (camera, debug, system): Self::SystemData) {
-        self.0.render_skybox(&system, &camera, debug.0);
-        self.0.render_stars(&system, &camera);
+impl<'a> System<'a> for RenderDragSelection {
+    type SystemData = (Write<'a, LineBuffers>, Read<'a, Controls>, Read<'a, ScreenDimensions>);
 
-        let offset = system.light * BACKGROUND_DISTANCE;
-
-        let rotation: Matrix4<f32> = look_at(offset).into();
-        let matrix = Matrix4::from_translation(camera.position() + offset) * rotation * Matrix4::from_scale(BACKGROUND_DISTANCE / 10.0);
-
-        self.0.render_billboard(matrix, Image::Star, &camera, &system);
-    }
-}
-
-pub struct RenderDragSelection<'a>(pub &'a mut Context);
-
-impl<'a> System<'a> for RenderDragSelection<'a> {
-    type SystemData = Read<'a, Controls>;
-
-    fn run(&mut self, controls: Self::SystemData) {
+    fn run(&mut self, (mut buffers, controls, screen_dims): Self::SystemData) {
         if let Some(origin) = controls.left_dragging() {
-            self.0.render_rect(origin, controls.mouse());
+            buffers.push_rect(origin, controls.mouse(), screen_dims.0.into());
         }
     }
 }
 
-pub struct RenderMovementPlane<'a>(pub &'a mut Context);
 
-impl<'a> System<'a> for RenderMovementPlane<'a> {
-    type SystemData = Read<'a, RightClickOrder>;
+pub struct RenderMovementPlane;
 
-    fn run(&mut self, order: Self::SystemData) {
+impl<'a> System<'a> for RenderMovementPlane {
+    type SystemData = (Write<'a, Buffers>, Read<'a, RightClickOrder>);
+
+    fn run(&mut self, (mut buffers, order): Self::SystemData) {
         if let Some(Command::MoveTo(point)) = order.command {
             let distance = 20.0;
 
@@ -292,13 +315,13 @@ impl<'a> System<'a> for RenderMovementPlane<'a> {
             for i in 0 .. points + 1 {
                 let i = i as f32 * distance - radius;
 
-                self.0.render_3d_line(
+                buffers.push_3d_line(
                     point + Vector3::new(i, 0.0, -radius),
                     point + Vector3::new(i, 0.0, radius),
                     WHITE
                 );
 
-                self.0.render_3d_line(
+                buffers.push_3d_line(
                     point + Vector3::new(-radius, 0.0, i),
                     point + Vector3::new(radius, 0.0, i),
                     WHITE
@@ -308,75 +331,42 @@ impl<'a> System<'a> for RenderMovementPlane<'a> {
     }
 }
 
-pub struct RenderLogSystem<'a>(pub &'a mut Context);
+pub struct RenderLogSystem;
 
-impl<'a> System<'a> for RenderLogSystem<'a>  {
-    type SystemData = Read<'a, Log>;
+impl<'a> System<'a> for RenderLogSystem  {
+    type SystemData = (Write<'a, Buffers>, Read<'a, Log>, Read<'a, ScreenDimensions>);
 
-    fn run(&mut self, log: Self::SystemData) {
-        log.render(&mut self.0);
+    fn run(&mut self, (mut buffers, log, screen_dims): Self::SystemData) {
+        log.render(&mut buffers, (screen_dims.0).1);
     }
 }
 
-pub struct RenderBillboards<'a>(pub &'a mut Context);
 
-impl<'a> System<'a> for RenderBillboards<'a> {
+pub struct RenderBillboards;
+
+impl<'a> System<'a> for RenderBillboards {
     type SystemData = (
         Read<'a, Camera>,
+        Write<'a, Buffers>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, Image>
     );
 
-    fn run(&mut self, (camera, pos, size, image): Self::SystemData) {
+    fn run(&mut self, (camera, mut buffers, pos, size, image): Self::SystemData) {
         let cam_pos = camera.position();
         let rotation = look_at(-camera.direction());
 
-        //let pred = |point: &Position| (rotation * (cam_pos - point.0)).z;
         let pred = |point: &Position| point.distance2(cam_pos);
 
         let mut billboards: Vec<_> = (&pos, &size, &image).join().collect();
         billboards.sort_unstable_by(|a, b| cmp_floats(pred(a.0), pred(b.0)));
 
-        let iterator = billboards.iter()
-            .map(|(pos, size, image)| {
-                let scale = Matrix4::from_scale(size.0);
-                let rotation: Matrix4<f32> = rotation.into();
-                let position = Matrix4::from_translation(pos.0) * rotation * scale;
-                InstanceVertex {
-                    instance_pos: position.into(),
-                    uv_offset: image.offset(),
-                    uv_dimensions: image.dimensions(),
-                }
-            });
-
-        self.0.render_billboards(iterator, billboards.len());
+        for (pos, size, image) in billboards {
+            let scale = Matrix4::from_scale(size.0);
+            let rotation: Matrix4<f32> = rotation.into();
+            let position = Matrix4::from_translation(pos.0) * rotation * scale;
+            buffers.push_billboard(position, *image);
+        }
     }
 }
-
-pub struct FlushUI<'a>(pub &'a mut Context);
-
-impl<'a> System<'a> for FlushUI<'a> {
-    type SystemData = (
-        Read<'a, Camera>,
-        Read<'a, StarSystem>
-    );
-
-    fn run(&mut self, (camera, system): Self::SystemData) {
-        self.0.flush_ui(&camera, &system);
-    }
-}
-
-pub struct FlushBillboards<'a>(pub &'a mut Context);
-
-impl<'a> System<'a> for FlushBillboards<'a> {
-    type SystemData = (
-        Read<'a, Camera>,
-        Read<'a, StarSystem>
-    );
-
-    fn run(&mut self, (camera, system): Self::SystemData) {
-        self.0.flush_billboards(&system, &camera);
-    }
-}
-*/

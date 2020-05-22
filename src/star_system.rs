@@ -140,7 +140,7 @@ struct ColouredVertex {
 
 impl ColouredVertex {
     fn rand(rng: &mut ThreadRng, rotation_quat: Quaternion<f32>, colour: Vector3<f32>, colour_mod: f64) -> Self {
-        use noise::{self, NoiseFn, Seedable};
+        use noise::{NoiseFn, Seedable};
 
         let vector = uniform_sphere_distribution(rng);
         let rotated_vector = rotation_quat * vector;
@@ -148,6 +148,8 @@ impl ColouredVertex {
         let value = noise::Perlin::new()
             .set_seed(rng.gen())
             .get([f64::from(vector.x), f64::from(vector.y), f64::from(vector.z)]) + colour_mod;
+
+        let value = value.max(0.0);
 
         Self {
             vector,

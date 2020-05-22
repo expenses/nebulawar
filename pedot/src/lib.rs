@@ -1,11 +1,6 @@
-extern crate glium;
-#[macro_use]
-extern crate derive_is_enum_variant;
-
-use glium::*;
-use glutin::*;
-use glutin::event::*;
-use glutin::dpi::*;
+use derive_is_enum_variant::is_enum_variant;
+use winit::event::*;
+use winit::dpi::*;
 
 use std::ops::*;
 use std::slice::*;

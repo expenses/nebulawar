@@ -14,12 +14,13 @@ impl<'a> System<'a> for EventHandlerSystem {
         Write<'a, MovementPlane>,
         Write<'a, Controls>,
         Write<'a, Paused>,
+        Write<'a, Help>,
         Write<'a, Formation>,
         Write<'a, Debug>,
         WriteStorage<'a, Selectable>
     );
 
-    fn run(&mut self, (mut events, mut camera, mut plane, mut controls, mut paused, mut formation, mut debug, mut selectable): Self::SystemData) {
+    fn run(&mut self, (mut events, mut camera, mut plane, mut controls, mut paused, mut help, mut formation, mut debug, mut selectable): Self::SystemData) {
         events.drain(..).for_each(|event| match event {
             WindowEvent::CursorMoved {position: PhysicalPosition {x, y}, ..} => {
                 let (x, y) = (x as f32, y as f32);
@@ -58,6 +59,7 @@ impl<'a> System<'a> for EventHandlerSystem {
                             .for_each(|selectable| selectable.camera_following = selectable.selected);
                     },
                     VirtualKeyCode::P if pressed => paused.switch(),
+                    VirtualKeyCode::H if pressed => help.switch(),
                     VirtualKeyCode::Slash if pressed => debug.0 = !debug.0,
                     VirtualKeyCode::Comma if pressed => formation.rotate_left(),
                     VirtualKeyCode::Period if pressed => formation.rotate_right(),

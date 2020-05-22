@@ -1,4 +1,5 @@
 use std::ops::*;
+use derive_is_enum_variant::is_enum_variant;
 
 #[derive(PartialEq, Debug, is_enum_variant, Copy, Clone)]
 pub enum VerticalAlign {

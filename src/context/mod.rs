@@ -1,7 +1,7 @@
-//mod lines;
+mod lines;
 mod resources;
 
-//use self::lines::*;
+pub use self::lines::*;
 
 pub use self::resources::{Image, Model, MeshArray, Resources, BILLBOARD_VERTICES};
 pub const WHITE: [f32; 3] = [1.0; 3];
@@ -16,7 +16,8 @@ use {
     crate::*,
     std::f32::consts::PI,
     zerocopy::AsBytes,
-    wgpu::vertex_attr_array
+    wgpu::vertex_attr_array,
+    pedot::Gui,
 };
 
 // ** Line Rendering Woes **
@@ -25,12 +26,6 @@ use {
 // 2d lines in 3d: getting lines to join nicely is hard, too flat
 // geometry shader: complicated
 // assembling triangle/square line meshes by hand: complicated, but might be best shot
-
-const VERT: &str = include_str!("shaders/shader.vert");
-const FRAG: &str = include_str!("shaders/shader.frag");
-
-const DEFAULT_WIDTH: f32 = 1280.0;
-const DEFAULT_HEIGHT: f32 = 800.0;
 
 #[derive(Clone, Copy)]
 pub enum Mode {
@@ -68,19 +63,29 @@ impl Vertex {
 
 pub struct Context {
     window: winit::window::Window,
-    pub device: wgpu::Device,
-    pub swap_chain: wgpu::SwapChain,
-    pub queue: wgpu::Queue,
+    device: wgpu::Device,
+    swap_chain: wgpu::SwapChain,
+    queue: wgpu::Queue,
     surface: wgpu::Surface,
 
-    pub bind_group_layout: wgpu::BindGroupLayout,
-    pub pipeline: wgpu::RenderPipeline,
-    pub pipeline_layout: wgpu::PipelineLayout,
-    pub sampler: wgpu::Sampler,
+    bind_group_layout: wgpu::BindGroupLayout,
+    triangle_pipeline: wgpu::RenderPipeline,
+    line_pipeline: wgpu::RenderPipeline,
+    point_pipeline: wgpu::RenderPipeline,
+    billboard_pipeline: wgpu::RenderPipeline,
+    sampler: wgpu::Sampler,
+
+    identity_instance: wgpu::Buffer,
+    billboard_vertices: wgpu::Buffer,
 
     depth_texture: wgpu::TextureView,
 
     pub resources: Resources,
+
+    lines: LineRenderer,
+
+    glyph_brush: wgpu_glyph::GlyphBrush<'static, ()>,
+
     /*
     display: Display,
     program: Program,
@@ -93,8 +98,9 @@ pub struct Context {
     lines_3d_buffer: Vec<Vertex>,
     
     smoke_buffer: Vec<InstanceVertex>,
+    */
 
-    pub gui: Gui*/
+    pub gui: Gui
 }
 
 impl Context {
@@ -103,15 +109,16 @@ impl Context {
 
         #[cfg(feature = "wasm")]
         {
+            window.set_inner_size(winit::dpi::LogicalSize::new(1850.0, 1000.0));
+
             use winit::platform::web::WindowExtWebSys;
-            web_sys::window()
-                .and_then(|win| win.document())
-                .and_then(|doc| doc.body())
-                .and_then(|body| {
-                    body.append_child(&web_sys::Element::from(window.canvas()))
-                        .ok()
-                })
-                .expect("couldn't append canvas to document body");
+            let web_win = web_sys::window().unwrap();
+            let document = web_win.document().unwrap();
+            let body = document.body().unwrap();
+
+            let canvas = window.canvas();
+            canvas.set_oncontextmenu(Some(&js_sys::Function::new_no_args("return false;")));
+            body.append_child(&web_sys::Element::from(canvas)).unwrap();
         }
 
         let instance = wgpu::Instance::new();
@@ -149,9 +156,9 @@ impl Context {
         let (resources, meshes) = Resources::new(&mut init_encoder, &device).unwrap();
         
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            address_mode_w: wgpu::AddressMode::Repeat,
             mag_filter: wgpu::FilterMode::Nearest,
             min_filter: wgpu::FilterMode::Nearest,
             mipmap_filter: wgpu::FilterMode::Nearest,
@@ -166,7 +173,7 @@ impl Context {
                 bindings: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
-                        visibility: wgpu::ShaderStage::all(),
+                        visibility: wgpu::ShaderStage::FRAGMENT | wgpu::ShaderStage::VERTEX,
                         ty: wgpu::BindingType::UniformBuffer {
                             dynamic: false
                         },
@@ -186,14 +193,20 @@ impl Context {
                         ty: wgpu::BindingType::Sampler { comparison: false },
                     },
                 ],
-                label: Some("Hectic BindGroupLayout"),
+                label: None,
             });
     
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             bind_group_layouts: &[&bind_group_layout],
         });
 
-        let pipeline = create_pipeline(&device, &pipeline_layout, &vs_module, &fs_module, wgpu::PrimitiveTopology::TriangleList);
+        let triangle_pipeline = create_pipeline(&device, &pipeline_layout, &vs_module, &fs_module, wgpu::PrimitiveTopology::TriangleList, true);
+        let billboard_pipeline = create_pipeline(&device, &pipeline_layout, &vs_module, &fs_module, wgpu::PrimitiveTopology::TriangleList, false);
+        let line_pipeline = create_pipeline(&device, &pipeline_layout, &vs_module, &fs_module, wgpu::PrimitiveTopology::LineList, true);
+        let point_pipeline = create_pipeline(&device, &pipeline_layout, &vs_module, &fs_module, wgpu::PrimitiveTopology::PointList, true);
+
+        let identity_instance = device.create_buffer_with_data(InstanceVertex::identity().as_bytes(), wgpu::BufferUsage::VERTEX);
+        let billboard_vertices = device.create_buffer_with_data(BILLBOARD_VERTICES.as_bytes(), wgpu::BufferUsage::VERTEX);
 
         let window_size = window.inner_size();
 
@@ -201,149 +214,30 @@ impl Context {
 
         queue.submit(Some(init_encoder.finish()));
 
+        let lines = LineRenderer::new(&device, &sampler, &resources);
+
+        let gui = Gui::new(window_size.width as f32, window_size.height as f32);
+
+        let font: &[u8] = include_bytes!("pixel_operator/PixelOperator.ttf");
+
+        let glyph_brush = wgpu_glyph::GlyphBrushBuilder::using_font_bytes(font)
+            .unwrap()
+            .texture_filter_method(wgpu::FilterMode::Nearest)
+            .build(&device, wgpu::TextureFormat::Bgra8Unorm);
+
+
         (
             Self {
-                swap_chain, pipeline, bind_group_layout, pipeline_layout, 
-                queue, sampler, resources, device, window, surface, depth_texture,
+                swap_chain, triangle_pipeline, point_pipeline, bind_group_layout, identity_instance, line_pipeline, billboard_pipeline,
+                queue, sampler, resources, device, window, surface, depth_texture, billboard_vertices, lines, glyph_brush, gui,
             },
             meshes
         )
     }
 
     pub fn copy_event(&mut self, event: &event::WindowEvent) {
-        //self.gui.update(event);
+        self.gui.update(event);
     }
-
-    /*pub fn clear(&mut self) {
-        self.target.clear_color_srgb_and_depth((0.0, 0.0, 0.0, 1.0), 1.0);
-    }
-
-    fn flush_3d_lines(&mut self, camera: &Camera, system: &StarSystem) {
-        let uniforms = uniform!{
-            view: matrix_to_array(camera.view_matrix()),
-            perspective: matrix_to_array(self.perspective_matrix()),
-            light_direction: vector_to_array(system.light),
-            mode: Mode::VertexColoured as i32
-        };
-
-        let vertices = VertexBuffer::new(&self.display, &self.lines_3d_buffer).unwrap();
-        let indices = NoIndices(PrimitiveType::LinesList);
-
-        let params = Self::draw_params();
-        let instances = [InstanceVertex::new(Matrix4::identity())];
-        let instance_buffer = VertexBuffer::new(&self.display, &instances).unwrap();
-
-        self.target.draw((&vertices, instance_buffer.per_instance().unwrap()), &indices, &self.program, &uniforms, &params).unwrap();
-
-        self.lines_3d_buffer.clear();
-    }
-
-    fn flush_text(&mut self) {
-        //self.resources.font.render_vertices(&self.text_buffer, [1.0; 4], &mut self.target, &self.display, &self.text_program, true).unwrap();
-        self.text_buffer.clear();
-    }
-
-    pub fn flush_ui(&mut self, camera: &Camera, system: &StarSystem) {
-        self.lines.flush(&mut self.target, &self.display);
-
-        self.flush_3d_lines(camera, system);
-        self.flush_text();
-
-        self.gui.clear();
-    }
-
-    pub fn finish(&mut self) {
-        self.target.set_finish().unwrap();
-        self.target = self.display.draw();
-    }
-
-    pub fn render_stars(&mut self, system: &StarSystem, camera: &Camera) {
-        let uniforms = self.background_uniforms(camera, system, Mode::White);
-
-        let vertices = VertexBuffer::new(&self.display, &system.stars).unwrap();
-        let indices = NoIndices(PrimitiveType::Points);
-
-        let params = DrawParameters {
-            polygon_mode: PolygonMode::Point,
-            point_size: Some(2.0 * self.dpi()),
-            .. Self::draw_params()
-        };
-
-        let instances = [InstanceVertex::new(Matrix4::identity())];
-        let instance_buffer = VertexBuffer::new(&self.display, &instances).unwrap();
-
-        self.target.draw((&vertices, instance_buffer.per_instance().unwrap()), &indices, &self.program, &uniforms, &params).unwrap();
-    }
-
-    pub fn render_skybox(&mut self, system: &StarSystem, camera: &Camera, debug: bool) {
-        let uniforms = self.background_uniforms(camera, system, Mode::VertexColoured);
-
-        let vertices = VertexBuffer::new(&self.display, &system.background).unwrap();
-        let indices = NoIndices(PrimitiveType::TrianglesList);
-
-        let mut params = Self::draw_params();
-
-        if debug {
-            params.polygon_mode = PolygonMode::Line;
-        }
-
-        let instances = [InstanceVertex::new(Matrix4::identity())];
-        let instance_buffer = VertexBuffer::new(&self.display, &instances).unwrap();
-
-        self.target.draw((&vertices, instance_buffer.per_instance().unwrap()), &indices, &self.program, &uniforms, &params).unwrap();
-    }
-
-    pub fn flush_billboards(&mut self, system: &StarSystem, camera: &Camera) {
-        let uniforms = self.uniforms(camera, system, &self.resources.image, Mode::Shadeless);
-        let mut params = Self::draw_params();
-        params.depth = Depth::default();
-
-        let buffer = VertexBuffer::new(&self.display, &self.smoke_buffer).unwrap();
-        
-        self.target.draw((&VertexBuffer::new(&self.display, &BILLBOARD_VERTICES).unwrap(), buffer.per_instance().unwrap()), &NoIndices(PrimitiveType::TrianglesList), &self.program, &uniforms, &params).unwrap();
-
-        self.smoke_buffer.clear();
-    }
-
-    pub fn background_uniforms<'a>(&self, camera: &Camera, system: &StarSystem, mode: Mode) -> impl Uniforms + 'a {
-        uniform! {
-            view: matrix_to_array(camera.view_matrix_only_direction()),
-            perspective: matrix_to_array(self.perspective_matrix()),
-            light_direction: vector_to_array(system.light),
-            mode: mode as i32
-        }
-    }
-
-    pub fn uniforms<'a>(&self, camera: &Camera, system: &StarSystem, texture: &'a SrgbTexture2d, mode: Mode) -> impl Uniforms + 'a {
-        uniform!{
-            view: matrix_to_array(camera.view_matrix()),
-            perspective: matrix_to_array(self.perspective_matrix()),
-            light_direction: vector_to_array(system.light),
-            tex: Sampler::new(texture).minify_filter(MinifySamplerFilter::Nearest).magnify_filter(MagnifySamplerFilter::Nearest),
-            ambient_colour: system.ambient_colour,
-            mode: mode as i32
-        }
-    }*/
-
-    /*pub fn render_model(&mut self, model: Model, info: &[InstanceVertex], camera: &Camera, system: &StarSystem) {
-        let model = &self.resources.models[model as usize];
-
-        let uniforms = self.uniforms(camera, system, &model.texture, Mode::Normal);
-        let params = Self::draw_params();
-
-        let buffer = VertexBuffer::new(&self.display, &info).unwrap();
-        
-        self.target.draw((&model.vertices, buffer.per_instance().unwrap()), &NoIndices(PrimitiveType::TrianglesList), &self.program, &uniforms, &params).unwrap();
-    }*/
-
-    /*pub fn render_text(&mut self, text: &str, x: f32, y: f32) {
-        //let iterator = self.resources.font.get_pixelated_vertices(text, [x, y], 16.0, 1.0, &self.display).unwrap();
-        //self.text_buffer.extend(iterator);
-    }
-
-    pub fn render_rect(&mut self, top_left: (f32, f32), bottom_right: (f32, f32)) {
-        self.lines.render_rect(top_left, bottom_right);
-    }*/
 
     pub fn screen_dimensions(&self) -> (f32, f32) {
         let dimensions = self.window.inner_size();
@@ -359,54 +253,39 @@ impl Context {
         perspective_matrix(self.aspect_ratio())
     }
 
-    /*fn dpi(&self) -> f32 {
-        (**self.display.gl_window()).window().scale_factor() as f32
-    }
-
-    fn draw_params() -> DrawParameters<'static> {
-        DrawParameters {
-            depth: Depth {
-                test: DepthTest::IfLess,
-                write: true,
-                .. Default::default()
-            },
-            backface_culling: BackfaceCullingMode::CullCounterClockwise,
-            blend: Blend::alpha_blending(),
-            .. Default::default()
-        }
-    }
-
-    pub fn render_image(&mut self, image: Image, x: f32, y: f32, width: f32, height: f32, overlay: [f32; 4]) {
-        self.lines.render_image(image, x, y, width, height, overlay, &mut self.target, &self.display, &self.resources)
-    }*/
-
-    fn uniforms(&self, camera: &Camera, system: &StarSystem, mode: Mode) -> wgpu::Buffer {
+    fn uniforms(&self, view_matrix: Matrix4<f32>, system: &StarSystem, mode: Mode) -> wgpu::Buffer {
         let uniforms = Uniforms {
-            view: camera.view_matrix().into(),
+            view: view_matrix.into(),
             perspective: self.perspective_matrix().into(),
-            light_direction: system.light.into(),
-            ambient_colour: system.ambient_colour,
-            mode: mode as i32
+            light_direction: [system.light.x, system.light.y, system.light.z, 0.0],
+            ambient_colour: [system.ambient_colour[0], system.ambient_colour[1], system.ambient_colour[2], 0.0],
+            mode: mode as i32,
         };
         
-        //println!("{:?}", uniforms);
-
         self.device.create_buffer_with_data(uniforms.as_bytes(), wgpu::BufferUsage::UNIFORM)
     }
 
-    pub fn render(&mut self, buffers: &mut Buffers, clear_colour: wgpu::Color, camera: &Camera, system: &StarSystem) {
-        let model_uniforms = self.uniforms(camera, system, Mode::Normal);
-        let nebula_uniforms = self.uniforms(camera, system, Mode::VertexColoured);
+    fn bind_group_from_uniforms(&self, view_matrix: Matrix4<f32>, system: &StarSystem, mode: Mode) -> wgpu::BindGroup {
+        let uniforms = self.uniforms(view_matrix, system, mode);
+        create_bind_group(&self.device, &self.bind_group_layout, &uniforms, &self.resources.image, &self.sampler)
+    }
 
-        let identity_instance = self.device.create_buffer_with_data(InstanceVertex::identity().as_bytes(), wgpu::BufferUsage::VERTEX);
+    pub fn render(&mut self, buffers: &mut Buffers, line_buffers: &mut LineBuffers, clear_colour: wgpu::Color, camera: &Camera, system: &StarSystem) {        
+        let normal_uniforms = self.uniforms(camera.view_matrix(), system, Mode::Normal);
 
-        let mut gpu_buffers = buffers.to_gpu(&self.device, &self.bind_group_layout, &model_uniforms, &self.resources, &self.sampler);
+        let vertex_coloured_bind_group = self.bind_group_from_uniforms(camera.view_matrix(), system, Mode::VertexColoured);
+        let shadeless_bind_group = self.bind_group_from_uniforms(camera.view_matrix(), system, Mode::Shadeless);
+        let nebula_bind_group = self.bind_group_from_uniforms(camera.view_matrix_only_direction(), system, Mode::VertexColoured);
+        let star_bind_group = self.bind_group_from_uniforms(camera.view_matrix_only_direction(), system, Mode::White);
 
+        let gpu_buffers = buffers.to_gpu(&self.device, &self.bind_group_layout, &normal_uniforms, &self.resources, &self.sampler);
         let nebula_buffer = self.device.create_buffer_with_data(&system.background.as_bytes(), wgpu::BufferUsage::VERTEX);
-        let nebula_bind_group = create_bind_group(&self.device, &self.bind_group_layout, &nebula_uniforms, &self.resources.models[0].texture, &self.sampler);
+        let star_buffer = self.device.create_buffer_with_data(&system.stars.as_bytes(), wgpu::BufferUsage::VERTEX);
+
+        let gpu_line_buffers = line_buffers.upload(&self.device);
 
         let output = self.swap_chain.get_next_texture().unwrap();
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Hectic CommandEncoder") });
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None});
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
@@ -431,7 +310,7 @@ impl Context {
                 if let Some((instances, bind_group)) = &gpu_buffers.models[i] {
                     let model = &self.resources.models[i];
 
-                    pass.set_pipeline(&self.pipeline);
+                    pass.set_pipeline(&self.triangle_pipeline);
                     pass.set_bind_group(0, &bind_group, &[]);
                     
                     let vertices_slice = model.vertices.slice(0 .. 0);
@@ -442,16 +321,63 @@ impl Context {
                 }
             }
 
-            /*pass.set_pipeline(&self.pipeline);
+            // Background
+            pass.set_pipeline(&self.triangle_pipeline);
             pass.set_bind_group(0, &nebula_bind_group, &[]);
             pass.set_vertex_buffer(0, nebula_buffer.slice(0 .. 0));
-            pass.set_vertex_buffer(1, identity_instance.slice(0 .. 0));
-            pass.draw(0 .. system.background.len() as u32, 0 .. 1);*/
-            
+            pass.set_vertex_buffer(1, self.identity_instance.slice(0 .. 0));
+            pass.draw(0 .. system.background.len() as u32, 0 .. 1); 
+
+            // Stars
+            pass.set_pipeline(&self.point_pipeline);
+            pass.set_bind_group(0, &star_bind_group, &[]);
+            pass.set_vertex_buffer(0, star_buffer.slice(0 .. 0));
+            pass.set_vertex_buffer(1, self.identity_instance.slice(0 .. 0));
+            pass.draw(0 .. system.stars.len() as u32, 0 .. 1);
+
+            if let Some(lines) = &gpu_buffers.lines_3d_buffer {
+                pass.set_pipeline(&self.line_pipeline);
+                pass.set_bind_group(0, &vertex_coloured_bind_group, &[]);
+                pass.set_vertex_buffer(0, lines.slice(0 .. 0));
+                pass.set_vertex_buffer(1, self.identity_instance.slice(0 .. 0));
+                pass.draw(0 .. buffers.lines_3d_buffer.len() as u32, 0 .. 1);
+            }
+
+            if let Some((vertices, indices)) = &gpu_line_buffers {
+                pass.set_pipeline(&self.lines.pipeline);
+                pass.set_bind_group(0, &self.lines.bind_group, &[]);
+                pass.set_index_buffer(indices.slice(0 .. 0));
+                pass.set_vertex_buffer(0, vertices.slice(0 .. 0));
+                pass.draw_indexed(0 .. line_buffers.num_indices(), 0, 0 .. 1);
+            }
+
+            if let Some(instances) = &gpu_buffers.billboard_buffer {
+                pass.set_pipeline(&self.billboard_pipeline);
+                pass.set_bind_group(0, &shadeless_bind_group, &[]);
+                pass.set_vertex_buffer(0, self.billboard_vertices.slice(0 .. 0));
+                pass.set_vertex_buffer(1, instances.slice(0 .. 0));
+                pass.draw(0 .. BILLBOARD_VERTICES.len() as u32, 0 .. buffers.billboard_buffer.len() as u32);
+            }
         }
+
+        for section in buffers.text_buffer.drain(..) {
+            let layout = wgpu_glyph::PixelPositioner(section.layout);
+            self.glyph_brush.queue_custom_layout(&section, &layout);
+        }
+
+        let dimensions = self.window.inner_size();
+
+        self.glyph_brush.draw_queued(
+            &self.device,
+            &mut encoder,
+            &output.view,
+            dimensions.width,
+            dimensions.height,
+        ).unwrap();
 
         self.queue.submit(Some(encoder.finish()));
         buffers.clear();
+        line_buffers.clear();
     }
 
     pub fn request_redraw(&self) {
@@ -518,7 +444,7 @@ fn create_bind_group(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, unif
 
 fn create_pipeline(
     device: &wgpu::Device, layout: &wgpu::PipelineLayout, vs_module: &wgpu::ShaderModule, fs_module: &wgpu::ShaderModule,
-    primitive_topology: wgpu::PrimitiveTopology,
+    primitive_topology: wgpu::PrimitiveTopology, depth_write: bool,
 ) -> wgpu::RenderPipeline {
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         layout,
@@ -554,7 +480,7 @@ fn create_pipeline(
         }],
         depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
             format: wgpu::TextureFormat::Depth32Float,
-            depth_write_enabled: true,
+            depth_write_enabled: depth_write,
             depth_compare: wgpu::CompareFunction::Less,
             stencil_front: wgpu::StencilStateFaceDescriptor::IGNORE,
             stencil_back: wgpu::StencilStateFaceDescriptor::IGNORE,
@@ -567,62 +493,12 @@ fn create_pipeline(
                 wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
                     step_mode: wgpu::InputStepMode::Vertex,
-                    attributes: &[
-                        wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float3,
-                            offset: 0,
-                            shader_location: 0,
-                        },
-                        wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float3,
-                            offset: 12,
-                            shader_location: 1,
-                        },
-                        wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float2,
-                            offset: 24,
-                            shader_location: 2,
-                        }
-                    ],
+                    attributes: &vertex_attr_array![0 => Float3, 1 => Float3, 2 => Float2],
                 },
                 wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<InstanceVertex>() as wgpu::BufferAddress,
                     step_mode: wgpu::InputStepMode::Instance,
                     attributes: &vertex_attr_array![3 => Float2, 4 => Float2, 5 => Float4, 6 => Float4, 7 => Float4, 8 => Float4],
-                    /*attributes: &[
-                        wgpu::VertexAttributeDescriptor {
-                            shader_location: 3,
-                            offset: (3 + 3 + 2) * 4,
-                            format: wgpu::VertexFormat::Float2
-                        },
-                        wgpu::VertexAttributeDescriptor {
-                            shader_location: 4,
-                            offset: (3 + 3 + 2 + 2) * 4,
-                            format: wgpu::VertexFormat::Float2
-                        },
-                        
-                        wgpu::VertexAttributeDescriptor {
-                            shader_location: 5,
-                            offset: (3 + 3 + 2 + 2 + 2) * 4,
-                            format: wgpu::VertexFormat::Float4
-                        },
-                        wgpu::VertexAttributeDescriptor {
-                            shader_location: 6,
-                            offset: (3 + 3 + 2 + 2 + 2 + 4) * 4,
-                            format: wgpu::VertexFormat::Float4
-                        },
-                        wgpu::VertexAttributeDescriptor {
-                            shader_location: 7,
-                            offset: (3 + 3 + 2 + 2 + 2 + 4 + 4) * 4,
-                            format: wgpu::VertexFormat::Float4
-                        },
-                        wgpu::VertexAttributeDescriptor {
-                            shader_location: 8,
-                            offset: (3 + 3 + 2 + 2 + 2 + 4 + 4 + 4) * 4,
-                            format: wgpu::VertexFormat::Float4
-                        },
-                        
-                    ],*/
                 }
             ],
         },
@@ -637,26 +513,28 @@ fn create_pipeline(
 pub struct Uniforms {
     perspective: [[f32; 4]; 4],
     view: [[f32; 4]; 4],
-    light_direction: [f32; 3],
-    ambient_colour: [f32; 3],
-    mode: i32
+    light_direction: [f32; 4],
+    ambient_colour: [f32; 4],
+    mode: i32,
 }
 
 #[derive(Default)]
 pub struct Buffers {
-    //text_buffer: Vec<runic::Vertex>,
+    text_buffer: Vec<wgpu_glyph::OwnedVariedSection<wgpu_glyph::DrawMode>>,
     lines_3d_buffer: Vec<Vertex>,
     billboard_buffer: Vec<InstanceVertex>,
     pub model_buffers: [Vec<InstanceVertex>; 6]
 }
 
 pub struct GpuBuffers {
-    models: [Option<(wgpu::Buffer, wgpu::BindGroup)>; 6]
+    models: [Option<(wgpu::Buffer, wgpu::BindGroup)>; 6],
+    billboard_buffer: Option<wgpu::Buffer>,
+    lines_3d_buffer: Option<wgpu::Buffer>,
 }
 
 impl Buffers {
     fn clear(&mut self) {
-        //self.text_buffer.clear();
+        self.text_buffer.clear();
         self.lines_3d_buffer.clear();
         self.billboard_buffer.clear();
         for buffer in &mut self.model_buffers {
@@ -707,13 +585,33 @@ impl Buffers {
         self.push_3d_lines(iterator, colour);
     }
 
-    pub fn push_billboard(&mut self, matrix: Matrix4<f32>, image: Image, camera: &Camera, system: &StarSystem) {
+    pub fn push_billboard(&mut self, matrix: Matrix4<f32>, image: Image) {
         let vertex = InstanceVertex {
             instance_pos: matrix.into(),
             uv_dimensions: image.dimensions().into(),
             uv_offset: image.offset().into()
         };
         self.billboard_buffer.push(vertex);
+    }
+
+    pub fn push_text(&mut self, text: &str, x: f32, y: f32) {
+        let scale = 16.0;
+        
+        let section = wgpu_glyph::OwnedVariedSection {
+            screen_position: (x, y),
+            text: vec![
+                wgpu_glyph::OwnedSectionText {
+                    text: text.to_string(),
+                    scale: wgpu_glyph::Scale::uniform(scale),
+                    color: [1.0; 4],
+                    font_id: wgpu_glyph::FontId(0),
+                    custom: wgpu_glyph::DrawMode::pixelated(1.0),
+                }
+            ],
+            ..wgpu_glyph::OwnedVariedSection::default()
+        };
+
+        self.text_buffer.push(section);
     }
 
     fn to_gpu(&self, device: &wgpu::Device, bind_group_layout: &wgpu::BindGroupLayout, uniforms_buffer: &wgpu::Buffer, res: &Resources, sampler: &wgpu::Sampler) -> GpuBuffers {
@@ -725,17 +623,35 @@ impl Buffers {
                 self.buffer_and_bind_group(3, device, bind_group_layout, uniforms_buffer, res, sampler),
                 self.buffer_and_bind_group(4, device, bind_group_layout, uniforms_buffer, res, sampler),
                 self.buffer_and_bind_group(5, device, bind_group_layout, uniforms_buffer, res, sampler),
-            ]
+            ],
+            billboard_buffer: if self.billboard_buffer.is_empty() {
+                None
+            } else {
+                Some(device.create_buffer_with_data(self.billboard_buffer.as_bytes(), wgpu::BufferUsage::VERTEX))
+            },
+            lines_3d_buffer: if self.lines_3d_buffer.is_empty() {
+                None
+            } else {
+                Some(device.create_buffer_with_data(self.lines_3d_buffer.as_bytes(), wgpu::BufferUsage::VERTEX))
+            },
         }
     }
 
     fn buffer_and_bind_group(&self, index: usize, device: &wgpu::Device, bind_group_layout: &wgpu::BindGroupLayout, uniforms_buffer: &wgpu::Buffer, res: &Resources, sampler: &wgpu::Sampler) -> Option<(wgpu::Buffer, wgpu::BindGroup)> {
-        if self.model_buffers[index].is_empty() {
-            return None;
-        }
+        buffer_and_bind_group(device, self.model_buffers[index].as_bytes(), bind_group_layout, uniforms_buffer, &res.models[index].texture, sampler)
+    }
+}
 
-        let bind_group = create_bind_group(device, bind_group_layout, uniforms_buffer, &res.models[index].texture, sampler);
-        let buffer = device.create_buffer_with_data(self.model_buffers[index].as_bytes(), wgpu::BufferUsage::VERTEX);
+fn buffer_and_bind_group(
+    device: &wgpu::Device, bytes: &[u8],
+    bind_group_layout: &wgpu::BindGroupLayout, uniforms_buffer: &wgpu::Buffer,
+    image: &wgpu::TextureView, sampler: &wgpu::Sampler
+) -> Option<(wgpu::Buffer, wgpu::BindGroup)> {
+    if bytes.is_empty() {
+        None
+    } else {
+        let bind_group = create_bind_group(device, bind_group_layout, uniforms_buffer, image, sampler);
+        let buffer = device.create_buffer_with_data(bytes, wgpu::BufferUsage::VERTEX);
         Some((buffer, bind_group))
     }
 }

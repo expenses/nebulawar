@@ -1,6 +1,5 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::unreadable_literal))]
 
-use winit::*;
 use genmesh;
 use obj::*;
 use crate::context::Vertex;
@@ -173,7 +172,6 @@ type Models = ArrayVec<[ObjModel; 6]>;
 pub struct Resources {
     pub models: Models,
     pub image: wgpu::TextureView,
-    pub billboard: wgpu::Buffer,
     //pub font: runic::CachedFont<'static>
 }
 
@@ -193,8 +191,6 @@ impl Resources {
             Self {
                 models,
                 image: load_image(encoder, device, load_resource!("output/packed.png")),
-                //font: runic::CachedFont::from_bytes(include_bytes!("pixel_operator/PixelOperator.ttf"), display)?,
-                billboard: device.create_buffer_with_data(BILLBOARD_VERTICES.as_bytes(), wgpu::BufferUsage::VERTEX),
             },
             meshes
         ))

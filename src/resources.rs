@@ -24,6 +24,15 @@ impl Paused {
     }
 }
 
+#[derive(Component, Default, Serialize, Deserialize, Clone)]
+pub struct Help(pub bool);
+
+impl Help {
+    pub fn switch(&mut self) {
+        self.0 = !self.0;
+    }
+}
+
 #[derive(Component, Default)]
 pub struct EntityUnderMouse(pub Option<(Entity, Vector3<f32>)>);
 
@@ -62,12 +71,10 @@ impl Log {
         });
     }
 
-    pub fn render(&self, context: &mut context::Context) {
-        /*let (_, height) = context.screen_dimensions();
-
+    pub fn render(&self, buffers: &mut context::Buffers, height: f32) {
         for (i, item) in self.iter().enumerate() {
-            context.render_text(&item.content, 10.0, height - 30.0 - i as f32 * 20.0);
-        }*/
+            buffers.push_text(&item.content, 10.0, height - 30.0 - i as f32 * 20.0);
+        }
     }
 }
 

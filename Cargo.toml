@@ -31,7 +31,7 @@ serde = "1.0.110"
 serde_derive = "1.0.110"
 bincode = "1.2.1"
 # UI (waiting on: me adding features)
-#pedot = { path = "pedot" }
+pedot = { path = "pedot" }
 # error handling
 failure = "0.1.8"
 # logging (dont need extra stuff)
@@ -63,6 +63,8 @@ console_error_panic_hook = "0.1.6"
 web-sys = "0.3.39"
 wasm-bindgen-futures = "0.4.12"
 wasm-timer = "0.2.4"
+js-sys = "0.3.39"
+wgpu_glyph = { git = "https://github.com/expenses/wgpu_glyph", branch = "experimental" }
 
 [features]
 default = ['embed_resources', "native"]
