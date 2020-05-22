@@ -9,7 +9,7 @@ pub struct ObjectRenderer;
 
 impl<'a> System<'a> for ObjectRenderer {
     type SystemData = (
-        Write<'a, Buffers>,
+        Write<'a, ModelBuffers>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, components::Rotation>,
         ReadStorage<'a, Size>,
@@ -33,16 +33,16 @@ impl<'a> System<'a> for RenderSystem {
     type SystemData = (
         Read<'a, Camera>,
         Read<'a, StarSystem>,
-        Write<'a, Buffers>,
+        Write<'a, BillboardBuffer>,
     );
 
-    fn run(&mut self, (camera, system, mut buffers): Self::SystemData) {
+    fn run(&mut self, (camera, system, mut buffer): Self::SystemData) {
         let offset = system.light * BACKGROUND_DISTANCE;
 
         let rotation: Matrix4<f32> = look_at(offset).into();
         let matrix = Matrix4::from_translation(camera.position() + offset) * rotation * Matrix4::from_scale(BACKGROUND_DISTANCE / 10.0);
 
-        buffers.push_billboard(matrix, Image::Star);
+        buffer.push_billboard(matrix, Image::Star);
     }
 }
 
@@ -52,18 +52,18 @@ impl<'a> System<'a> for RenderSelected {
     type SystemData = (
         Entities<'a>,
         Read<'a, Camera>,
-        Write<'a, Buffers>,
+        Write<'a, Lines3DBuffer>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Selectable>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, Side>
     );
 
-    fn run(&mut self, (entities, camera, mut buffers, pos, selectable, size, side): Self::SystemData) {
+    fn run(&mut self, (entities, camera, mut buffer, pos, selectable, size, side): Self::SystemData) {
         for (entity, pos, selectable, side) in (&entities, &pos, &selectable, &side).join() {
             if selectable.selected {
                 let size = size.get(entity).map(|size| size.0).unwrap_or(1.0);
-                buffers.push_circle(pos.0, size, side.colour(), &camera);
+                buffer.push_circle(pos.0, size, side.colour(), &camera);
             }
         }
     }
@@ -74,7 +74,7 @@ pub struct RenderCommandPaths;
 
 impl<'a> System<'a> for RenderCommandPaths {
     type SystemData = (
-        Write<'a, Buffers>,
+        Write<'a, Lines3DBuffer>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Selectable>,
         ReadStorage<'a, Commands>
@@ -97,7 +97,7 @@ pub struct RenderUI;
 impl<'a> System<'a> for RenderUI {
     type SystemData = (
         Entities<'a>,
-        Write<'a, Buffers>,
+        Write<'a, TextBuffer>,
         Read<'a, Time>,
         Read<'a, Formation>,
         Read<'a, Paused>,
@@ -111,11 +111,11 @@ impl<'a> System<'a> for RenderUI {
         ReadStorage<'a, Health>
     );
 
-    fn run(&mut self, (entities, mut buffers, time, formation, paused, help, tag, selectable, occupation, parent, materials, mineable, health): Self::SystemData) {
+    fn run(&mut self, (entities, mut text_buffer, time, formation, paused, help, tag, selectable, occupation, parent, materials, mineable, health): Self::SystemData) {
         let y = &mut 10.0;
 
         let mut render_text = |text: &str|  {
-            buffers.push_text(text, 10.0, *y);
+            text_buffer.push_text(text, 10.0, *y);
             *y += 20.0;
         };
 
@@ -213,7 +213,7 @@ pub struct RenderDebug;
 impl<'a> System<'a> for RenderDebug {
     type SystemData = (
         Entities<'a>,
-        Write<'a, Buffers>,
+        Write<'a, Lines3DBuffer>,
         Read<'a, Camera>,
         Read<'a, EntityUnderMouse>,
         Read<'a, Debug>,
@@ -228,13 +228,13 @@ impl<'a> System<'a> for RenderDebug {
         ReadStorage<'a, FrictionForce>
     );
 
-    fn run(&mut self, (entities, mut buffers, camera, entity, debug, meshes, pos, rot, size, model, vel, seek, avoid, friction): Self::SystemData) {
+    fn run(&mut self, (entities, mut lines_buffer, camera, entity, debug, meshes, pos, rot, size, model, vel, seek, avoid, friction): Self::SystemData) {
         if !debug.0 {
             return;
         }
 
         if let Some((_, point)) = entity.0 {
-            buffers.push_circle(point, 10.0, [1.0; 3], &camera);
+            lines_buffer.push_circle(point, 10.0, [1.0; 3], &camera);
         }
 
         let scale = 1000.0;
@@ -244,21 +244,21 @@ impl<'a> System<'a> for RenderDebug {
             let mut position = pos.0 + step;
 
             if let Some(seek) = seek.get(entity) {
-                buffers.push_3d_line(position, position + seek.0 * scale, [1.0, 0.0, 0.0]);
+                lines_buffer.push_3d_line(position, position + seek.0 * scale, [1.0, 0.0, 0.0]);
                 position += step;
             }
 
             if let Some(avoid) = avoid.get(entity) {
-                buffers.push_3d_line(position, position + avoid.0 * scale, [0.0, 1.0, 0.0]);
+                lines_buffer.push_3d_line(position, position + avoid.0 * scale, [0.0, 1.0, 0.0]);
                 position += step;
             }
 
             if let Some(friction) = friction.get(entity) {
-                buffers.push_3d_line(position, position + friction.0 * scale, [0.0, 0.0, 1.0]);
+                lines_buffer.push_3d_line(position, position + friction.0 * scale, [0.0, 0.0, 1.0]);
                 position += step;
             }
 
-            buffers.push_3d_line(position, position + vel.0 * scale / 10.0, [0.0, 1.0, 1.0]);
+            lines_buffer.push_3d_line(position, position + vel.0 * scale / 10.0, [0.0, 1.0, 1.0]);
 
             // render bbox
 
@@ -271,13 +271,13 @@ impl<'a> System<'a> for RenderDebug {
                 let start = min;
                 let mut end = start;
                 end[i] = max[i];
-                buffers.push_3d_line(start, end, WHITE);
+                lines_buffer.push_3d_line(start, end, WHITE);
 
                 let start = max;
                 let mut end = start;
                 end[i] = min[i];
 
-                buffers.push_3d_line(start, end, WHITE);
+                lines_buffer.push_3d_line(start, end, WHITE);
             }
         }
     }
@@ -300,9 +300,9 @@ impl<'a> System<'a> for RenderDragSelection {
 pub struct RenderMovementPlane;
 
 impl<'a> System<'a> for RenderMovementPlane {
-    type SystemData = (Write<'a, Buffers>, Read<'a, RightClickOrder>);
+    type SystemData = (Write<'a, Lines3DBuffer>, Read<'a, RightClickOrder>);
 
-    fn run(&mut self, (mut buffers, order): Self::SystemData) {
+    fn run(&mut self, (mut buffer, order): Self::SystemData) {
         if let Some(Command::MoveTo(point)) = order.command {
             let distance = 20.0;
 
@@ -315,13 +315,13 @@ impl<'a> System<'a> for RenderMovementPlane {
             for i in 0 .. points + 1 {
                 let i = i as f32 * distance - radius;
 
-                buffers.push_3d_line(
+                buffer.push_3d_line(
                     point + Vector3::new(i, 0.0, -radius),
                     point + Vector3::new(i, 0.0, radius),
                     WHITE
                 );
 
-                buffers.push_3d_line(
+                buffer.push_3d_line(
                     point + Vector3::new(-radius, 0.0, i),
                     point + Vector3::new(radius, 0.0, i),
                     WHITE
@@ -334,10 +334,10 @@ impl<'a> System<'a> for RenderMovementPlane {
 pub struct RenderLogSystem;
 
 impl<'a> System<'a> for RenderLogSystem  {
-    type SystemData = (Write<'a, Buffers>, Read<'a, Log>, Read<'a, ScreenDimensions>);
+    type SystemData = (Write<'a, TextBuffer>, Read<'a, Log>, Read<'a, ScreenDimensions>);
 
-    fn run(&mut self, (mut buffers, log, screen_dims): Self::SystemData) {
-        log.render(&mut buffers, (screen_dims.0).1);
+    fn run(&mut self, (mut buffer, log, screen_dims): Self::SystemData) {
+        log.render(&mut buffer, (screen_dims.0).1);
     }
 }
 
@@ -347,13 +347,13 @@ pub struct RenderBillboards;
 impl<'a> System<'a> for RenderBillboards {
     type SystemData = (
         Read<'a, Camera>,
-        Write<'a, Buffers>,
+        Write<'a, BillboardBuffer>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, Image>
     );
 
-    fn run(&mut self, (camera, mut buffers, pos, size, image): Self::SystemData) {
+    fn run(&mut self, (camera, mut buffer, pos, size, image): Self::SystemData) {
         let cam_pos = camera.position();
         let rotation = look_at(-camera.direction());
 
@@ -366,7 +366,7 @@ impl<'a> System<'a> for RenderBillboards {
             let scale = Matrix4::from_scale(size.0);
             let rotation: Matrix4<f32> = rotation.into();
             let position = Matrix4::from_translation(pos.0) * rotation * scale;
-            buffers.push_billboard(position, *image);
+            buffer.push_billboard(position, *image);
         }
     }
 }

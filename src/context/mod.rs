@@ -270,7 +270,11 @@ impl Context {
         create_bind_group(&self.device, &self.bind_group_layout, &uniforms, &self.resources.image, &self.sampler)
     }
 
-    pub fn render(&mut self, buffers: &mut Buffers, line_buffers: &mut LineBuffers, clear_colour: wgpu::Color, camera: &Camera, system: &StarSystem) {        
+    pub fn render(
+        &mut self,
+        model_buffers: &mut ModelBuffers, lines: &mut LineBuffers, lines_3d: &mut Lines3DBuffer, billboards: &mut BillboardBuffer, text: &mut TextBuffer,
+        clear_colour: wgpu::Color, camera: &Camera, system: &StarSystem
+    ) {        
         let normal_uniforms = self.uniforms(camera.view_matrix(), system, Mode::Normal);
 
         let vertex_coloured_bind_group = self.bind_group_from_uniforms(camera.view_matrix(), system, Mode::VertexColoured);
@@ -278,11 +282,13 @@ impl Context {
         let nebula_bind_group = self.bind_group_from_uniforms(camera.view_matrix_only_direction(), system, Mode::VertexColoured);
         let star_bind_group = self.bind_group_from_uniforms(camera.view_matrix_only_direction(), system, Mode::White);
 
-        let gpu_buffers = buffers.to_gpu(&self.device, &self.bind_group_layout, &normal_uniforms, &self.resources, &self.sampler);
+        let gpu_model_buffers = model_buffers.upload(&self.device, &self.bind_group_layout, &normal_uniforms, &self.resources, &self.sampler);
         let nebula_buffer = self.device.create_buffer_with_data(&system.background.as_bytes(), wgpu::BufferUsage::VERTEX);
         let star_buffer = self.device.create_buffer_with_data(&system.stars.as_bytes(), wgpu::BufferUsage::VERTEX);
 
-        let gpu_line_buffers = line_buffers.upload(&self.device);
+        let gpu_lines = lines.upload(&self.device);
+        let gpu_lines_3d = lines_3d.upload(&self.device);
+        let gpu_billboards = billboards.upload(&self.device);
 
         let output = self.swap_chain.get_next_texture().unwrap();
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None});
@@ -307,7 +313,7 @@ impl Context {
             });
 
             for i in 0 .. 6 {
-                if let Some((instances, bind_group)) = &gpu_buffers.models[i] {
+                if let Some((instances, bind_group)) = &gpu_model_buffers[i] {
                     let model = &self.resources.models[i];
 
                     pass.set_pipeline(&self.triangle_pipeline);
@@ -317,7 +323,7 @@ impl Context {
                     let instances_slice = instances.slice(0 .. 0);
                     pass.set_vertex_buffer(0, vertices_slice);
                     pass.set_vertex_buffer(1, instances_slice);
-                    pass.draw(0 .. model.vertices_len as u32, 0 .. buffers.model_buffers[i].len() as u32);
+                    pass.draw(0 .. model.vertices_len as u32, 0 .. model_buffers.inner[i].len() as u32);
                 }
             }
 
@@ -335,32 +341,32 @@ impl Context {
             pass.set_vertex_buffer(1, self.identity_instance.slice(0 .. 0));
             pass.draw(0 .. system.stars.len() as u32, 0 .. 1);
 
-            if let Some(lines) = &gpu_buffers.lines_3d_buffer {
+            if let Some(gpu_lines_3d) = &gpu_lines_3d {
                 pass.set_pipeline(&self.line_pipeline);
                 pass.set_bind_group(0, &vertex_coloured_bind_group, &[]);
-                pass.set_vertex_buffer(0, lines.slice(0 .. 0));
+                pass.set_vertex_buffer(0, gpu_lines_3d.slice(0 .. 0));
                 pass.set_vertex_buffer(1, self.identity_instance.slice(0 .. 0));
-                pass.draw(0 .. buffers.lines_3d_buffer.len() as u32, 0 .. 1);
+                pass.draw(0 .. lines_3d.inner.len() as u32, 0 .. 1);
             }
 
-            if let Some((vertices, indices)) = &gpu_line_buffers {
+            if let Some((vertices, indices)) = &gpu_lines {
                 pass.set_pipeline(&self.lines.pipeline);
                 pass.set_bind_group(0, &self.lines.bind_group, &[]);
                 pass.set_index_buffer(indices.slice(0 .. 0));
                 pass.set_vertex_buffer(0, vertices.slice(0 .. 0));
-                pass.draw_indexed(0 .. line_buffers.num_indices(), 0, 0 .. 1);
+                pass.draw_indexed(0 .. lines.num_indices(), 0, 0 .. 1);
             }
 
-            if let Some(instances) = &gpu_buffers.billboard_buffer {
+            if let Some(instances) = &gpu_billboards {
                 pass.set_pipeline(&self.billboard_pipeline);
                 pass.set_bind_group(0, &shadeless_bind_group, &[]);
                 pass.set_vertex_buffer(0, self.billboard_vertices.slice(0 .. 0));
                 pass.set_vertex_buffer(1, instances.slice(0 .. 0));
-                pass.draw(0 .. BILLBOARD_VERTICES.len() as u32, 0 .. buffers.billboard_buffer.len() as u32);
+                pass.draw(0 .. BILLBOARD_VERTICES.len() as u32, 0 .. billboards.inner.len() as u32);
             }
         }
 
-        for section in buffers.text_buffer.drain(..) {
+        for section in text.inner.drain(..) {
             let layout = wgpu_glyph::PixelPositioner(section.layout);
             self.glyph_brush.queue_custom_layout(&section, &layout);
         }
@@ -376,8 +382,11 @@ impl Context {
         ).unwrap();
 
         self.queue.submit(Some(encoder.finish()));
-        buffers.clear();
-        line_buffers.clear();
+        model_buffers.clear();
+        lines.clear();
+        billboards.clear();
+        lines_3d.clear();
+        text.clear();
     }
 
     pub fn request_redraw(&self) {
@@ -519,31 +528,44 @@ pub struct Uniforms {
 }
 
 #[derive(Default)]
-pub struct Buffers {
-    text_buffer: Vec<wgpu_glyph::OwnedVariedSection<wgpu_glyph::DrawMode>>,
-    lines_3d_buffer: Vec<Vertex>,
-    billboard_buffer: Vec<InstanceVertex>,
-    pub model_buffers: [Vec<InstanceVertex>; 6]
+pub struct TextBuffer {
+    inner: Vec<wgpu_glyph::OwnedVariedSection<wgpu_glyph::DrawMode>>
 }
 
-pub struct GpuBuffers {
-    models: [Option<(wgpu::Buffer, wgpu::BindGroup)>; 6],
-    billboard_buffer: Option<wgpu::Buffer>,
-    lines_3d_buffer: Option<wgpu::Buffer>,
-}
-
-impl Buffers {
+impl TextBuffer {
     fn clear(&mut self) {
-        self.text_buffer.clear();
-        self.lines_3d_buffer.clear();
-        self.billboard_buffer.clear();
-        for buffer in &mut self.model_buffers {
-            buffer.clear();
-        }
+        self.inner.clear();
     }
 
-    pub fn push_model(&mut self, model: Model, instance: InstanceVertex) {
-        self.model_buffers[model as usize].push(instance);
+    pub fn push_text(&mut self, text: &str, x: f32, y: f32) {
+        let scale = 16.0;
+        
+        let section = wgpu_glyph::OwnedVariedSection {
+            screen_position: (x, y),
+            text: vec![
+                wgpu_glyph::OwnedSectionText {
+                    text: text.to_string(),
+                    scale: wgpu_glyph::Scale::uniform(scale),
+                    color: [1.0; 4],
+                    font_id: wgpu_glyph::FontId(0),
+                    custom: wgpu_glyph::DrawMode::pixelated(1.0),
+                }
+            ],
+            ..wgpu_glyph::OwnedVariedSection::default()
+        };
+
+        self.inner.push(section);
+    }
+}
+
+#[derive(Default)]
+pub struct Lines3DBuffer {
+    inner: Vec<Vertex>,
+}
+
+impl Lines3DBuffer {
+    fn clear(&mut self) {
+        self.inner.clear();
     }
 
     pub fn push_3d_lines<I: Iterator<Item=Vector3<f32>>>(&mut self, iterator: I, colour: [f32; 3]) {
@@ -553,8 +575,8 @@ impl Buffers {
             let vertex = Vertex::with_colour(vector, colour);
 
             if let Some(last) = last {
-                self.lines_3d_buffer.push(last);
-                self.lines_3d_buffer.push(vertex);
+                self.inner.push(last);
+                self.inner.push(vertex);
             }
 
             last = Some(vertex);
@@ -585,60 +607,72 @@ impl Buffers {
         self.push_3d_lines(iterator, colour);
     }
 
+    fn upload(&self, device: &wgpu::Device) -> Option<wgpu::Buffer> {
+        if self.inner.is_empty() {
+            None
+        } else {
+            Some(device.create_buffer_with_data(self.inner.as_bytes(), wgpu::BufferUsage::VERTEX))
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct BillboardBuffer {
+    inner: Vec<InstanceVertex>
+}
+
+impl BillboardBuffer {
+    fn clear(&mut self) {
+        self.inner.clear();
+    }
+
     pub fn push_billboard(&mut self, matrix: Matrix4<f32>, image: Image) {
         let vertex = InstanceVertex {
             instance_pos: matrix.into(),
             uv_dimensions: image.dimensions().into(),
             uv_offset: image.offset().into()
         };
-        self.billboard_buffer.push(vertex);
+        self.inner.push(vertex);
     }
 
-    pub fn push_text(&mut self, text: &str, x: f32, y: f32) {
-        let scale = 16.0;
-        
-        let section = wgpu_glyph::OwnedVariedSection {
-            screen_position: (x, y),
-            text: vec![
-                wgpu_glyph::OwnedSectionText {
-                    text: text.to_string(),
-                    scale: wgpu_glyph::Scale::uniform(scale),
-                    color: [1.0; 4],
-                    font_id: wgpu_glyph::FontId(0),
-                    custom: wgpu_glyph::DrawMode::pixelated(1.0),
-                }
-            ],
-            ..wgpu_glyph::OwnedVariedSection::default()
-        };
-
-        self.text_buffer.push(section);
+    fn upload(&self, device: &wgpu::Device) -> Option<wgpu::Buffer> {
+        if self.inner.is_empty() {
+            None
+        } else {
+            Some(device.create_buffer_with_data(self.inner.as_bytes(), wgpu::BufferUsage::VERTEX))
+        }
     }
+}
 
-    fn to_gpu(&self, device: &wgpu::Device, bind_group_layout: &wgpu::BindGroupLayout, uniforms_buffer: &wgpu::Buffer, res: &Resources, sampler: &wgpu::Sampler) -> GpuBuffers {
-        GpuBuffers {
-            models: [
-                self.buffer_and_bind_group(0, device, bind_group_layout, uniforms_buffer, res, sampler),
-                self.buffer_and_bind_group(1, device, bind_group_layout, uniforms_buffer, res, sampler),
-                self.buffer_and_bind_group(2, device, bind_group_layout, uniforms_buffer, res, sampler),
-                self.buffer_and_bind_group(3, device, bind_group_layout, uniforms_buffer, res, sampler),
-                self.buffer_and_bind_group(4, device, bind_group_layout, uniforms_buffer, res, sampler),
-                self.buffer_and_bind_group(5, device, bind_group_layout, uniforms_buffer, res, sampler),
-            ],
-            billboard_buffer: if self.billboard_buffer.is_empty() {
-                None
-            } else {
-                Some(device.create_buffer_with_data(self.billboard_buffer.as_bytes(), wgpu::BufferUsage::VERTEX))
-            },
-            lines_3d_buffer: if self.lines_3d_buffer.is_empty() {
-                None
-            } else {
-                Some(device.create_buffer_with_data(self.lines_3d_buffer.as_bytes(), wgpu::BufferUsage::VERTEX))
-            },
+#[derive(Default)]
+pub struct ModelBuffers {
+    inner: [Vec<InstanceVertex>; 6]
+}
+
+impl ModelBuffers {
+    fn clear(&mut self) {
+        for buffer in &mut self.inner {
+            buffer.clear();
         }
     }
 
+    pub fn push_model(&mut self, model: Model, instance: InstanceVertex) {
+        self.inner[model as usize].push(instance);
+    }
+
+    fn upload(&self, device: &wgpu::Device, bind_group_layout: &wgpu::BindGroupLayout, uniforms_buffer: &wgpu::Buffer, res: &Resources, sampler: &wgpu::Sampler) -> [Option<(wgpu::Buffer, wgpu::BindGroup)>; 6] {
+        [
+            self.buffer_and_bind_group(0, device, bind_group_layout, uniforms_buffer, res, sampler),
+            self.buffer_and_bind_group(1, device, bind_group_layout, uniforms_buffer, res, sampler),
+            self.buffer_and_bind_group(2, device, bind_group_layout, uniforms_buffer, res, sampler),
+            self.buffer_and_bind_group(3, device, bind_group_layout, uniforms_buffer, res, sampler),
+            self.buffer_and_bind_group(4, device, bind_group_layout, uniforms_buffer, res, sampler),
+            self.buffer_and_bind_group(5, device, bind_group_layout, uniforms_buffer, res, sampler),
+        ]
+    }
+
     fn buffer_and_bind_group(&self, index: usize, device: &wgpu::Device, bind_group_layout: &wgpu::BindGroupLayout, uniforms_buffer: &wgpu::Buffer, res: &Resources, sampler: &wgpu::Sampler) -> Option<(wgpu::Buffer, wgpu::BindGroup)> {
-        buffer_and_bind_group(device, self.model_buffers[index].as_bytes(), bind_group_layout, uniforms_buffer, &res.models[index].texture, sampler)
+        buffer_and_bind_group(device, self.inner[index].as_bytes(), bind_group_layout, uniforms_buffer, &res.models[index].texture, sampler)
     }
 }
 

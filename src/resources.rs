@@ -71,9 +71,9 @@ impl Log {
         });
     }
 
-    pub fn render(&self, buffers: &mut context::Buffers, height: f32) {
+    pub fn render(&self, buffer: &mut context::TextBuffer, height: f32) {
         for (i, item) in self.iter().enumerate() {
-            buffers.push_text(&item.content, 10.0, height - 30.0 - i as f32 * 20.0);
+            buffer.push_text(&item.content, 10.0, height - 30.0 - i as f32 * 20.0);
         }
     }
 }
