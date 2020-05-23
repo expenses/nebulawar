@@ -110,7 +110,7 @@ impl<'a> System<'a> for SetMouseRay {
     );
 
     fn run(&mut self, (mut ray, controls, camera, screen_dims): Self::SystemData) {
-        ray.0 = camera.ray(controls.mouse(), screen_dims.0);
+        ray.0 = camera.ray(controls.mouse(), screen_dims.0.into());
     }
 }
 

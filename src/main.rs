@@ -142,6 +142,7 @@ impl Game {
         let (context, meshes) = context::Context::new(events_loop).await;
 
         world.insert(Meshes::new(meshes));
+        world.insert(Dpi(context.dpi()));
 
         Self {
             context, world,
@@ -152,7 +153,7 @@ impl Game {
 
     fn update(&mut self, secs: f32) {
         *self.world.write_resource() = Secs(secs);
-        *self.world.write_resource() = ScreenDimensions(self.context.screen_dimensions());
+        *self.world.write_resource() = ScreenDimensions(self.context.screen_dimensions().into());
 
         self.update_dispatcher.dispatch(&self.world);
 
@@ -162,12 +163,12 @@ impl Game {
     fn render(&mut self) {
         self.render_dispatcher.dispatch(&self.world);
 
-        let (camera, system, mut buffers, mut line_buffers, mut lines_3d, mut billboards, mut text): (
+        let (camera, system, mut buffers, mut line_buffers, mut billboards, mut text): (
             specs::Read<camera::Camera>, specs::Read<star_system::StarSystem>,
             specs::Write<context::ModelBuffers>, specs::Write<context::LineBuffers>,
-            specs::Write<context::Lines3DBuffer>, specs::Write<context::BillboardBuffer>, specs::Write<context::TextBuffer>,
+            specs::Write<context::BillboardBuffer>, specs::Write<context::TextBuffer>,
         ) = self.world.system_data();
-        self.context.render(&mut buffers, &mut line_buffers, &mut lines_3d, &mut billboards, &mut text, wgpu::Color {r: 0.0, g: 0.0, b: 0.0, a: 1.0}, &camera, &system);
+        self.context.render(&mut buffers, &mut line_buffers, &mut billboards, &mut text, wgpu::Color {r: 0.0, g: 0.0, b: 0.0, a: 1.0}, &camera, &system);
     }
 
     fn print_error<E: failure::Fail>(&mut self, error: &E) {
@@ -261,7 +262,6 @@ fn create_world() -> World {
     world.insert(context::ModelBuffers::default());
     world.insert(context::LineBuffers::default());
     world.insert(context::BillboardBuffer::default());
-    world.insert(context::Lines3DBuffer::default());
     world.insert(context::TextBuffer::default());
 
     world.register::<Position>();

@@ -71,9 +71,9 @@ impl Log {
         });
     }
 
-    pub fn render(&self, buffer: &mut context::TextBuffer, height: f32) {
+    pub fn render(&self, buffer: &mut context::TextBuffer, height: f32, dpi: f32) {
         for (i, item) in self.iter().enumerate() {
-            buffer.push_text(&item.content, 10.0, height - 30.0 - i as f32 * 20.0);
+            buffer.push_text(&item.content, 10.0, height - 30.0 - i as f32 * 20.0, dpi);
         }
     }
 }
@@ -96,8 +96,14 @@ impl Default for MouseRay {
     }
 }
 
-#[derive(Component, Default)]
-pub struct ScreenDimensions(pub (f32, f32));
+#[derive(Component)]
+pub struct ScreenDimensions(pub Vector2<f32>);
+
+impl Default for ScreenDimensions {
+    fn default() -> Self {
+        Self(Vector2::new(0.0, 0.0))
+    }
+}
 
 #[derive(Component, Default, Clone, Serialize, Deserialize)]
 pub struct Debug(pub bool);
@@ -159,3 +165,6 @@ impl Default for Meshes {
         }
     }
 }
+
+#[derive(Default)]
+pub struct Dpi(pub f32);

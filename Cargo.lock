@@ -581,6 +581,7 @@ dependencies = [
  "noise",
  "obj",
  "odds",
+ "ordered-float",
  "pedot",
  "rand 0.7.3",
  "serde",

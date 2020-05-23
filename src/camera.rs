@@ -77,7 +77,7 @@ impl Camera {
         self.center = move_towards(self.center, target, 50.0);
     }
 
-    pub fn screen_position(&self, point: Vector3<f32>, (screen_width, screen_height): (f32, f32)) -> Option<(f32, f32, f32)> {
+    pub fn screen_position(&self, point: Vector3<f32>, (screen_width, screen_height): (f32, f32), allow_behind: bool) -> Option<Vector3<f32>> {
         let modelview = self.view_matrix() * Matrix4::from_translation(point);
 
         let gl_position = perspective_matrix(screen_height / screen_width) * modelview * Vector4::new(0.0, 0.0, 0.0, 1.0);
@@ -90,8 +90,8 @@ impl Camera {
         // this may be dpi dependent, not sure
         let (x, y) = (x * 2.0, y * 2.0);
 
-        if z < 1.0 {
-            Some((x, y, z))
+        if allow_behind || z < 1.0 {
+            Some(Vector3::new(x, y, z))
         } else {
             None
         }

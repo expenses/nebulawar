@@ -65,6 +65,7 @@ wasm-bindgen-futures = "0.4.12"
 wasm-timer = "0.2.4"
 js-sys = "0.3.39"
 wgpu_glyph = { git = "https://github.com/expenses/wgpu_glyph", branch = "experimental" }
+ordered-float = "1.0.2"
 
 [features]
 default = ['embed_resources', "native"]

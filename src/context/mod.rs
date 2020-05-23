@@ -70,7 +70,6 @@ pub struct Context {
 
     bind_group_layout: wgpu::BindGroupLayout,
     triangle_pipeline: wgpu::RenderPipeline,
-    line_pipeline: wgpu::RenderPipeline,
     point_pipeline: wgpu::RenderPipeline,
     billboard_pipeline: wgpu::RenderPipeline,
     sampler: wgpu::Sampler,
@@ -202,7 +201,6 @@ impl Context {
 
         let triangle_pipeline = create_pipeline(&device, &pipeline_layout, &vs_module, &fs_module, wgpu::PrimitiveTopology::TriangleList, true);
         let billboard_pipeline = create_pipeline(&device, &pipeline_layout, &vs_module, &fs_module, wgpu::PrimitiveTopology::TriangleList, false);
-        let line_pipeline = create_pipeline(&device, &pipeline_layout, &vs_module, &fs_module, wgpu::PrimitiveTopology::LineList, true);
         let point_pipeline = create_pipeline(&device, &pipeline_layout, &vs_module, &fs_module, wgpu::PrimitiveTopology::PointList, true);
 
         let identity_instance = device.create_buffer_with_data(InstanceVertex::identity().as_bytes(), wgpu::BufferUsage::VERTEX);
@@ -228,7 +226,7 @@ impl Context {
 
         (
             Self {
-                swap_chain, triangle_pipeline, point_pipeline, bind_group_layout, identity_instance, line_pipeline, billboard_pipeline,
+                swap_chain, triangle_pipeline, point_pipeline, bind_group_layout, identity_instance, billboard_pipeline,
                 queue, sampler, resources, device, window, surface, depth_texture, billboard_vertices, lines, glyph_brush, gui,
             },
             meshes
@@ -237,6 +235,10 @@ impl Context {
 
     pub fn copy_event(&mut self, event: &event::WindowEvent) {
         self.gui.update(event);
+    }
+
+    pub fn dpi(&self) -> f32 {
+        self.window.scale_factor() as f32
     }
 
     pub fn screen_dimensions(&self) -> (f32, f32) {
@@ -260,6 +262,7 @@ impl Context {
             light_direction: [system.light.x, system.light.y, system.light.z, 0.0],
             ambient_colour: [system.ambient_colour[0], system.ambient_colour[1], system.ambient_colour[2], 0.0],
             mode: mode as i32,
+            dpi: self.dpi()
         };
         
         self.device.create_buffer_with_data(uniforms.as_bytes(), wgpu::BufferUsage::UNIFORM)
@@ -272,12 +275,11 @@ impl Context {
 
     pub fn render(
         &mut self,
-        model_buffers: &mut ModelBuffers, lines: &mut LineBuffers, lines_3d: &mut Lines3DBuffer, billboards: &mut BillboardBuffer, text: &mut TextBuffer,
+        model_buffers: &mut ModelBuffers, lines: &mut LineBuffers, billboards: &mut BillboardBuffer, text: &mut TextBuffer,
         clear_colour: wgpu::Color, camera: &Camera, system: &StarSystem
     ) {        
         let normal_uniforms = self.uniforms(camera.view_matrix(), system, Mode::Normal);
 
-        let vertex_coloured_bind_group = self.bind_group_from_uniforms(camera.view_matrix(), system, Mode::VertexColoured);
         let shadeless_bind_group = self.bind_group_from_uniforms(camera.view_matrix(), system, Mode::Shadeless);
         let nebula_bind_group = self.bind_group_from_uniforms(camera.view_matrix_only_direction(), system, Mode::VertexColoured);
         let star_bind_group = self.bind_group_from_uniforms(camera.view_matrix_only_direction(), system, Mode::White);
@@ -287,7 +289,6 @@ impl Context {
         let star_buffer = self.device.create_buffer_with_data(&system.stars.as_bytes(), wgpu::BufferUsage::VERTEX);
 
         let gpu_lines = lines.upload(&self.device);
-        let gpu_lines_3d = lines_3d.upload(&self.device);
         let gpu_billboards = billboards.upload(&self.device);
 
         let output = self.swap_chain.get_next_texture().unwrap();
@@ -341,14 +342,6 @@ impl Context {
             pass.set_vertex_buffer(1, self.identity_instance.slice(0 .. 0));
             pass.draw(0 .. system.stars.len() as u32, 0 .. 1);
 
-            if let Some(gpu_lines_3d) = &gpu_lines_3d {
-                pass.set_pipeline(&self.line_pipeline);
-                pass.set_bind_group(0, &vertex_coloured_bind_group, &[]);
-                pass.set_vertex_buffer(0, gpu_lines_3d.slice(0 .. 0));
-                pass.set_vertex_buffer(1, self.identity_instance.slice(0 .. 0));
-                pass.draw(0 .. lines_3d.inner.len() as u32, 0 .. 1);
-            }
-
             if let Some((vertices, indices)) = &gpu_lines {
                 pass.set_pipeline(&self.lines.pipeline);
                 pass.set_bind_group(0, &self.lines.bind_group, &[]);
@@ -385,7 +378,6 @@ impl Context {
         model_buffers.clear();
         lines.clear();
         billboards.clear();
-        lines_3d.clear();
         text.clear();
     }
 
@@ -525,6 +517,7 @@ pub struct Uniforms {
     light_direction: [f32; 4],
     ambient_colour: [f32; 4],
     mode: i32,
+    dpi: f32,
 }
 
 #[derive(Default)]
@@ -537,8 +530,8 @@ impl TextBuffer {
         self.inner.clear();
     }
 
-    pub fn push_text(&mut self, text: &str, x: f32, y: f32) {
-        let scale = 16.0;
+    pub fn push_text(&mut self, text: &str, x: f32, y: f32, dpi: f32) {
+        let scale = 16.0 * dpi.round();
         
         let section = wgpu_glyph::OwnedVariedSection {
             screen_position: (x, y),
@@ -555,64 +548,6 @@ impl TextBuffer {
         };
 
         self.inner.push(section);
-    }
-}
-
-#[derive(Default)]
-pub struct Lines3DBuffer {
-    inner: Vec<Vertex>,
-}
-
-impl Lines3DBuffer {
-    fn clear(&mut self) {
-        self.inner.clear();
-    }
-
-    pub fn push_3d_lines<I: Iterator<Item=Vector3<f32>>>(&mut self, iterator: I, colour: [f32; 3]) {
-        let mut last = None;
-
-        for vector in iterator {
-            let vertex = Vertex::with_colour(vector, colour);
-
-            if let Some(last) = last {
-                self.inner.push(last);
-                self.inner.push(vertex);
-            }
-
-            last = Some(vertex);
-        }
-    }
-
-    pub fn push_3d_line(&mut self, start: Vector3<f32>, end: Vector3<f32>, colour: [f32; 3]) {
-        self.push_3d_lines(iter_owned([start, end]), colour);
-    }
-
-    pub fn push_circle(&mut self, position: Vector3<f32>, size: f32, colour: [f32; 3], camera: &Camera) {
-        let points = 20;
-
-        let rotation = look_at(-camera.direction());
-
-        let iterator = (0 .. points)
-            .chain(iter_owned([0]))
-            .map(|point| {
-                let percentage = point as f32 / PI;
-
-                position + rotation * Vector3::new(
-                    percentage.sin() * size,
-                    percentage.cos() * size,
-                    0.0
-                )
-            });
-
-        self.push_3d_lines(iterator, colour);
-    }
-
-    fn upload(&self, device: &wgpu::Device) -> Option<wgpu::Buffer> {
-        if self.inner.is_empty() {
-            None
-        } else {
-            Some(device.create_buffer_with_data(self.inner.as_bytes(), wgpu::BufferUsage::VERTEX))
-        }
     }
 }
 

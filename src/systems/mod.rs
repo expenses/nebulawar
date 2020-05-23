@@ -67,8 +67,8 @@ impl<'a> System<'a> for DragSelectSystem {
     fn run(&mut self, (controls, camera, screen_dims, pos, mut selectable): Self::SystemData) {
         if let Some((left, top, right, bottom)) = controls.left_drag_rect() {
             for (pos, selectable) in (&pos, &mut selectable).join() {
-                if let Some((x, y, _)) = camera.screen_position(pos.0, screen_dims.0) {
-                    let selected = x >= left && x <= right && y >= top && y <= bottom;
+                if let Some(pos) = camera.screen_position(pos.0, screen_dims.0.into(), false) {
+                    let selected = pos.x >= left && pos.x <= right && pos.y >= top && pos.y <= bottom;
                     
                     if !controls.shift {
                         selectable.selected = selected;

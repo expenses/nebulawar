@@ -9,16 +9,17 @@ use super::*;
 #[repr(C)]
 #[derive(Copy, Clone, Debug, zerocopy::AsBytes, Default)]
 struct Vertex2d {
-    position: [f32; 2],
+    // Position in screen space (x, y, depth)
+    position: [f32; 3],
     colour: [f32; 4],
     uv: [f32; 2]
 }
 
 impl Vertex2d {
-    fn new(pos: Vector2<f32>, window_size: Vector2<f32>, uv: [f32; 2], colour: [f32; 4]) -> Self {
+    fn new(pos: Vector2<f32>, window_size: Vector2<f32>, uv: [f32; 2], colour: [f32; 4], depth: f32) -> Self {
         let (x, y) = screen_pos_to_opengl_pos(pos.x, pos.y, window_size.x, window_size.y);
         Self {
-            position: [x, y],
+            position: [x, y, depth],
             uv, colour
         }
     }
@@ -27,24 +28,34 @@ impl Vertex2d {
 struct Constructor {
     colour: [f32; 4],
     window_size: Vector2<f32>,
+    line_depths: Option<(f32, f32)>
 }
 
 impl Constructor {
-    fn new(colour: [f32; 4], window_size: Vector2<f32>) -> Self {
+    fn new(colour: [f32; 4], window_size: Vector2<f32>, line_depths: Option<(f32, f32)>) -> Self {
         Self {
-            colour, window_size
+            colour, window_size, line_depths
         }
     }
 }
 
 impl FillVertexConstructor<Vertex2d> for Constructor {
     fn new_vertex(&mut self, point: Point, _: FillAttributes) -> Vertex2d {
-        Vertex2d::new(point.to_array().into(), self.window_size, [0.0; 2], self.colour)
+        Vertex2d::new(point.to_array().into(), self.window_size, [0.0; 2], self.colour, 0.0)
     }
 }
 impl StrokeVertexConstructor<Vertex2d> for Constructor {
-    fn new_vertex(&mut self, point: Point, _: StrokeAttributes) -> Vertex2d {
-        Vertex2d::new(point.to_array().into(), self.window_size, [0.0; 2], self.colour)
+    fn new_vertex(&mut self, point: Point, attr: StrokeAttributes) -> Vertex2d {
+        let depth = if let Some((start_depth, end_depth)) = self.line_depths {
+            if attr.advancement() == 0.0 {
+                start_depth
+            } else {
+                end_depth
+            }
+        } else {
+            0.0
+        };
+        Vertex2d::new(point.to_array().into(), self.window_size, [0.0; 2], self.colour, depth)
     }
 }
 
@@ -130,7 +141,7 @@ impl LineRenderer {
                     wgpu::VertexBufferDescriptor {
                         stride: std::mem::size_of::<Vertex2d>() as wgpu::BufferAddress,
                         step_mode: wgpu::InputStepMode::Vertex,
-                        attributes: &vertex_attr_array![0 => Float2, 1 => Float4, 2 => Float2],
+                        attributes: &vertex_attr_array![0 => Float3, 1 => Float4, 2 => Float2],
                     },
                 ],
             },
@@ -166,6 +177,65 @@ pub struct LineBuffers {
 }
 
 impl LineBuffers {
+    pub fn push_3d_lines<I: Iterator<Item=Vector3<f32>>>(&mut self, iterator: I, colour: [f32; 3], window_size: Vector2<f32>, camera: &Camera) {
+        let mut last = None;
+
+        for point in iterator {
+            if let Some(last) = last {
+                self.push_3d_line(last, point, colour, window_size, camera);
+            }
+
+            last = Some(point);
+        }
+    }
+
+    pub fn push_circle(&mut self, position: Vector3<f32>, size: f32, colour: [f32; 3], window_size: Vector2<f32>, camera: &Camera) {
+        let points = 20;
+
+        let rotation = look_at(-camera.direction());
+
+        let iterator = (0 .. points)
+            .chain(iter_owned([0]))
+            .map(|point| {
+                let percentage = point as f32 / PI;
+
+                position + rotation * Vector3::new(
+                    percentage.sin() * size,
+                    percentage.cos() * size,
+                    0.0
+                )
+            });
+
+        self.push_3d_lines(iterator, colour, window_size, camera);
+    }
+
+
+    pub fn push_3d_line(&mut self, start: Vector3<f32>, end: Vector3<f32>, colour: [f32; 3], window_size: Vector2<f32>, camera: &Camera) {
+        let mut start = camera.screen_position(start, window_size.into(), true).unwrap();
+        let mut end = camera.screen_position(end, window_size.into(), true).unwrap();
+
+        if end.z >= 1.0 {
+            // todo: set to screen edge
+            end.x = start.x - (end.x - start.x) * 10.0;
+            end.y = start.y - (end.y - start.y) * 10.0;
+            end.z = 1.0;
+        }
+
+        if start.z >= 1.0 {
+            // todo: set to screen edge
+            start.x = end.x - (start.x - end.x) * 10.0;
+            start.y = end.y - (start.y - end.y) * 10.0;
+            start.z = 1.0;
+        }
+
+        stroke_polyline(
+            iter_owned([point(start.x, start.y), point(end.x, end.y)]),
+            false,
+            &StrokeOptions::tolerance(0.5).with_line_width(2.0),
+            &mut BuffersBuilder::new(&mut self.vertex_buffers, Constructor::new([colour[0], colour[1], colour[2], 1.0], window_size, Some((start.z, end.z))))
+        ).unwrap();
+    }
+
     pub fn push_rect(&mut self, (left, top): (f32, f32), (right, bottom): (f32, f32), window_size: Vector2<f32>) {
         let origin_x = left.min(right);
         let origin_y = top.min(bottom);
@@ -175,7 +245,7 @@ impl LineBuffers {
         stroke_rectangle(
             &rect(origin_x, origin_y, width, height),
             &StrokeOptions::tolerance(0.5).with_line_width(1.0),
-            &mut BuffersBuilder::new(&mut self.vertex_buffers, Constructor::new([1.0; 4], window_size))
+            &mut BuffersBuilder::new(&mut self.vertex_buffers, Constructor::new([1.0; 4], window_size, None))
         ).unwrap();
     }
     
@@ -183,10 +253,10 @@ impl LineBuffers {
         let len = self.vertex_buffers.vertices.len() as u16;
 
         self.vertex_buffers.vertices.extend_from_slice(&[
-            Vertex2d::new(Vector2::new(x - width / 2.0, y - height / 2.0), window_size, image.translate([0.0, 1.0]), overlay),
-            Vertex2d::new(Vector2::new(x + width / 2.0, y - height / 2.0), window_size, image.translate([1.0, 1.0]), overlay),
-            Vertex2d::new(Vector2::new(x - width / 2.0, y + height / 2.0), window_size, image.translate([0.0, 0.0]), overlay),
-            Vertex2d::new(Vector2::new(x + width / 2.0, y + height / 2.0), window_size, image.translate([1.0, 0.0]), overlay)
+            Vertex2d::new(Vector2::new(x - width / 2.0, y - height / 2.0), window_size, image.translate([0.0, 1.0]), overlay, 0.0),
+            Vertex2d::new(Vector2::new(x + width / 2.0, y - height / 2.0), window_size, image.translate([1.0, 1.0]), overlay, 0.0),
+            Vertex2d::new(Vector2::new(x - width / 2.0, y + height / 2.0), window_size, image.translate([0.0, 0.0]), overlay, 0.0),
+            Vertex2d::new(Vector2::new(x + width / 2.0, y + height / 2.0), window_size, image.translate([1.0, 0.0]), overlay, 0.0)
         ]);
 
         self.vertex_buffers.indices.extend_from_slice(&[
