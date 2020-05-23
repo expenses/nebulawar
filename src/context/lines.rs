@@ -231,6 +231,7 @@ impl LineBuffers {
         stroke_polyline(
             iter_owned([point(start.x, start.y), point(end.x, end.y)]),
             false,
+            // todo: maybe replace this thickness with dpi
             &StrokeOptions::tolerance(0.5).with_line_width(2.0),
             &mut BuffersBuilder::new(&mut self.vertex_buffers, Constructor::new([colour[0], colour[1], colour[2], 1.0], window_size, Some((start.z, end.z))))
         ).unwrap();
