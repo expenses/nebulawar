@@ -68,11 +68,9 @@ wgpu_glyph = { git = "https://github.com/expenses/wgpu_glyph", branch = "experim
 ordered-float = "1.0.2"
 
 [features]
-default = ['embed_resources', "native"]
+default = ["native"]
 native = ["specs/parallel"]
 wasm = ["winit/web-sys"]
-
-embed_resources = []
 
 [package.metadata.bundle]
 name = "Fleet Commander"
@@ -80,6 +78,7 @@ identifier = "io.github.expenses.fleet_commander"
 icon = ["resources/ui/mine.png"]
 
 [build-dependencies]
-texture_packer = "0.21.1"
+texture_packer = { git = "https://github.com/expenses/texture_packer", branch = "row-padding" }
 image = { version = "0.23.4", default-features = false, features = ["png"] }
 codegen = { git = "https://github.com/carllerche/codegen" }
+case_style = "0.2.1"

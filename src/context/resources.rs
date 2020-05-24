@@ -41,20 +41,10 @@ const BOTTOM_RIGHT: Vertex = Vertex {
 
 pub const BILLBOARD_VERTICES: [Vertex; 6] = [TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT];
 
-#[cfg(feature = "embed_resources")]
 macro_rules! load_resource {
     ($filename:expr) => (
         include_bytes!(concat!("../../resources/", $filename))
     )
-}
-
-#[cfg(not(feature = "embed_resources"))]
-macro_rules! load_resource {
-    ($filename:expr) => ({
-        use std::fs;
-        use std::path::*;
-        &fs::read(PathBuf::from("resources").join($filename))?
-    })
 }
 
 pub fn load_image(encoder: &mut wgpu::CommandEncoder, device: &wgpu::Device, bytes: &[u8]) -> wgpu::TextureView {
@@ -100,7 +90,7 @@ pub fn load_image(encoder: &mut wgpu::CommandEncoder, device: &wgpu::Device, byt
 }
 
 // Returns a vertex buffer that should be rendered as `TrianglesList`.
-pub fn load_wavefront(data: &[u8]) ->  Vec<Vertex> {
+pub fn load_wavefront(data: &[u8], image: Image) ->  Vec<Vertex> {
     let mut data = io::BufReader::new(data);
     let data = ObjData::load_buf(&mut data).unwrap();
 
@@ -116,10 +106,12 @@ pub fn load_wavefront(data: &[u8]) ->  Vec<Vertex> {
             }
         })
         .map(|v| {
+            let texture = v.1.map(|index| texture[index]).unwrap_or([0.0, 0.0]);
+
             Vertex {
                 position: position[v.0],
                 normal: v.2.map(|index| normal[index]).unwrap_or([0.0, 0.0, 0.0]),
-                texture: v.1.map(|index| texture[index]).unwrap_or([0.0, 0.0]),
+                texture: image.translate(texture),
             }
         })
         .collect()
@@ -139,13 +131,12 @@ pub enum Model {
 
 pub struct ObjModel {
     pub vertices: wgpu::Buffer,
-    pub texture: wgpu::TextureView,
     pub vertices_len: usize,
 }
 
 impl ObjModel {
-    fn new(encoder: &mut wgpu::CommandEncoder, device: &wgpu::Device, model: &[u8], image: &[u8]) -> io::Result<(Self, TriMesh<f32>)> {
-        let vertices = load_wavefront(model);
+    fn new(device: &wgpu::Device, model: &[u8], image: Image) -> io::Result<(Self, TriMesh<f32>)> {
+        let vertices = load_wavefront(model, image);
 
         let points: Vec<_> = vertices.iter()
             .map(|vertex| Point3::new(vertex.position[0], vertex.position[1], vertex.position[2]))
@@ -159,7 +150,6 @@ impl ObjModel {
             Self {
                 vertices_len: vertices.len(),
                 vertices: device.create_buffer_with_data(vertices.as_bytes(), wgpu::BufferUsage::VERTEX),
-                texture: load_image(encoder, device, image),
             },
             TriMesh::new(points, faces, None)
         ))
@@ -180,12 +170,12 @@ impl Resources {
         let mut meshes = MeshArray::new();
         let mut models = Models::new();
 
-        add_model(&mut meshes, &mut models, encoder, device, load_resource!("models/fighter.obj"),  load_resource!("models/fighter.png"))?;
-        add_model(&mut meshes, &mut models, encoder, device, load_resource!("models/tanker.obj"),   load_resource!("models/tanker.png"))?;
-        add_model(&mut meshes, &mut models, encoder, device, load_resource!("models/carrier.obj"),  load_resource!("models/carrier.png"))?;
-        add_model(&mut meshes, &mut models, encoder, device, load_resource!("models/asteroid.obj"), load_resource!("models/asteroid.png"))?;
-        add_model(&mut meshes, &mut models, encoder, device, load_resource!("models/miner.obj"),    load_resource!("models/miner.png"))?;
-        add_model(&mut meshes, &mut models, encoder, device, load_resource!("models/missile.obj"),  load_resource!("models/missile.png"))?;
+        add_model(&mut meshes, &mut models, device, load_resource!("models/fighter.obj"),  Image::Fighter)?;
+        add_model(&mut meshes, &mut models, device, load_resource!("models/tanker.obj"),   Image::Tanker)?;
+        add_model(&mut meshes, &mut models, device, load_resource!("models/carrier.obj"),  Image::Carrier)?;
+        add_model(&mut meshes, &mut models, device, load_resource!("models/asteroid.obj"), Image::Asteroid)?;
+        add_model(&mut meshes, &mut models, device, load_resource!("models/miner.obj"),    Image::Miner)?;
+        add_model(&mut meshes, &mut models, device, load_resource!("models/missile.obj"),  Image::Missile)?;
 
         Ok((
             Self {
@@ -197,8 +187,8 @@ impl Resources {
     }
 }
 
-pub fn add_model(meshes: &mut MeshArray, models: &mut Models, encoder: &mut wgpu::CommandEncoder, device: &wgpu::Device, obj: &[u8], png: &[u8]) -> Result<(), failure::Error> {
-    let (object, mesh) = ObjModel::new(encoder, device, obj, png)?;
+pub fn add_model(meshes: &mut MeshArray, models: &mut Models, device: &wgpu::Device, obj: &[u8], image: Image) -> Result<(), failure::Error> {
+    let (object, mesh) = ObjModel::new(device, obj, image)?;
     models.push(object);
     meshes.push(mesh);
 

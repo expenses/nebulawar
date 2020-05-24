@@ -3,8 +3,21 @@ use codegen::*;
 use std::path::*;
 use image::DynamicImage;
 
-fn load_image(filename: &str) -> DynamicImage {
-    ImageImporter::import_from_file(Path::new(filename)).unwrap()
+fn load_image(path: &Path) -> DynamicImage {
+    println!("{}", path.display());
+    ImageImporter::import_from_file(path).unwrap()
+}
+
+fn load_dir(path: &str, packer: &mut TexturePacker<DynamicImage>) {
+    for entry in std::fs::read_dir(path).unwrap() {
+        let path = entry.unwrap().path();
+
+        if path.extension() == Some(std::ffi::OsStr::new("png")) {
+            let stem = path.file_stem().unwrap().to_str().unwrap();
+            let capitalised = case_style::CaseStyle::guess(stem).unwrap().to_pascalcase();
+            packer.pack_own(capitalised, load_image(&path)).unwrap();
+        }
+    }
 }
 
 fn main() {
@@ -14,17 +27,15 @@ fn main() {
         .. Default::default()
     });
 
-    packer.pack_own("Star".to_string(), load_image("resources/star.png")).unwrap();
-    packer.pack_own("Smoke".to_string(), load_image("resources/smoke.png")).unwrap();
-    packer.pack_own("Mine".to_string(), load_image("resources/mine.png")).unwrap();
-    packer.pack_own("Move".to_string(), load_image("resources/move.png")).unwrap();
-    packer.pack_own("Attack".to_string(), load_image("resources/attack.png")).unwrap();
-    packer.pack_own("Explosion1".to_string(), load_image("resources/explosion/1.png")).unwrap();
-    packer.pack_own("Explosion2".to_string(), load_image("resources/explosion/2.png")).unwrap();
-    packer.pack_own("Explosion3".to_string(), load_image("resources/explosion/3.png")).unwrap();
-    packer.pack_own("Explosion4".to_string(), load_image("resources/explosion/4.png")).unwrap();
-    packer.pack_own("Explosion5".to_string(), load_image("resources/explosion/5.png")).unwrap();
-    packer.pack_own("Explosion6".to_string(), load_image("resources/explosion/6.png")).unwrap();
+    load_dir("resources", &mut packer);
+    load_dir("resources/models", &mut packer);
+
+    let width = packer.width();
+
+    if width % 64 != 0 {
+        let needed = 64 - (width % 64);
+        packer.set_row_padding(needed);
+    }
 
     let mut scope = Scope::new();
 
@@ -81,7 +92,7 @@ fn main() {
             .line("let dim = self.dimensions();")
             .line("[
                 offset[0] + uv[0] * dim[0],
-                1.0 - (offset[1] + uv[1] * dim[1])
+                offset[1] + uv[1] * dim[1]
             ]");
     }
 
@@ -95,5 +106,6 @@ fn main() {
     // Save the result
     //
     let exporter = ImageExporter::export(&packer).unwrap();
+
     exporter.save("resources/output/packed.png").unwrap();
 }

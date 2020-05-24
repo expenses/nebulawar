@@ -200,6 +200,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "case_style"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0be601f05a919236af08cb96053cf9e9ebcfd08edca86cfad401591400f59896"
+
+[[package]]
 name = "cc"
 version = "1.0.54"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -561,6 +567,7 @@ version = "0.1.0"
 dependencies = [
  "arrayvec",
  "bincode",
+ "case_style",
  "cgmath 0.17.0",
  "codegen",
  "collision",
@@ -2563,8 +2570,7 @@ dependencies = [
 [[package]]
 name = "texture_packer"
 version = "0.21.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb33a4fd8021f9f30a7f2da815e1b0c7a3b4900ab17cff870fef2512a29dc205"
+source = "git+https://github.com/expenses/texture_packer?branch=row-padding#67b4b1ff636ada223eb610762b01e41f54a49fa0"
 dependencies = [
  "image 0.23.4",
 ]
