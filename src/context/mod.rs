@@ -602,15 +602,19 @@ pub struct InstanceVertex {
 }
 
 impl InstanceVertex {
-    pub fn new(matrix: Matrix4<f32>) -> Self {
+    pub fn new(matrix: Matrix4<f32>, image: Image) -> Self {
         Self {
             instance_pos: matrix.into(),
-            uv_offset: [0.0; 2],
-            uv_dimensions: [1.0; 2]
+            uv_offset: image.offset(),
+            uv_dimensions: image.dimensions()
         }
     }
 
     pub fn identity() -> Self {
-        Self::new(Matrix4::identity())
+        Self {
+            instance_pos: Matrix4::identity().into(),
+            uv_offset: [0.0; 2],
+            uv_dimensions: [1.0; 2]
+        }
     }
 }

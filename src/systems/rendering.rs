@@ -21,7 +21,7 @@ impl<'a> System<'a> for ObjectRenderer {
             let scale = Matrix4::from_scale(size.0);
             let rotation: Matrix4<f32> = rot.0.into();
             let position = Matrix4::from_translation(pos.0) * rotation * scale;
-            let instance = InstanceVertex::new(position);
+            let instance = InstanceVertex::new(position, model.diffuse());
             buffers.push_model(*model, instance);
         }
     }
