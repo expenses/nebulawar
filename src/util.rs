@@ -3,8 +3,8 @@ use std::f32::consts::*;
 use arrayvec;
 use std::ops::*;
 use std::collections::*;
-use rand::distributions::*;
 use rand::rngs::*;
+use rand::Rng;
 use std::cmp::*;
 
 pub const BACKGROUND_DISTANCE: f32 = 10000.0;
@@ -103,14 +103,13 @@ pub fn summarize<T: Ord, I: Iterator<Item=T>>(iterator: I) -> (BTreeMap<T, u64>,
     )
 }
 
-// http://corysimon.github.io/articles/uniformdistn-on-sphere/
 pub fn uniform_sphere_distribution(rng: &mut ThreadRng) -> Vector3<f32> {
+    uniform_sphere_distribution_from_coords(rng.gen_range(0.0, 1.0), rng.gen_range(0.0, 1.0))
+}
+
+// http://corysimon.github.io/articles/uniformdistn-on-sphere/
+pub fn uniform_sphere_distribution_from_coords(x: f64, y: f64) -> Vector3<f32> {
     use std::f64::consts::PI;
-
-    let uniform = Uniform::new(0.0, 1.0);
-
-    let x = uniform.sample(rng);
-    let y = uniform.sample(rng);
 
     let theta = 2.0 * PI * x;
     let phi = (1.0 - 2.0 * y).acos();

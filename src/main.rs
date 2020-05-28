@@ -163,12 +163,12 @@ impl Game {
     fn render(&mut self) {
         self.render_dispatcher.dispatch(&self.world);
 
-        let (camera, system, mut buffers, mut line_buffers, mut billboards, mut text): (
-            specs::Read<camera::Camera>, specs::Read<star_system::StarSystem>,
+        let (camera, mut system, mut buffers, mut line_buffers, mut billboards, mut text): (
+            specs::Read<camera::Camera>, specs::Write<star_system::StarSystem>,
             specs::Write<context::ModelBuffers>, specs::Write<context::LineBuffers>,
             specs::Write<context::BillboardBuffer>, specs::Write<context::TextBuffer>,
         ) = self.world.system_data();
-        self.context.render(&mut buffers, &mut line_buffers, &mut billboards, &mut text, wgpu::Color {r: 0.0, g: 0.0, b: 0.0, a: 1.0}, &camera, &system);
+        self.context.render(&mut buffers, &mut line_buffers, &mut billboards, &mut text, wgpu::Color {r: 0.0, g: 0.0, b: 0.0, a: 1.0}, &camera, &mut system);
     }
 
     fn print_error<E: failure::Fail>(&mut self, error: &E) {

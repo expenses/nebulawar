@@ -7,6 +7,7 @@ use entities::*;
 use spade;
 use spade::delaunay::FloatDelaunayTriangulation;
 use tint::Colour;
+use zerocopy::AsBytes;
 
 #[derive(Debug)]
 enum SystemType {
@@ -30,13 +31,28 @@ impl SystemType {
     }
 }
 
-#[derive(Serialize, Deserialize, Component, Clone)]
+#[derive(Serialize, Deserialize, Component)]
 pub struct StarSystem {
     pub location: Vector2<f32>,
-    pub stars: Vec<context::Vertex>,
+    pub stars: Vec<(f64, f64, f32)>,
     pub light: Vector3<f32>,
     pub background: Vec<context::Vertex>,
-    pub ambient_colour: [f32; 3]
+    pub ambient_colour: [f32; 3],
+    #[serde(skip)]
+    pub star_buffer: Option<wgpu::Buffer>
+}
+
+impl Clone for StarSystem {
+    fn clone(&self) -> Self {
+        Self {
+            location: self.location,
+            stars: self.stars.clone(),
+            light: self.light,
+            background: self.background.clone(),
+            ambient_colour: self.ambient_colour,
+            star_buffer: None
+        }
+    }
 }
 
 impl StarSystem {
@@ -46,12 +62,7 @@ impl StarSystem {
         let stars = 10000;
 
         let stars = (0 .. stars)
-            .map(|_| {
-                context::Vertex::with_brightness(
-                    uniform_sphere_distribution(rng) * (BACKGROUND_DISTANCE + 100.0),
-                    rng.gen_range(0.0_f32, 1.0)
-                )
-            })
+            .map(|_| (rng.gen_range(0.0, 1.0), rng.gen_range(0.0, 1.0), rng.gen_range(0.0, 1.0)))
             .collect();
 
         let mut light = uniform_sphere_distribution(rng);
@@ -68,8 +79,32 @@ impl StarSystem {
         let (background, ambient_colour) = make_background(rng);
 
         Self {
-            light, background, stars, location, ambient_colour
+            light, background, stars, location, ambient_colour,
+            star_buffer: None,
         }
+    }
+
+    pub fn star_buffer(&mut self, device: &wgpu::Device) -> &wgpu::Buffer {
+        let Self { star_buffer, stars, .. } = self;
+
+        star_buffer.get_or_insert_with(|| {
+            let vec = stars.iter()
+                .map(|&(x, y, brightness)| (uniform_sphere_distribution_from_coords(x, y), brightness))
+                .map(|(position, brightness)| {
+                    let position = position * (BACKGROUND_DISTANCE + 100.0);
+                    let rotation: Matrix4<f32> = look_at(position).into();
+                    let matrix = Matrix4::from_translation(position) * rotation * Matrix4::from_scale(BACKGROUND_DISTANCE / 400.0);
+
+                    context::InstanceVertex {
+                        instance_pos: matrix.into(),
+                        uv_dimensions: [0.0; 2],
+                        uv_offset: [brightness; 2]
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            device.create_buffer_with_data(vec.as_bytes(), wgpu::BufferUsage::VERTEX)
+        })
     }
 }
 
@@ -80,7 +115,8 @@ impl Default for StarSystem {
             stars: Vec::new(),
             light: Vector3::zero(),
             background: Vec::new(),
-            ambient_colour: [0.0; 3]
+            ambient_colour: [0.0; 3],
+            star_buffer: None,
         }
     }
 }

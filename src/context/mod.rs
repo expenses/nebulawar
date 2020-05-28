@@ -44,14 +44,6 @@ pub struct Vertex {
 }
 
 impl Vertex {
-    pub fn with_brightness(position: Vector3<f32>, brightness: f32) -> Self {
-        Self {
-            position: position.into(),
-            normal: [0.0; 3],
-            texture: [brightness; 2]
-        }
-    }
-
     pub fn with_colour(position: Vector3<f32>, colour: [f32; 3]) -> Self {
         Self {
             position: position.into(),
@@ -70,7 +62,6 @@ pub struct Context {
 
     bind_group_layout: wgpu::BindGroupLayout,
     triangle_pipeline: wgpu::RenderPipeline,
-    point_pipeline: wgpu::RenderPipeline,
     billboard_pipeline: wgpu::RenderPipeline,
     sampler: wgpu::Sampler,
 
@@ -84,20 +75,6 @@ pub struct Context {
     lines: LineRenderer,
 
     glyph_brush: wgpu_glyph::GlyphBrush<'static, ()>,
-
-    /*
-    display: Display,
-    program: Program,
-    target: Frame,
-    resources: Resources,
-    //lines: LineRenderer,
-    text_program: Program,
-    
-    text_buffer: Vec<runic::Vertex>,
-    lines_3d_buffer: Vec<Vertex>,
-    
-    smoke_buffer: Vec<InstanceVertex>,
-    */
 
     pub gui: Gui
 }
@@ -201,7 +178,6 @@ impl Context {
 
         let triangle_pipeline = create_pipeline(&device, &pipeline_layout, &vs_module, &fs_module, wgpu::PrimitiveTopology::TriangleList, true);
         let billboard_pipeline = create_pipeline(&device, &pipeline_layout, &vs_module, &fs_module, wgpu::PrimitiveTopology::TriangleList, false);
-        let point_pipeline = create_pipeline(&device, &pipeline_layout, &vs_module, &fs_module, wgpu::PrimitiveTopology::PointList, true);
 
         let identity_instance = device.create_buffer_with_data(InstanceVertex::identity().as_bytes(), wgpu::BufferUsage::VERTEX);
         let billboard_vertices = device.create_buffer_with_data(BILLBOARD_VERTICES.as_bytes(), wgpu::BufferUsage::VERTEX);
@@ -226,7 +202,7 @@ impl Context {
 
         (
             Self {
-                swap_chain, triangle_pipeline, point_pipeline, bind_group_layout, identity_instance, billboard_pipeline,
+                swap_chain, triangle_pipeline, bind_group_layout, identity_instance, billboard_pipeline,
                 queue, sampler, resources, device, window, surface, depth_texture, billboard_vertices, lines, glyph_brush, gui,
             },
             meshes
@@ -276,7 +252,7 @@ impl Context {
     pub fn render(
         &mut self,
         model_buffers: &mut ModelBuffers, lines: &mut LineBuffers, billboards: &mut BillboardBuffer, text: &mut TextBuffer,
-        clear_colour: wgpu::Color, camera: &Camera, system: &StarSystem
+        clear_colour: wgpu::Color, camera: &Camera, system: &mut StarSystem
     ) {        
         let normal_bind_group = self.bind_group_from_uniforms(camera.view_matrix(), system, Mode::Normal);
         let shadeless_bind_group = self.bind_group_from_uniforms(camera.view_matrix(), system, Mode::Shadeless);
@@ -285,7 +261,9 @@ impl Context {
 
         let gpu_model_buffers = model_buffers.upload(&self.device);
         let nebula_buffer = self.device.create_buffer_with_data(&system.background.as_bytes(), wgpu::BufferUsage::VERTEX);
-        let star_buffer = self.device.create_buffer_with_data(&system.stars.as_bytes(), wgpu::BufferUsage::VERTEX);
+        let background_len = system.background.len() as u32;
+        let stars_len = system.stars.len() as u32;
+        let star_buffer = system.star_buffer(&self.device);
 
         let gpu_lines = lines.upload(&self.device);
         let gpu_billboards = billboards.upload(&self.device);
@@ -328,18 +306,16 @@ impl Context {
             }
 
             // Background
-            pass.set_pipeline(&self.triangle_pipeline);
             pass.set_bind_group(0, &nebula_bind_group, &[]);
             pass.set_vertex_buffer(0, nebula_buffer.slice(0 .. 0));
             pass.set_vertex_buffer(1, self.identity_instance.slice(0 .. 0));
-            pass.draw(0 .. system.background.len() as u32, 0 .. 1); 
+            pass.draw(0 .. background_len, 0 .. 1); 
 
             // Stars
-            pass.set_pipeline(&self.point_pipeline);
             pass.set_bind_group(0, &star_bind_group, &[]);
-            pass.set_vertex_buffer(0, star_buffer.slice(0 .. 0));
-            pass.set_vertex_buffer(1, self.identity_instance.slice(0 .. 0));
-            pass.draw(0 .. system.stars.len() as u32, 0 .. 1);
+            pass.set_vertex_buffer(0, self.billboard_vertices.slice(0 .. 0));
+            pass.set_vertex_buffer(1, star_buffer.slice(0 .. 0));
+            pass.draw(0 .. BILLBOARD_VERTICES.len() as u32, 0 .. stars_len);
 
             if let Some((vertices, indices)) = &gpu_lines {
                 pass.set_pipeline(&self.lines.pipeline);
