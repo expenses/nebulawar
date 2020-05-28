@@ -13,7 +13,7 @@ impl<'a> System<'a> for ObjectRenderer {
         ReadStorage<'a, Position>,
         ReadStorage<'a, components::Rotation>,
         ReadStorage<'a, Size>,
-        ReadStorage<'a, Model>
+        ReadStorage<'a, Model>,
     );
 
     fn run(&mut self, (mut buffers, pos, rot, size, model): Self::SystemData) {
