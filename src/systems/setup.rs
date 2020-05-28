@@ -137,7 +137,7 @@ impl<'a> System<'a> for EntityUnderMouseSystem {
                 let iso = make_iso(pos.0 / size.0, rot.0);
 
                 meshes.get_mesh(*model)
-                    .toi_with_ray(&iso, &ray, 1000000.0, true)
+                    .toi_with_ray(&iso, &ray, 1_000_000.0, true)
                     .map(|f| {
                         let point = ray.origin + ray.dir * f;
                         (entity, Vector3::new(point.x, point.y, point.z) * size.0, f)

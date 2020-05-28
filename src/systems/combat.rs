@@ -56,7 +56,7 @@ impl<'a> System<'a> for ShootStuffSystem {
     ): Self::SystemData) {
 
         for (entity, attack) in (&entities, &mut attack).join() {
-            let entity_pos = pos.get(entity).unwrap().clone();
+            let entity_pos = *pos.get(entity).unwrap();
             let entity_rot = rot.get(entity).unwrap().clone();
 
             if let Some(target_entity) = target.get(entity).map(|target| target.entity) {
@@ -224,7 +224,7 @@ impl<'a> System<'a> for DestroyShips {
                 delete_entity(entity, &entities, &parents);
                 if let Some(pos) = position.get(entity).cloned() {
                     let explosion_size = explosion_size.get(entity).map(|size| size.0)
-                        .or(size.get(entity).map(|size| size.0 * 2.0))
+                        .or_else(|| size.get(entity).map(|size| size.0 * 2.0))
                         .unwrap_or(10.0);
                     
                     create_explosion(pos.0, explosion_size, &entities, &mut position, &mut size, &mut time, &mut nocollide, &mut explosion, &mut markers, &mut allocator);

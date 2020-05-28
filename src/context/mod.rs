@@ -539,8 +539,8 @@ impl BillboardBuffer {
     pub fn push_billboard(&mut self, matrix: Matrix4<f32>, image: Image) {
         let vertex = InstanceVertex {
             instance_pos: matrix.into(),
-            uv_dimensions: image.dimensions().into(),
-            uv_offset: image.offset().into()
+            uv_dimensions: image.dimensions(),
+            uv_offset: image.offset()
         };
         self.inner.push(vertex);
     }

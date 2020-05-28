@@ -1,6 +1,5 @@
 use cgmath::*;
 use std::f32::consts::*;
-use arrayvec;
 use std::ops::*;
 use std::collections::*;
 use rand::rngs::*;

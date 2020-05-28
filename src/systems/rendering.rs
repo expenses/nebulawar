@@ -64,7 +64,7 @@ impl<'a> System<'a> for RenderSelected {
         for (entity, pos, selectable, side) in (&entities, &pos, &selectable, &side).join() {
             if selectable.selected {
                 let size = size.get(entity).map(|size| size.0).unwrap_or(1.0);
-                buffer.push_circle(pos.0, size, side.colour(), screen_dims.0.into(), &camera);
+                buffer.push_circle(pos.0, size, side.colour(), screen_dims.0, &camera);
             }
         }
     }
@@ -207,7 +207,7 @@ impl<'a> System<'a> for RenderMouse {
         let (x, y) = controls.mouse();
 
         if let Some(Command::GoToAnd(_, interaction)) = order.command {
-            buffers.push_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4], screen_dims.0.into());
+            buffers.push_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4], screen_dims.0);
         }
     }
 }
@@ -296,7 +296,7 @@ impl<'a> System<'a> for RenderDragSelection {
 
     fn run(&mut self, (mut buffers, controls, screen_dims): Self::SystemData) {
         if let Some(origin) = controls.left_dragging() {
-            buffers.push_rect(origin, controls.mouse(), screen_dims.0.into());
+            buffers.push_rect(origin, controls.mouse(), screen_dims.0);
         }
     }
 }

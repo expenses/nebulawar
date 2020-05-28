@@ -1,12 +1,9 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::unreadable_literal))]
 
-use genmesh;
 use obj::*;
 use crate::context::Vertex;
-use image;
 use crate::util::*;
 use std::io;
-use failure;
 use specs::*;
 use arrayvec::*;
 use ncollide3d::shape::TriMesh;

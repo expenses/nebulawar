@@ -4,7 +4,6 @@ use specs::{DenseVecStorage, World, Component};
 use crate::context;
 use crate::util::*;
 use entities::*;
-use spade;
 use spade::delaunay::FloatDelaunayTriangulation;
 use tint::Colour;
 use zerocopy::AsBytes;
