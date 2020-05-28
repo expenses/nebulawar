@@ -38,6 +38,9 @@ void main() {
     } else {
         float specularity = texture(sampler2D(tex, samp), spec_texture).r;
 
+        if (spec_texture.x == -1.0) {
+            specularity = 0.0;
+        }
 
         // Ambient
         vec3 ambient = ambient_colour.xyz * AMBIENT_STRENGTH; 

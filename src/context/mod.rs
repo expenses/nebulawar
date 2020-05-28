@@ -40,7 +40,8 @@ pub enum Mode {
 pub struct Vertex {
     pub position: [f32; 3],
     pub normal: [f32; 3],
-    pub texture: [f32; 2],
+    pub diff_texture: [f32; 2],
+    pub spec_texture: [f32; 2]
 }
 
 impl Vertex {
@@ -48,7 +49,8 @@ impl Vertex {
         Self {
             position: position.into(),
             normal: colour,
-            texture: [0.0; 2]
+            diff_texture: [0.0; 2],
+            spec_texture: [0.0; 2]
         }
     }
 }
@@ -469,12 +471,12 @@ fn create_pipeline(
                 wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
                     step_mode: wgpu::InputStepMode::Vertex,
-                    attributes: &vertex_attr_array![0 => Float3, 1 => Float3, 2 => Float2],
+                    attributes: &vertex_attr_array![0 => Float3, 1 => Float3, 2 => Float2, 3 => Float2],
                 },
                 wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<InstanceVertex>() as wgpu::BufferAddress,
                     step_mode: wgpu::InputStepMode::Instance,
-                    attributes: &vertex_attr_array![3 => Float2, 4 => Float2, 5 => Float2, 6 => Float4, 7 => Float4, 8 => Float4, 9 => Float4],
+                    attributes: &vertex_attr_array![4 => Float2, 5 => Float2, 6 => Float4, 7 => Float4, 8 => Float4, 9 => Float4],
                 }
             ],
         },
@@ -540,8 +542,7 @@ impl BillboardBuffer {
         let vertex = InstanceVertex {
             instance_pos: matrix.into(),
             uv_dimensions: image.dimensions(),
-            diff_offset: image.offset(),
-            spec_offset: [0.0, 0.0]
+            uv_offset: image.offset(),
         };
         self.inner.push(vertex);
     }
@@ -597,28 +598,21 @@ impl ModelBuffers {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, zerocopy::AsBytes)]
 pub struct InstanceVertex {
-    pub diff_offset: [f32; 2],
-    pub spec_offset: [f32; 2],
+    pub uv_offset: [f32; 2],
     pub uv_dimensions: [f32; 2],
     pub instance_pos: [[f32; 4]; 4],
 }
 
 impl InstanceVertex {
-    pub fn new(matrix: Matrix4<f32>, diffuse: Image, specular: Image) -> Self {
+    pub fn new(matrix: Matrix4<f32>) -> Self {
         Self {
             instance_pos: matrix.into(),
-            diff_offset: diffuse.offset(),
-            spec_offset: specular.offset(),
-            uv_dimensions: diffuse.dimensions()
+            uv_offset: [0.0; 2],
+            uv_dimensions: [1.0; 2]
         }
     }
 
     pub fn identity() -> Self {
-        Self {
-            instance_pos: Matrix4::identity().into(),
-            diff_offset: [0.0; 2],
-            spec_offset: [0.0; 2],
-            uv_dimensions: [1.0; 2]
-        }
+        Self::new(Matrix4::identity())
     }
 }
