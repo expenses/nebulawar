@@ -474,7 +474,7 @@ fn create_pipeline(
                 wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<InstanceVertex>() as wgpu::BufferAddress,
                     step_mode: wgpu::InputStepMode::Instance,
-                    attributes: &vertex_attr_array![3 => Float2, 4 => Float2, 5 => Float4, 6 => Float4, 7 => Float4, 8 => Float4],
+                    attributes: &vertex_attr_array![3 => Float2, 4 => Float2, 5 => Float2, 6 => Float4, 7 => Float4, 8 => Float4, 9 => Float4],
                 }
             ],
         },
@@ -540,7 +540,8 @@ impl BillboardBuffer {
         let vertex = InstanceVertex {
             instance_pos: matrix.into(),
             uv_dimensions: image.dimensions(),
-            uv_offset: image.offset()
+            diff_offset: image.offset(),
+            spec_offset: [0.0, 0.0]
         };
         self.inner.push(vertex);
     }
@@ -596,24 +597,27 @@ impl ModelBuffers {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, zerocopy::AsBytes)]
 pub struct InstanceVertex {
-    pub uv_offset: [f32; 2],
+    pub diff_offset: [f32; 2],
+    pub spec_offset: [f32; 2],
     pub uv_dimensions: [f32; 2],
     pub instance_pos: [[f32; 4]; 4],
 }
 
 impl InstanceVertex {
-    pub fn new(matrix: Matrix4<f32>, image: Image) -> Self {
+    pub fn new(matrix: Matrix4<f32>, diffuse: Image, specular: Image) -> Self {
         Self {
             instance_pos: matrix.into(),
-            uv_offset: image.offset(),
-            uv_dimensions: image.dimensions()
+            diff_offset: diffuse.offset(),
+            spec_offset: specular.offset(),
+            uv_dimensions: diffuse.dimensions()
         }
     }
 
     pub fn identity() -> Self {
         Self {
             instance_pos: Matrix4::identity().into(),
-            uv_offset: [0.0; 2],
+            diff_offset: [0.0; 2],
+            spec_offset: [0.0; 2],
             uv_dimensions: [1.0; 2]
         }
     }

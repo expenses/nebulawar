@@ -2,7 +2,8 @@
 
 layout(location = 0) in vec3 v_normal;
 layout(location = 1) in vec3 o_normal;
-layout(location = 2) in vec2 v_texture;
+layout(location = 2) in vec2 diff_texture;
+layout(location = 3) in vec2 spec_texture;
 
 layout(location = 0) out vec4 colour;
 
@@ -26,15 +27,18 @@ const vec3 LIGHT_COLOUR = vec3(1.0, 1.0, 1.0);
 const float MIN_DIFFUSE = 0.1;
 
 void main() {
-    vec4 texture_colour = texture(sampler2D(tex, samp), v_texture);
+    vec4 texture_colour = texture(sampler2D(tex, samp), diff_texture);
 
     if (mode == VERTEX_COLOURED) {
         colour = vec4(o_normal, 1.0);
     } else if (mode == SHADELESS) {
         colour = texture_colour;
     } else if (mode == WHITE) {
-        colour = vec4(vec3(1.0), v_texture.x);
+        colour = vec4(vec3(1.0), diff_texture.x);
     } else {
+        float specularity = texture(sampler2D(tex, samp), spec_texture).r;
+
+
         // Ambient
         vec3 ambient = ambient_colour.xyz * AMBIENT_STRENGTH; 
 
@@ -45,7 +49,11 @@ void main() {
         float diff = max(dot(norm, light_dir), MIN_DIFFUSE);
         vec3 diffuse = diff * LIGHT_COLOUR;
 
-        vec3 result = (ambient + diffuse) * texture_colour.rgb;
-        colour = vec4(result, 1.0);
+        vec3 diffuse_result = (ambient + diffuse) * texture_colour.rgb;
+
+        vec3 mixed = mix(diffuse_result, texture_colour.rgb, specularity);
+
+
+        colour = vec4(mixed, 1.0);
     }
 }

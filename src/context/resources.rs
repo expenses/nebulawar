@@ -139,6 +139,16 @@ impl Model {
             Model::Missile => Image::Missile,
         }
     }
+
+    pub fn specular(self) -> Image {
+        match self {
+            Model::Fighter => Image::FighterSpecular,
+            Model::Tanker => Image::TankerSpecular,
+            Model::Carrier => Image::CarrierSpecular,
+            Model::Miner => Image::MinerSpecular,
+            _ => Image::FighterSpecular,
+        }
+    }
 }
 
 pub struct ObjModel {

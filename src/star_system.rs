@@ -97,7 +97,8 @@ impl StarSystem {
                     context::InstanceVertex {
                         instance_pos: matrix.into(),
                         uv_dimensions: [0.0; 2],
-                        uv_offset: [brightness; 2]
+                        diff_offset: [brightness; 2],
+                        spec_offset: [0.0; 2]
                     }
                 })
                 .collect::<Vec<_>>();
