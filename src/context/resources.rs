@@ -107,11 +107,14 @@ pub fn load_wavefront(data: &[u8], image: Image) ->  Vec<Vertex> {
         })
         .map(|v| {
             let texture = v.1.map(|index| texture[index]).unwrap_or([0.0, 0.0]);
+            let texture = image.translate(texture);
+            // not sure why i need to do this
+            let texture = [texture[0], 1.0 - texture[1]];
 
             Vertex {
                 position: position[v.0],
                 normal: v.2.map(|index| normal[index]).unwrap_or([0.0, 0.0, 0.0]),
-                texture: image.translate(texture),
+                texture,
             }
         })
         .collect()

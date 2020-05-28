@@ -23,15 +23,7 @@ layout(set = 0, binding = 0) uniform Uniforms {
 const int WHITE = 3;
 
 void main() {
-    if (mode == WHITE) {
-        gl_PointSize = 2.0 * dpi;
-        gl_LineWidth = dpi;
-    }
-
-    v_texture = vec2(
-        uv_offset.x + texture.x * uv_dimensions.x,
-        1.0 - (uv_offset.y + texture.y * uv_dimensions.y)
-    );
+    v_texture = uv_offset + texture * uv_dimensions;
     o_normal = normal;
     
     mat4 modelview = view * instance_pos;
