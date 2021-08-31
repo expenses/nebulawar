@@ -1,13 +1,13 @@
-use specs::*;
-use cgmath::*;
-use winit::*;
-use crate::ships::*;
-use odds::vec::*;
 use crate::context;
-use ncollide3d::shape::*;
-use ncollide3d::query::Ray;
-use ncollide3d::bounding_volume::*;
+use crate::ships::*;
 use crate::util::*;
+use cgmath::*;
+use ncollide3d::bounding_volume::*;
+use ncollide3d::query::Ray;
+use ncollide3d::shape::*;
+use odds::vec::*;
+use specs::*;
+use winit::*;
 
 #[derive(Component, Default, NewtypeProxy)]
 pub struct Secs(pub f32);
@@ -41,7 +41,7 @@ pub struct EntityUnderMouse(pub Option<(Entity, Vector3<f32>)>);
 #[derive(Component, Default)]
 pub struct RightClickOrder {
     pub to_move: Vec<Entity>,
-    pub command: Option<Command>
+    pub command: Option<Command>,
 }
 
 #[derive(Component, Default)]
@@ -60,7 +60,7 @@ impl Log {
     pub fn append(&mut self, text: String) {
         self.push(LogItem {
             age: 0.0,
-            content: text
+            content: text,
         })
     }
 
@@ -81,7 +81,7 @@ impl Log {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct LogItem {
     age: f32,
-    content: String
+    content: String,
 }
 
 #[derive(Component, NewtypeProxy)]
@@ -91,7 +91,7 @@ impl Default for MouseRay {
     fn default() -> Self {
         MouseRay(Ray::new(
             nalgebra::Point3::new(0.0, 0.0, 0.0),
-            nalgebra::Vector3::zero()
+            nalgebra::Vector3::zero(),
         ))
     }
 }
@@ -110,22 +110,28 @@ pub struct Debug(pub bool);
 
 #[derive(Component)]
 pub struct Meshes {
-    meshes: context::MeshArray
+    meshes: context::MeshArray,
 }
 
 impl Meshes {
     pub fn new(meshes: context::MeshArray) -> Self {
-        Self {
-            meshes
-        }
+        Self { meshes }
     }
 
     pub fn get_mesh(&self, model: context::Model) -> &TriMesh<f32> {
         &self.meshes[model as usize]
     }
 
-    pub fn get_bbox(&self, model: context::Model, pos: Vector3<f32>, rot: Quaternion<f32>, size: f32) -> AABB<f32> {
-        let bbox: AABB<f32> = self.get_mesh(model).bounding_volume(&make_iso(Vector3::zero(), rot));
+    pub fn get_bbox(
+        &self,
+        model: context::Model,
+        pos: Vector3<f32>,
+        rot: Quaternion<f32>,
+        size: f32,
+    ) -> AABB<f32> {
+        let bbox: AABB<f32> = self
+            .get_mesh(model)
+            .bounding_volume(&make_iso(Vector3::zero(), rot));
 
         let pos = vector_to_na_vector(pos);
 
@@ -133,15 +139,22 @@ impl Meshes {
     }
 
     fn get_mesh_at_size(&self, model: context::Model, size: f32) -> TriMesh<f32> {
-        self.get_mesh(model).clone().scaled(&nalgebra::Vector3::new(size, size, size))
+        self.get_mesh(model)
+            .clone()
+            .scaled(&nalgebra::Vector3::new(size, size, size))
     }
 
     pub fn intersects(
         &self,
-        model_a: context::Model, pos_a: Vector3<f32>, rot_a: Quaternion<f32>, size_a: f32,
-        model_b: context::Model, pos_b: Vector3<f32>, rot_b: Quaternion<f32>, size_b: f32
+        model_a: context::Model,
+        pos_a: Vector3<f32>,
+        rot_a: Quaternion<f32>,
+        size_a: f32,
+        model_b: context::Model,
+        pos_b: Vector3<f32>,
+        rot_b: Quaternion<f32>,
+        size_b: f32,
     ) -> bool {
-        
         let bb_a = self.get_bbox(model_a, pos_a, rot_a, size_a);
         let bb_b = self.get_bbox(model_b, pos_b, rot_b, size_b);
 
@@ -153,7 +166,7 @@ impl Meshes {
             &make_iso(pos_a, rot_a),
             &self.get_mesh_at_size(model_a, size_a),
             &make_iso(pos_b, rot_b),
-            &self.get_mesh_at_size(model_b, size_b)
+            &self.get_mesh_at_size(model_b, size_b),
         ) == 0.0
     }
 }
@@ -161,7 +174,7 @@ impl Meshes {
 impl Default for Meshes {
     fn default() -> Self {
         Self {
-            meshes: context::MeshArray::default()
+            meshes: context::MeshArray::default(),
         }
     }
 }

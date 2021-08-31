@@ -1,10 +1,10 @@
 use cgmath::*;
-use std::f32::consts::*;
-use std::ops::*;
-use std::collections::*;
 use rand::rngs::*;
 use rand::Rng;
 use std::cmp::*;
+use std::collections::*;
+use std::f32::consts::*;
+use std::ops::*;
 
 pub const BACKGROUND_DISTANCE: f32 = 10000.0;
 pub const FOV: f32 = FRAC_PI_3;
@@ -13,39 +13,48 @@ pub const NEAR: f32 = 0.1;
 pub const UP: Vector3<f32> = Vector3 {
     x: 0.0,
     y: 1.0,
-    z: 0.0
+    z: 0.0,
 };
 
 pub fn perspective_matrix(aspect_ratio: f32) -> Matrix4<f32> {
     let f = 1.0 / (FOV / 2.0).tan();
 
     Matrix4::new(
-        f *   aspect_ratio, 0.0,    0.0,                            0.0,
-        0.0,                f,      0.0,                            0.0,
-        0.0,                0.0,    (FAR+NEAR)/(FAR-NEAR),      1.0,
-        0.0,                0.0,    -(2.0*FAR*NEAR)/(FAR-NEAR), 0.0
+        f * aspect_ratio,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        f,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        (FAR + NEAR) / (FAR - NEAR),
+        1.0,
+        0.0,
+        0.0,
+        -(2.0 * FAR * NEAR) / (FAR - NEAR),
+        0.0,
     )
 }
 
 pub fn opengl_pos_to_screen_pos(x: f32, y: f32, width: f32, height: f32) -> (f32, f32) {
     (
         (x + 1.0) / 2.0 * width / 2.0,
-        (1.0 - y) / 2.0 * height / 2.0
+        (1.0 - y) / 2.0 * height / 2.0,
     )
 }
 
 pub fn screen_pos_to_opengl_pos(x: f32, y: f32, width: f32, height: f32) -> (f32, f32) {
-    (
-        2.0 * x / width - 1.0,
-        - 2.0 * y / height + 1.0
-    )
+    (2.0 * x / width - 1.0, -2.0 * y / height + 1.0)
 }
 
 pub fn vector_to_point(vector: Vector3<f32>) -> Point3<f32> {
     Point3::new(vector.x, vector.y, vector.z)
 }
 
-pub fn iter_owned<T, A: arrayvec::Array<Item=T>>(array: A) -> arrayvec::IntoIter<A> {
+pub fn iter_owned<T, A: arrayvec::Array<Item = T>>(array: A) -> arrayvec::IntoIter<A> {
     arrayvec::ArrayVec::from(array).into_iter()
 }
 
@@ -82,7 +91,11 @@ impl Positioned for f32 {
     }
 }
 
-pub fn move_towards<T: Sub<Output=T> + Add<Output=T> + Positioned + Clone>(position: T, target: T, step: f32) -> T {
+pub fn move_towards<T: Sub<Output = T> + Add<Output = T> + Positioned + Clone>(
+    position: T,
+    target: T,
+    step: f32,
+) -> T {
     let delta = target.clone() - position.clone();
 
     if step < position.distance(&target) {
@@ -92,14 +105,11 @@ pub fn move_towards<T: Sub<Output=T> + Add<Output=T> + Positioned + Clone>(posit
     }
 }
 
-pub fn summarize<T: Ord, I: Iterator<Item=T>>(iterator: I) -> (BTreeMap<T, u64>, u64) {
-    iterator.fold(
-        (BTreeMap::new(), 0),
-        |(mut map, total), item| {
-            *map.entry(item).or_insert(0) += 1;
-            (map, total + 1)
-        }
-    )
+pub fn summarize<T: Ord, I: Iterator<Item = T>>(iterator: I) -> (BTreeMap<T, u64>, u64) {
+    iterator.fold((BTreeMap::new(), 0), |(mut map, total), item| {
+        *map.entry(item).or_insert(0) += 1;
+        (map, total + 1)
+    })
 }
 
 pub fn uniform_sphere_distribution(rng: &mut ThreadRng) -> Vector3<f32> {
@@ -116,7 +126,7 @@ pub fn uniform_sphere_distribution_from_coords(x: f64, y: f64) -> Vector3<f32> {
     Vector3::new(
         (phi.sin() * theta.cos()) as f32,
         (phi.sin() * theta.sin()) as f32,
-        phi.cos() as f32
+        phi.cos() as f32,
     )
 }
 
@@ -175,7 +185,7 @@ pub fn make_iso(pos: Vector3<f32>, rot: Quaternion<f32>) -> nalgebra::Isometry3<
 
     nalgebra::Isometry3::from_parts(
         nalgebra::Translation3::new(pos.x, pos.y, pos.z),
-        nalgebra::Unit::new_normalize(quat)
+        nalgebra::Unit::new_normalize(quat),
     )
 }
 

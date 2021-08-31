@@ -1,7 +1,7 @@
-use texture_packer::{*, importer::*, exporter::*, texture::*};
 use codegen::*;
-use std::path::*;
 use image::DynamicImage;
+use std::path::*;
+use texture_packer::{exporter::*, importer::*, texture::*, *};
 
 fn load_image(path: &Path) -> DynamicImage {
     println!("{}", path.display());
@@ -24,7 +24,7 @@ fn main() {
     let mut packer = TexturePacker::new_skyline(TexturePackerConfig {
         trim: false,
         texture_padding: 1,
-        .. Default::default()
+        ..Default::default()
     });
 
     load_dir("resources", &mut packer);
@@ -41,7 +41,8 @@ fn main() {
 
     {
         {
-            let image_enum = scope.new_enum("Image")
+            let image_enum = scope
+                .new_enum("Image")
                 .derive("Copy, Clone, Component, Serialize, Deserialize, PartialEq, Debug")
                 .vis("pub");
 
@@ -50,7 +51,7 @@ fn main() {
             }
         }
 
-        let impl_block = scope.new_impl("Image");    
+        let impl_block = scope.new_impl("Image");
 
         let mut offset_match_block = Block::new("match self");
 
@@ -62,38 +63,47 @@ fn main() {
 
             dimensions_match_block.line(&format!(
                 "Image::{} => [{:?}, {:?}],",
-                name, frame.frame.w as f32 / width, frame.frame.h as f32 / height
+                name,
+                frame.frame.w as f32 / width,
+                frame.frame.h as f32 / height
             ));
 
             offset_match_block.line(&format!(
                 "Image::{} => [{:?}, {:?}],",
-                name, frame.frame.x as f32 / width, frame.frame.y as f32 / height
+                name,
+                frame.frame.x as f32 / width,
+                frame.frame.y as f32 / height
             ));
         }
 
-        impl_block.new_fn("dimensions")
+        impl_block
+            .new_fn("dimensions")
             .arg_self()
             .vis("pub")
             .ret("[f32; 2]")
             .push_block(dimensions_match_block);
 
-        impl_block.new_fn("offset")
+        impl_block
+            .new_fn("offset")
             .arg_self()
             .vis("pub")
             .ret("[f32; 2]")
             .push_block(offset_match_block);
 
-        impl_block.new_fn("translate")
+        impl_block
+            .new_fn("translate")
             .arg_self()
             .vis("pub")
             .arg("uv", "[f32; 2]")
             .ret("[f32; 2]")
             .line("let offset = self.offset();")
             .line("let dim = self.dimensions();")
-            .line("[
+            .line(
+                "[
                 offset[0] + uv[0] * dim[0],
                 offset[1] + uv[1] * dim[1]
-            ]");
+            ]",
+            );
     }
 
     let out_dir = std::env::var("OUT_DIR").unwrap();

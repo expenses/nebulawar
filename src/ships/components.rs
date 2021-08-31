@@ -6,7 +6,7 @@ pub enum ShipComponentType {
     Boltor89Cannons,
     AX17KXDrive,
     FoodRecycler,
-    MiningDrill
+    MiningDrill,
 }
 
 impl ShipComponentType {
@@ -15,7 +15,7 @@ impl ShipComponentType {
             ShipComponentType::AX2900Drive => 1.0,
             ShipComponentType::HG900Drive => 5.0,
             ShipComponentType::AX17KXDrive => 100.0,
-            _ => 0.0
+            _ => 0.0,
         }
     }
 
@@ -23,14 +23,14 @@ impl ShipComponentType {
         match self {
             ShipComponentType::HG43WarpDrive => true,
             ShipComponentType::AX17KXDrive => true,
-            _ => false
+            _ => false,
         }
     }
 
     pub fn drill_speed(self) -> f32 {
         match self {
             ShipComponentType::MiningDrill => 0.01,
-            _ => 0.0
+            _ => 0.0,
         }
     }
 }
@@ -38,14 +38,12 @@ impl ShipComponentType {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ShipComponent {
     age: u8,
-    tag: ShipComponentType
+    tag: ShipComponentType,
 }
 
 impl ShipComponent {
     pub fn new(tag: ShipComponentType, age: u8) -> Self {
-        Self {
-            tag, age
-        }
+        Self { tag, age }
     }
 
     pub fn tag(&self) -> ShipComponentType {
@@ -55,26 +53,27 @@ impl ShipComponent {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Components {
-    inner: Vec<ShipComponent>
+    inner: Vec<ShipComponent>,
 }
 
 impl Components {
     pub fn new(inner: Vec<ShipComponent>) -> Self {
-        Self {
-            inner
-        }
+        Self { inner }
     }
 
-    fn component_types(&self) -> impl Iterator<Item=ShipComponentType> + '_ {
+    fn component_types(&self) -> impl Iterator<Item = ShipComponentType> + '_ {
         self.inner.iter().map(ShipComponent::tag)
     }
 
     pub fn thrust(&self) -> f32 {
-        self.component_types().map(ShipComponentType::thrust).sum() 
+        self.component_types().map(ShipComponentType::thrust).sum()
     }
 
     pub fn drill_speed(&self) -> Option<f32> {
-        let speed = self.component_types().map(ShipComponentType::drill_speed).sum();
+        let speed = self
+            .component_types()
+            .map(ShipComponentType::drill_speed)
+            .sum();
         Some(speed).filter(|speed| *speed > 0.0)
     }
 }

@@ -1,8 +1,8 @@
-use cgmath::*;
-use std::f32::consts::*;
 use crate::util::*;
-use specs::*;
+use cgmath::*;
 use ncollide3d::query::Ray;
+use specs::*;
+use std::f32::consts::*;
 
 #[derive(Serialize, Deserialize, Clone, Component)]
 pub struct Camera {
@@ -10,7 +10,7 @@ pub struct Camera {
     longitude: f32,
     latitude: f32,
     distance: f32,
-    target_distance: f32
+    target_distance: f32,
 }
 
 impl Camera {
@@ -27,7 +27,9 @@ impl Camera {
     }
 
     pub fn rotate_latitude(&mut self, amount: f32) {
-        self.latitude = (self.latitude + amount).max(-Self::MAX_VERTICALITY).min(Self::MAX_VERTICALITY);
+        self.latitude = (self.latitude + amount)
+            .max(-Self::MAX_VERTICALITY)
+            .min(Self::MAX_VERTICALITY);
     }
 
     pub fn change_distance(&mut self, amount: f32) {
@@ -49,24 +51,20 @@ impl Camera {
         Vector3::new(
             self.longitude.sin() * self.latitude.cos(),
             self.latitude.sin(),
-            self.longitude.cos() * self.latitude.cos()
+            self.longitude.cos() * self.latitude.cos(),
         )
     }
 
-    pub fn position(&self) -> Vector3<f32> {   
+    pub fn position(&self) -> Vector3<f32> {
         self.center + self.direction() * self.distance
     }
 
     pub fn view_matrix_only_direction(&self) -> Matrix4<f32> {
-        Matrix4::look_at_dir(
-            vector_to_point(Vector3::zero()), self.direction(), UP
-        )
+        Matrix4::look_at_dir(vector_to_point(Vector3::zero()), self.direction(), UP)
     }
 
     pub fn view_matrix(&self) -> Matrix4<f32> {
-        Matrix4::look_at_dir(
-            vector_to_point(self.position()), self.direction(), UP
-        )
+        Matrix4::look_at_dir(vector_to_point(self.position()), self.direction(), UP)
     }
 
     pub fn step(&mut self) {
@@ -77,10 +75,17 @@ impl Camera {
         self.center = move_towards(self.center, target, 50.0);
     }
 
-    pub fn screen_position(&self, point: Vector3<f32>, (screen_width, screen_height): (f32, f32), allow_behind: bool) -> Option<Vector3<f32>> {
+    pub fn screen_position(
+        &self,
+        point: Vector3<f32>,
+        (screen_width, screen_height): (f32, f32),
+        allow_behind: bool,
+    ) -> Option<Vector3<f32>> {
         let modelview = self.view_matrix() * Matrix4::from_translation(point);
 
-        let gl_position = perspective_matrix(screen_height / screen_width) * modelview * Vector4::new(0.0, 0.0, 0.0, 1.0);
+        let gl_position = perspective_matrix(screen_height / screen_width)
+            * modelview
+            * Vector4::new(0.0, 0.0, 0.0, 1.0);
 
         let x = gl_position[0] / gl_position[3];
         let y = gl_position[1] / gl_position[3];
@@ -104,14 +109,19 @@ impl Camera {
 
         let clip = Vector4::new(-x, -y, -1.0, 1.0);
 
-        let eye = perspective_matrix(screen_height / screen_width).invert().unwrap() * clip;
+        let eye = perspective_matrix(screen_height / screen_width)
+            .invert()
+            .unwrap()
+            * clip;
         let eye = Vector4::new(eye.x, eye.y, -1.0, 0.0);
 
-        let direction = (self.view_matrix().invert().unwrap() * eye).truncate().normalize_to(-1.0);
+        let direction = (self.view_matrix().invert().unwrap() * eye)
+            .truncate()
+            .normalize_to(-1.0);
 
         Ray::new(
             point_to_na_point(vector_to_point(self.position())),
-            vector_to_na_vector(direction)
+            vector_to_na_vector(direction),
         )
     }
 }
@@ -123,7 +133,7 @@ impl Default for Camera {
             longitude: 0.0,
             latitude: FRAC_PI_4,
             distance: Self::DEFAULT_ZOOM,
-            target_distance: Self::DEFAULT_ZOOM
+            target_distance: Self::DEFAULT_ZOOM,
         }
     }
 }

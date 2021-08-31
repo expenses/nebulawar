@@ -1,9 +1,9 @@
-use crate::util::*;
-use specs::*;
+use super::*;
 use crate::components;
 use crate::context::*;
-use super::*;
+use crate::util::*;
 use cgmath::Matrix4;
+use specs::*;
 
 pub struct ObjectRenderer;
 
@@ -40,7 +40,9 @@ impl<'a> System<'a> for RenderSystem {
         let offset = system.light * BACKGROUND_DISTANCE;
 
         let rotation: Matrix4<f32> = look_at(offset).into();
-        let matrix = Matrix4::from_translation(camera.position() + offset) * rotation * Matrix4::from_scale(BACKGROUND_DISTANCE / 10.0);
+        let matrix = Matrix4::from_translation(camera.position() + offset)
+            * rotation
+            * Matrix4::from_scale(BACKGROUND_DISTANCE / 10.0);
 
         buffer.push_billboard(matrix, Image::Star);
     }
@@ -57,10 +59,13 @@ impl<'a> System<'a> for RenderSelected {
         ReadStorage<'a, Position>,
         ReadStorage<'a, Selectable>,
         ReadStorage<'a, Size>,
-        ReadStorage<'a, Side>
+        ReadStorage<'a, Side>,
     );
 
-    fn run(&mut self, (entities, camera, mut buffer, screen_dims, pos, selectable, size, side): Self::SystemData) {
+    fn run(
+        &mut self,
+        (entities, camera, mut buffer, screen_dims, pos, selectable, size, side): Self::SystemData,
+    ) {
         for (entity, pos, selectable, side) in (&entities, &pos, &selectable, &side).join() {
             if selectable.selected {
                 let size = size.get(entity).map(|size| size.0).unwrap_or(1.0);
@@ -69,7 +74,6 @@ impl<'a> System<'a> for RenderSelected {
         }
     }
 }
-
 
 pub struct RenderCommandPaths;
 
@@ -80,15 +84,22 @@ impl<'a> System<'a> for RenderCommandPaths {
         Read<'a, ScreenDimensions>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Selectable>,
-        ReadStorage<'a, Commands>
+        ReadStorage<'a, Commands>,
     );
 
-    fn run(&mut self, (mut buffers, camera, screen_dims, positions, selectable, commands): Self::SystemData) {
-        (&positions, &selectable, &commands).join()
+    fn run(
+        &mut self,
+        (mut buffers, camera, screen_dims, positions, selectable, commands): Self::SystemData,
+    ) {
+        (&positions, &selectable, &commands)
+            .join()
             .filter(|(_, selectable, _)| selectable.selected)
             .for_each(|(pos, _, commands)| {
-                let points = iter_owned([pos.0])
-                    .chain(commands.iter().filter_map(|command| command.point(&positions)));
+                let points = iter_owned([pos.0]).chain(
+                    commands
+                        .iter()
+                        .filter_map(|command| command.point(&positions)),
+                );
 
                 buffers.push_3d_lines(points, WHITE, screen_dims.0, &camera);
             });
@@ -112,13 +123,31 @@ impl<'a> System<'a> for RenderUI {
         ReadStorage<'a, Parent>,
         ReadStorage<'a, Materials>,
         ReadStorage<'a, MineableMaterials>,
-        ReadStorage<'a, Health>
+        ReadStorage<'a, Health>,
     );
 
-    fn run(&mut self, (entities, mut text_buffer, time, formation, paused, help, dpi, tag, selectable, occupation, parent, materials, mineable, health): Self::SystemData) {
+    fn run(
+        &mut self,
+        (
+            entities,
+            mut text_buffer,
+            time,
+            formation,
+            paused,
+            help,
+            dpi,
+            tag,
+            selectable,
+            occupation,
+            parent,
+            materials,
+            mineable,
+            health,
+        ): Self::SystemData,
+    ) {
         let y = &mut 10.0;
 
-        let mut render_text = |text: &str|  {
+        let mut render_text = |text: &str| {
             text_buffer.push_text(text, 10.0, *y, dpi.0);
             *y += 20.0;
         };
@@ -157,7 +186,8 @@ impl<'a> System<'a> for RenderUI {
             render_text(&format!("{:?}: {}", tag, num));
         }
 
-        let entity = (&entities, &selectable).join()
+        let entity = (&entities, &selectable)
+            .join()
             .filter(|(_, selectable)| selectable.selected)
             .map(|(entity, _)| entity)
             .next();
@@ -177,21 +207,21 @@ impl<'a> System<'a> for RenderUI {
                 render_text(&format!("Mineable Materials: {}", mineable.0));
             }
 
-            let people = (&occupation, &parent).join()
+            let people = (&occupation, &parent)
+                .join()
                 .filter(|(_, parent)| parent.0 == entity)
                 .map(|(occupation, _)| occupation);
 
             let (people, total) = summarize(people);
 
             render_text(&format!("Population: {}", total));
-            
+
             for (tag, num) in people {
                 render_text(&format!("{:?}: {}", tag, num));
             }
         }
     }
 }
-
 
 pub struct RenderMouse;
 
@@ -207,7 +237,15 @@ impl<'a> System<'a> for RenderMouse {
         let (x, y) = controls.mouse();
 
         if let Some(Command::GoToAnd(_, interaction)) = order.command {
-            buffers.push_image(interaction.image(), x + 32.0, y + 32.0, 64.0, 64.0, [0.0; 4], screen_dims.0);
+            buffers.push_image(
+                interaction.image(),
+                x + 32.0,
+                y + 32.0,
+                64.0,
+                64.0,
+                [0.0; 4],
+                screen_dims.0,
+            );
         }
     }
 }
@@ -230,10 +268,29 @@ impl<'a> System<'a> for RenderDebug {
         ReadStorage<'a, Velocity>,
         ReadStorage<'a, SeekForce>,
         ReadStorage<'a, AvoidanceForce>,
-        ReadStorage<'a, FrictionForce>
+        ReadStorage<'a, FrictionForce>,
     );
 
-    fn run(&mut self, (entities, mut buffers, camera, entity, debug, meshes, screen_dims, pos, rot, size, model, vel, seek, avoid, friction): Self::SystemData) {
+    fn run(
+        &mut self,
+        (
+            entities,
+            mut buffers,
+            camera,
+            entity,
+            debug,
+            meshes,
+            screen_dims,
+            pos,
+            rot,
+            size,
+            model,
+            vel,
+            seek,
+            avoid,
+            friction,
+        ): Self::SystemData,
+    ) {
         if !debug.0 {
             return;
         }
@@ -244,26 +301,52 @@ impl<'a> System<'a> for RenderDebug {
 
         let scale = 1000.0;
 
-        for (entity, pos, rot, size, model, vel) in (&entities, &pos, &rot, &size, &model, &vel).join() {
+        for (entity, pos, rot, size, model, vel) in
+            (&entities, &pos, &rot, &size, &model, &vel).join()
+        {
             let step = Vector3::new(0.0, 0.05, 0.0);
             let mut position = pos.0 + step;
 
             if let Some(seek) = seek.get(entity) {
-                buffers.push_3d_line(position, position + seek.0 * scale, [1.0, 0.0, 0.0], screen_dims.0, &camera);
+                buffers.push_3d_line(
+                    position,
+                    position + seek.0 * scale,
+                    [1.0, 0.0, 0.0],
+                    screen_dims.0,
+                    &camera,
+                );
                 position += step;
             }
 
             if let Some(avoid) = avoid.get(entity) {
-                buffers.push_3d_line(position, position + avoid.0 * scale, [0.0, 1.0, 0.0], screen_dims.0, &camera);
+                buffers.push_3d_line(
+                    position,
+                    position + avoid.0 * scale,
+                    [0.0, 1.0, 0.0],
+                    screen_dims.0,
+                    &camera,
+                );
                 position += step;
             }
 
             if let Some(friction) = friction.get(entity) {
-                buffers.push_3d_line(position, position + friction.0 * scale, [0.0, 0.0, 1.0], screen_dims.0, &camera);
+                buffers.push_3d_line(
+                    position,
+                    position + friction.0 * scale,
+                    [0.0, 0.0, 1.0],
+                    screen_dims.0,
+                    &camera,
+                );
                 position += step;
             }
 
-            buffers.push_3d_line(position, position + vel.0 * scale / 10.0, [0.0, 1.0, 1.0], screen_dims.0, &camera);
+            buffers.push_3d_line(
+                position,
+                position + vel.0 * scale / 10.0,
+                [0.0, 1.0, 1.0],
+                screen_dims.0,
+                &camera,
+            );
 
             // render bbox
 
@@ -272,7 +355,7 @@ impl<'a> System<'a> for RenderDebug {
             let min = na_point_to_vector(*bbox.mins());
             let max = na_point_to_vector(*bbox.maxs());
 
-            for i in 0 .. 3 {
+            for i in 0..3 {
                 let start = min;
                 let mut end = start;
                 end[i] = max[i];
@@ -288,11 +371,14 @@ impl<'a> System<'a> for RenderDebug {
     }
 }
 
-
 pub struct RenderDragSelection;
 
 impl<'a> System<'a> for RenderDragSelection {
-    type SystemData = (Write<'a, LineBuffers>, Read<'a, Controls>, Read<'a, ScreenDimensions>);
+    type SystemData = (
+        Write<'a, LineBuffers>,
+        Read<'a, Controls>,
+        Read<'a, ScreenDimensions>,
+    );
 
     fn run(&mut self, (mut buffers, controls, screen_dims): Self::SystemData) {
         if let Some(origin) = controls.left_dragging() {
@@ -301,35 +387,47 @@ impl<'a> System<'a> for RenderDragSelection {
     }
 }
 
-
 pub struct RenderMovementPlane;
 
 impl<'a> System<'a> for RenderMovementPlane {
-    type SystemData = (Write<'a, LineBuffers>, Read<'a, RightClickOrder>, Read<'a, Camera>, Read<'a, ScreenDimensions>);
+    type SystemData = (
+        Write<'a, LineBuffers>,
+        Read<'a, RightClickOrder>,
+        Read<'a, Camera>,
+        Read<'a, ScreenDimensions>,
+    );
 
     fn run(&mut self, (mut buffers, order, camera, screen_dims): Self::SystemData) {
         if let Some(Command::MoveTo(point)) = order.command {
             let distance = 20.0;
 
-            let point = Vector3::new(round_to(point.x, distance), point.y, round_to(point.z, distance));
+            let point = Vector3::new(
+                round_to(point.x, distance),
+                point.y,
+                round_to(point.z, distance),
+            );
 
             let points = 5;
 
             let radius = points as f32 * distance / 2.0;
 
-            for i in 0 .. points + 1 {
+            for i in 0..points + 1 {
                 let i = i as f32 * distance - radius;
 
                 buffers.push_3d_line(
                     point + Vector3::new(i, 0.0, -radius),
                     point + Vector3::new(i, 0.0, radius),
-                    WHITE, screen_dims.0, &camera
+                    WHITE,
+                    screen_dims.0,
+                    &camera,
                 );
 
                 buffers.push_3d_line(
                     point + Vector3::new(-radius, 0.0, i),
                     point + Vector3::new(radius, 0.0, i),
-                    WHITE, screen_dims.0, &camera
+                    WHITE,
+                    screen_dims.0,
+                    &camera,
                 );
             }
         }
@@ -338,7 +436,7 @@ impl<'a> System<'a> for RenderMovementPlane {
 
 pub struct RenderLogSystem;
 
-impl<'a> System<'a> for RenderLogSystem  {
+impl<'a> System<'a> for RenderLogSystem {
     type SystemData = (
         Write<'a, TextBuffer>,
         Read<'a, Log>,
@@ -351,7 +449,6 @@ impl<'a> System<'a> for RenderLogSystem  {
     }
 }
 
-
 pub struct RenderBillboards;
 
 impl<'a> System<'a> for RenderBillboards {
@@ -360,7 +457,7 @@ impl<'a> System<'a> for RenderBillboards {
         Write<'a, BillboardBuffer>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Size>,
-        ReadStorage<'a, Image>
+        ReadStorage<'a, Image>,
     );
 
     fn run(&mut self, (camera, mut buffer, pos, size, image): Self::SystemData) {

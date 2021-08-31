@@ -1,9 +1,9 @@
-use crate::components;
-use specs::{*, saveload::*, error::*, saveload::MarkerAllocator as _};
-use crate::context::{Model, Image};
-use std::fs::*;
 use super::*;
+use crate::components;
+use crate::context::{Image, Model};
 use crate::{Marker, MarkerAllocator};
+use specs::{error::*, saveload::MarkerAllocator as _, saveload::*, *};
+use std::fs::*;
 
 type ComponentsA<'a> = (
     WriteStorage<'a, Position>,
@@ -21,7 +21,7 @@ type ComponentsA<'a> = (
     WriteStorage<'a, Parent>,
     WriteStorage<'a, CreationTime>,
     WriteStorage<'a, DrillSpeed>,
-    WriteStorage<'a, MineableMaterials>
+    WriteStorage<'a, MineableMaterials>,
 );
 
 type ComponentsB<'a> = (
@@ -32,7 +32,7 @@ type ComponentsB<'a> = (
     WriteStorage<'a, AttackTarget>,
     WriteStorage<'a, NoCollide>,
     WriteStorage<'a, ExplosionSize>,
-    WriteStorage<'a, Explosion>
+    WriteStorage<'a, Explosion>,
 );
 
 type ComponentsASerialized = <ComponentsA<'static> as SerializeComponents<Error, Marker>>::Data;
@@ -44,7 +44,6 @@ impl<'a> System<'a> for SaveSystem {
     type SystemData = (
         Entities<'a>,
         Read<'a, Controls>,
-
         Read<'a, Camera>,
         Read<'a, StarSystem>,
         Read<'a, Time>,
@@ -53,43 +52,55 @@ impl<'a> System<'a> for SaveSystem {
         Read<'a, Log>,
         Read<'a, MovementPlane>,
         Read<'a, Debug>,
-
         ComponentsA<'a>,
         ComponentsB<'a>,
-        
-        ReadStorage<'a, Marker>
+        ReadStorage<'a, Marker>,
     );
 
-    fn run(&mut self, (
-        entities, controls,
-        cam, sys, time, paused, formation, log, plane, debug,
-        comp_a, comp_b,
-        markers
-    ): Self::SystemData) {
+    fn run(
+        &mut self,
+        (
+            entities,
+            controls,
+            cam,
+            sys,
+            time,
+            paused,
+            formation,
+            log,
+            plane,
+            debug,
+            comp_a,
+            comp_b,
+            markers,
+        ): Self::SystemData,
+    ) {
         if !controls.save {
             return;
         }
 
         let ids = |entity| markers.get(entity).cloned();
 
-        let comp_a = (&entities, &markers).join()
+        let comp_a = (&entities, &markers)
+            .join()
             .map(|(entity, marker)| (marker, comp_a.serialize_entity(entity, ids)))
-            .map(|(marker, result): (&Marker, Result<ComponentsASerialized, Error>)| {
-                EntityData {
+            .map(
+                |(marker, result): (&Marker, Result<ComponentsASerialized, Error>)| EntityData {
                     marker: *marker,
-                    components: result.unwrap()
-                }
-            })
+                    components: result.unwrap(),
+                },
+            )
             .collect();
 
-        let comp_b = (&entities, &markers).join()
+        let comp_b = (&entities, &markers)
+            .join()
             .map(|(entity, marker)| (marker, comp_b.serialize_entity(entity, ids)))
-            .map(|(marker, result): (&Marker, Result<ComponentsBSerialized, Error>)| {
-                EntityData {
+            .map(
+                |(marker, result): (&Marker, Result<ComponentsBSerialized, Error>)| EntityData {
                     marker: *marker,
-                    components: result.unwrap()
-                }
-            })
+                    components: result.unwrap(),
+                },
+            )
             .collect();
 
         let data = GameData {
@@ -102,7 +113,8 @@ impl<'a> System<'a> for SaveSystem {
             plane: plane.clone(),
             debug: debug.clone(),
 
-            comp_a, comp_b
+            comp_a,
+            comp_b,
         };
 
         let game = File::create("save.sav").unwrap();
@@ -118,7 +130,6 @@ impl<'a> System<'a> for LoadSystem {
         Entities<'a>,
         Read<'a, Controls>,
         Write<'a, MarkerAllocator>,
-
         Write<'a, Camera>,
         Write<'a, StarSystem>,
         Write<'a, Time>,
@@ -127,19 +138,30 @@ impl<'a> System<'a> for LoadSystem {
         Write<'a, Log>,
         Write<'a, MovementPlane>,
         Write<'a, Debug>,
-
         ComponentsA<'a>,
         ComponentsB<'a>,
-
-        WriteStorage<'a, Marker>
+        WriteStorage<'a, Marker>,
     );
 
-    fn run(&mut self, (
-        entities, controls, mut allocator,
-        mut camera, mut system, mut time, mut paused, mut formation, mut log, mut plane, mut debug,
-        mut comp_a, mut comp_b,
-        mut markers
-    ): Self::SystemData) {
+    fn run(
+        &mut self,
+        (
+            entities,
+            controls,
+            mut allocator,
+            mut camera,
+            mut system,
+            mut time,
+            mut paused,
+            mut formation,
+            mut log,
+            mut plane,
+            mut debug,
+            mut comp_a,
+            mut comp_b,
+            mut markers,
+        ): Self::SystemData,
+    ) {
         if !controls.load {
             return;
         }
@@ -160,12 +182,18 @@ impl<'a> System<'a> for LoadSystem {
         *debug = data.debug;
 
         data.comp_a.into_iter().for_each(|entity_data| {
-            let result: Result<(), Error> = comp_a.deserialize_entity(func(entity_data.marker), entity_data.components, |e| Some(func(e)));
+            let result: Result<(), Error> =
+                comp_a.deserialize_entity(func(entity_data.marker), entity_data.components, |e| {
+                    Some(func(e))
+                });
             result.unwrap();
         });
 
         data.comp_b.into_iter().for_each(|entity_data| {
-            let result: Result<(), Error> = comp_b.deserialize_entity(func(entity_data.marker), entity_data.components, |e| Some(func(e)));
+            let result: Result<(), Error> =
+                comp_b.deserialize_entity(func(entity_data.marker), entity_data.components, |e| {
+                    Some(func(e))
+                });
             result.unwrap();
         });
     }
@@ -183,5 +211,5 @@ struct GameData {
     debug: Debug,
 
     comp_a: Vec<EntityData<Marker, ComponentsASerialized>>,
-    comp_b: Vec<EntityData<Marker, ComponentsBSerialized>>
+    comp_b: Vec<EntityData<Marker, ComponentsBSerialized>>,
 }

@@ -3,7 +3,7 @@ use std::fmt;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StoredResource {
     amount: f32,
-    capacity: f32
+    capacity: f32,
 }
 
 impl StoredResource {
@@ -20,16 +20,14 @@ impl StoredResource {
         debug_assert!(capacity >= 0.0);
         debug_assert!(amount >= 0.0);
 
-        Self {
-            amount, capacity
-        }
+        Self { amount, capacity }
     }
 
     pub fn reduce(&mut self, amount: f32) -> f32 {
         let reduced_by = self.amount.min(amount);
         self.amount -= reduced_by;
         reduced_by
-    } 
+    }
 
     pub fn increase(&mut self, amount: f32) -> f32 {
         let increased_by = (self.capacity - self.amount).min(amount);

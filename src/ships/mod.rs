@@ -1,21 +1,21 @@
-use cgmath::Vector3;
-use crate::context::*;
-use specs::{DenseVecStorage, Component, Entity, ReadStorage, error::*, saveload::*};
 use crate::components::*;
+use crate::context::*;
+use cgmath::Vector3;
+use specs::{error::*, saveload::*, Component, DenseVecStorage, Entity, ReadStorage};
 
 pub mod components;
-mod storage;
 mod formations;
+mod storage;
 
 pub use self::components::*;
-pub use self::storage::*;
 pub use self::formations::*;
+pub use self::storage::*;
 
 #[derive(Deserialize, Serialize, Clone, Copy, Debug, PartialEq)]
 pub enum Interaction {
     Follow,
     Mine,
-    Attack
+    Attack,
 }
 
 impl Interaction {
@@ -23,7 +23,7 @@ impl Interaction {
         match self {
             Interaction::Follow => Image::Move,
             Interaction::Mine => Image::Mine,
-            Interaction::Attack => Image::Attack
+            Interaction::Attack => Image::Attack,
         }
     }
 }
@@ -31,7 +31,7 @@ impl Interaction {
 #[derive(Debug, ConvertSaveload, Clone)]
 pub enum Command {
     MoveTo(Vector3<f32>),
-    GoToAnd(Entity, Interaction)
+    GoToAnd(Entity, Interaction),
 }
 
 impl Command {
@@ -48,7 +48,7 @@ pub enum ShipType {
     Fighter,
     Tanker,
     Carrier,
-    Miner
+    Miner,
 }
 
 impl ShipType {
@@ -57,7 +57,7 @@ impl ShipType {
             ShipType::Fighter => Model::Fighter,
             ShipType::Tanker => Model::Tanker,
             ShipType::Carrier => Model::Carrier,
-            ShipType::Miner => Model::Miner
+            ShipType::Miner => Model::Miner,
         }
     }
 
@@ -66,41 +66,39 @@ impl ShipType {
             ShipType::Fighter => 1,
             ShipType::Tanker => 10,
             ShipType::Carrier => 100,
-            ShipType::Miner => 5
+            ShipType::Miner => 5,
         }
     }
 
     pub fn default_components(&self, age: u8) -> Components {
-        Components::new(
-            match *self {
-                ShipType::Fighter => vec![
-                    ShipComponent::new(ShipComponentType::AX2900Drive, age),
-                    ShipComponent::new(ShipComponentType::Boltor89Cannons, age)
-                ],
-                ShipType::Tanker => vec![
-                    ShipComponent::new(ShipComponentType::HG900Drive, age),
-                    ShipComponent::new(ShipComponentType::HG43WarpDrive, age)
-                ],
-                ShipType::Carrier => vec![
-                    ShipComponent::new(ShipComponentType::AX17KXDrive, age),
-                    ShipComponent::new(ShipComponentType::AX17KXDrive, age),
-                    ShipComponent::new(ShipComponentType::FoodRecycler, age)
-                ],
-                ShipType::Miner => vec![
-                    ShipComponent::new(ShipComponentType::HG900Drive, age),
-                    ShipComponent::new(ShipComponentType::HG43WarpDrive, age),
-                    ShipComponent::new(ShipComponentType::MiningDrill, age),
-                ]
-            }
-        )
-    } 
+        Components::new(match *self {
+            ShipType::Fighter => vec![
+                ShipComponent::new(ShipComponentType::AX2900Drive, age),
+                ShipComponent::new(ShipComponentType::Boltor89Cannons, age),
+            ],
+            ShipType::Tanker => vec![
+                ShipComponent::new(ShipComponentType::HG900Drive, age),
+                ShipComponent::new(ShipComponentType::HG43WarpDrive, age),
+            ],
+            ShipType::Carrier => vec![
+                ShipComponent::new(ShipComponentType::AX17KXDrive, age),
+                ShipComponent::new(ShipComponentType::AX17KXDrive, age),
+                ShipComponent::new(ShipComponentType::FoodRecycler, age),
+            ],
+            ShipType::Miner => vec![
+                ShipComponent::new(ShipComponentType::HG900Drive, age),
+                ShipComponent::new(ShipComponentType::HG43WarpDrive, age),
+                ShipComponent::new(ShipComponentType::MiningDrill, age),
+            ],
+        })
+    }
 
     pub fn mass(&self) -> f32 {
         match *self {
             ShipType::Fighter => 2.0,
             ShipType::Tanker => 100.0,
             ShipType::Carrier => 2000.0,
-            ShipType::Miner => 20.0
+            ShipType::Miner => 20.0,
         }
     }
 
@@ -109,7 +107,7 @@ impl ShipType {
             ShipType::Fighter => 1.0,
             ShipType::Tanker => 2.0,
             ShipType::Carrier => 4.0,
-            ShipType::Miner => 2.0
+            ShipType::Miner => 2.0,
         }
     }
 }

@@ -1,6 +1,6 @@
 use super::*;
-use cgmath::Zero;
 use crate::{Marker, MarkerAllocator};
+use cgmath::Zero;
 
 pub struct TestDeleteSystem;
 
@@ -8,12 +8,13 @@ impl<'a> System<'a> for TestDeleteSystem {
     type SystemData = (
         Read<'a, Controls>,
         WriteStorage<'a, Selectable>,
-        WriteStorage<'a, Health>
+        WriteStorage<'a, Health>,
     );
 
     fn run(&mut self, (controls, selectable, mut health): Self::SystemData) {
         if controls.delete {
-            (&mut health, &selectable).join()
+            (&mut health, &selectable)
+                .join()
                 .filter(|(_, selectable)| selectable.selected)
                 .for_each(|(health, _)| {
                     health.0 = 0.0;
@@ -29,7 +30,6 @@ impl<'a> System<'a> for ShootStuffSystem {
         Entities<'a>,
         Write<'a, MarkerAllocator>,
         WriteStorage<'a, CanAttack>,
-        
         WriteStorage<'a, Position>,
         WriteStorage<'a, components::Rotation>,
         WriteStorage<'a, Velocity>,
@@ -44,17 +44,32 @@ impl<'a> System<'a> for ShootStuffSystem {
         WriteStorage<'a, Health>,
         WriteStorage<'a, NoCollide>,
         WriteStorage<'a, ExplosionSize>,
-
-        WriteStorage<'a, Marker>
+        WriteStorage<'a, Marker>,
     );
 
-    fn run(&mut self, (
-        entities, mut allocator,
-        mut attack,
-        mut pos, mut rot, mut vel, mut size, mut model, mut time, mut selectable, mut side, mut smoke, mut target, mut speed, mut health, mut nocollide, mut explosion_size,
-        mut markers
-    ): Self::SystemData) {
-
+    fn run(
+        &mut self,
+        (
+            entities,
+            mut allocator,
+            mut attack,
+            mut pos,
+            mut rot,
+            mut vel,
+            mut size,
+            mut model,
+            mut time,
+            mut selectable,
+            mut side,
+            mut smoke,
+            mut target,
+            mut speed,
+            mut health,
+            mut nocollide,
+            mut explosion_size,
+            mut markers,
+        ): Self::SystemData,
+    ) {
         for (entity, attack) in (&entities, &mut attack).join() {
             let entity_pos = *pos.get(entity).unwrap();
             let entity_rot = rot.get(entity).unwrap().clone();
@@ -62,13 +77,16 @@ impl<'a> System<'a> for ShootStuffSystem {
             if let Some(target_entity) = target.get(entity).map(|target| target.entity) {
                 let target_pos = pos.get(target_entity).unwrap().0;
 
-                if attack.time != 0.0 || entity_pos.distance(target_pos) > attack.range + CLOSE_ENOUGH_DISTANCE * 2.0 {
+                if attack.time != 0.0
+                    || entity_pos.distance(target_pos) > attack.range + CLOSE_ENOUGH_DISTANCE * 2.0
+                {
                     continue;
                 }
 
                 attack.time = attack.delay;
 
-                entities.build_entity()
+                entities
+                    .build_entity()
                     .with(entity_pos, &mut pos)
                     .with(entity_rot, &mut rot)
                     .with(Velocity(Vector3::zero()), &mut vel)
@@ -78,7 +96,13 @@ impl<'a> System<'a> for ShootStuffSystem {
                     .with(Selectable::new(false), &mut selectable)
                     .with(Side::Friendly, &mut side)
                     .with(SpawnSmoke(0), &mut smoke)
-                    .with(AttackTarget {entity: target_entity, kamikaze: true}, &mut target)
+                    .with(
+                        AttackTarget {
+                            entity: target_entity,
+                            kamikaze: true,
+                        },
+                        &mut target,
+                    )
                     .with(MaxSpeed(5.0), &mut speed)
                     .with(Health(1.0), &mut health)
                     .with(NoCollide, &mut nocollide)
@@ -117,20 +141,32 @@ impl<'a> System<'a> for SpawnSmokeSystem {
         Entities<'a>,
         Read<'a, Paused>,
         Write<'a, MarkerAllocator>,
-
         WriteStorage<'a, SpawnSmoke>,
         ReadStorage<'a, Velocity>,
-        
         WriteStorage<'a, Position>,
         WriteStorage<'a, Size>,
         WriteStorage<'a, TimeLeft>,
         WriteStorage<'a, Image>,
         WriteStorage<'a, NoCollide>,
-
-        WriteStorage<'a, Marker>
+        WriteStorage<'a, Marker>,
     );
 
-    fn run(&mut self, (entities, paused, mut allocator, mut smoke, vel, mut pos, mut size, mut time, mut image, mut nocollide, mut markers): Self::SystemData) {
+    fn run(
+        &mut self,
+        (
+            entities,
+            paused,
+            mut allocator,
+            mut smoke,
+            vel,
+            mut pos,
+            mut size,
+            mut time,
+            mut image,
+            mut nocollide,
+            mut markers,
+        ): Self::SystemData,
+    ) {
         if paused.0 {
             return;
         }
@@ -138,7 +174,8 @@ impl<'a> System<'a> for SpawnSmokeSystem {
         for (entity, vel, mut smoke) in (&entities, &vel, &mut smoke).join() {
             if let Some(p) = pos.get(entity).map(|p| p.0) {
                 if smoke.0 % 2 == 0 {
-                    entities.build_entity()
+                    entities
+                        .build_entity()
                         .with(Position(p - vel.0), &mut pos)
                         .with(Size(2.0), &mut size)
                         .with(TimeLeft(2.0), &mut time)
@@ -166,10 +203,13 @@ impl<'a> System<'a> for KamikazeSystem {
         ReadStorage<'a, AttackTarget>,
         ReadStorage<'a, Model>,
         WriteStorage<'a, SeekPosition>,
-        WriteStorage<'a, Health>
+        WriteStorage<'a, Health>,
     );
 
-    fn run(&mut self, (entities, meshes, position, size, rotation, target, model, mut seek, mut health): Self::SystemData) {
+    fn run(
+        &mut self,
+        (entities, meshes, position, size, rotation, target, model, mut seek, mut health): Self::SystemData,
+    ) {
         for (entity, target) in (&entities, &target).join() {
             if target.kamikaze {
                 let entity_pos = position.get(entity).unwrap().0;
@@ -183,11 +223,21 @@ impl<'a> System<'a> for KamikazeSystem {
                     let target_size = size.get(target.entity).unwrap().0;
                     let target_model = model.get(target.entity).unwrap();
 
-                    if meshes.intersects(*entity_model, entity_pos, entity_rot, entity_size, *target_model, target_pos, target_rot, target_size) {
+                    if meshes.intersects(
+                        *entity_model,
+                        entity_pos,
+                        entity_rot,
+                        entity_size,
+                        *target_model,
+                        target_pos,
+                        target_rot,
+                        target_size,
+                    ) {
                         health.get_mut(target.entity).unwrap().0 -= 25.0;
                         health.get_mut(entity).unwrap().0 = 0.0;
                     } else {
-                        seek.insert(entity, SeekPosition::to_point(target_pos, false)).unwrap();
+                        seek.insert(entity, SeekPosition::to_point(target_pos, false))
+                            .unwrap();
                     }
                 } else {
                     seek.remove(entity);
@@ -203,31 +253,55 @@ impl<'a> System<'a> for DestroyShips {
     type SystemData = (
         Entities<'a>,
         Write<'a, MarkerAllocator>,
-
         ReadStorage<'a, Health>,
         ReadStorage<'a, ExplosionSize>,
-        
         WriteStorage<'a, Position>,
         WriteStorage<'a, Size>,
         WriteStorage<'a, TimeLeft>,
         WriteStorage<'a, NoCollide>,
         WriteStorage<'a, Explosion>,
-
         WriteStorage<'a, Marker>,
-        
-        ReadStorage<'a, Parent>
+        ReadStorage<'a, Parent>,
     );
 
-    fn run(&mut self, (entities, mut allocator, health, explosion_size, mut position, mut size, mut time, mut nocollide, mut explosion, mut markers, parents): Self::SystemData) {
+    fn run(
+        &mut self,
+        (
+            entities,
+            mut allocator,
+            health,
+            explosion_size,
+            mut position,
+            mut size,
+            mut time,
+            mut nocollide,
+            mut explosion,
+            mut markers,
+            parents,
+        ): Self::SystemData,
+    ) {
         for (entity, health) in (&entities, &health).join() {
             if health.0 <= 0.0 {
                 delete_entity(entity, &entities, &parents);
                 if let Some(pos) = position.get(entity).cloned() {
-                    let explosion_size = explosion_size.get(entity).map(|size| size.0)
+                    let explosion_size = explosion_size
+                        .get(entity)
+                        .map(|size| size.0)
                         .or_else(|| size.get(entity).map(|size| size.0 * 2.0))
                         .unwrap_or(10.0);
-                    
-                    create_explosion(pos.0, explosion_size, &entities, &mut position, &mut size, &mut time, &mut nocollide, &mut explosion, &mut markers, &mut allocator);
+
+                    create_explosion(
+                        pos.0,
+                        explosion_size,
+                        &entities,
+                        &mut position,
+                        &mut size,
+                        &mut time,
+                        &mut nocollide,
+                        &mut explosion,
+                        &mut markers,
+                        &mut allocator,
+                    );
                 }
             }
         }
@@ -235,11 +309,19 @@ impl<'a> System<'a> for DestroyShips {
 }
 
 fn create_explosion(
-    position: Vector3<f32>, explosion_size: f32,
-    entities: &Entities, pos: &mut WriteStorage<Position>, size: &mut WriteStorage<Size>, time: &mut WriteStorage<TimeLeft>, nocollide: &mut WriteStorage<NoCollide>, explosion: &mut WriteStorage<Explosion>,
-    markers: &mut WriteStorage<Marker>, allocator: &mut Write<MarkerAllocator>
+    position: Vector3<f32>,
+    explosion_size: f32,
+    entities: &Entities,
+    pos: &mut WriteStorage<Position>,
+    size: &mut WriteStorage<Size>,
+    time: &mut WriteStorage<TimeLeft>,
+    nocollide: &mut WriteStorage<NoCollide>,
+    explosion: &mut WriteStorage<Explosion>,
+    markers: &mut WriteStorage<Marker>,
+    allocator: &mut Write<MarkerAllocator>,
 ) -> Entity {
-    entities.build_entity()
+    entities
+        .build_entity()
         .with(Position(position), pos)
         .with(Size(explosion_size), size)
         .with(TimeLeft(1.0), time)

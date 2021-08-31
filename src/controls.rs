@@ -2,8 +2,8 @@
 // clicked -> up
 // dragging -> dragged -> up
 
-use std::mem::swap;
 use specs::*;
+use std::mem::swap;
 
 #[derive(is_enum_variant, Debug, Clone)]
 enum MouseState {
@@ -11,7 +11,7 @@ enum MouseState {
     Dragged(f32, f32),
     Up,
     Clicked,
-    Down(u8, f32, f32)
+    Down(u8, f32, f32),
 }
 
 impl MouseState {
@@ -19,7 +19,11 @@ impl MouseState {
         let (mouse_x, mouse_y) = mouse;
         match *self {
             MouseState::Clicked => *self = MouseState::Up,
-            MouseState::Down(frames, x, y) if frames > 10 || (mouse_x - x).abs() > 10.0 || (mouse_y - y).abs() > 10.0 => *self = MouseState::Dragging(x, y),
+            MouseState::Down(frames, x, y)
+                if frames > 10 || (mouse_x - x).abs() > 10.0 || (mouse_y - y).abs() > 10.0 =>
+            {
+                *self = MouseState::Dragging(x, y)
+            }
             MouseState::Down(ref mut frames, _, _) => *frames += 1,
             MouseState::Dragged(_, _) => *self = MouseState::Up,
             _ => {}
@@ -43,7 +47,7 @@ impl MouseState {
         match *self {
             MouseState::Down(_, _, _) => *self = MouseState::Clicked,
             MouseState::Dragging(x, y) => *self = MouseState::Dragged(x, y),
-            _ => *self = MouseState::Up
+            _ => *self = MouseState::Up,
         }
     }
 }
@@ -69,7 +73,7 @@ pub struct Controls {
     pub shift: bool,
     pub delete: bool,
     pub save: bool,
-    pub load: bool
+    pub load: bool,
 }
 
 impl Controls {
@@ -118,7 +122,7 @@ impl Controls {
         self.right_state.is_clicked()
     }
 
-    pub fn left_dragged(&self) -> Option<(f32, f32)>  {
+    pub fn left_dragged(&self) -> Option<(f32, f32)> {
         if let MouseState::Dragged(x, y) = self.left_state {
             Some((x, y))
         } else {
@@ -137,7 +141,7 @@ impl Controls {
     pub fn left_drag_rect(&self) -> Option<(f32, f32, f32, f32)> {
         self.left_dragged().map(|(mut left, mut top)| {
             let (mut right, mut bottom) = self.mouse();
-            
+
             if right < left {
                 swap(&mut right, &mut left);
             }

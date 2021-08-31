@@ -1,17 +1,23 @@
-use cgmath::*;
 use crate::util::*;
-use std::f32::consts::*;
+use cgmath::*;
 use specs::*;
+use std::f32::consts::*;
 
 #[derive(Deserialize, Serialize, Debug, Component, Clone)]
 pub enum Formation {
     Screen,
     DeltaWing,
-    GoTo
+    GoTo,
 }
 
 impl Formation {
-    pub fn arrange(&self, ships: usize, position: Vector3<f32>, target: Vector3<f32>, distance: f32) -> Vec<Vector3<f32>> {
+    pub fn arrange(
+        &self,
+        ships: usize,
+        position: Vector3<f32>,
+        target: Vector3<f32>,
+        distance: f32,
+    ) -> Vec<Vector3<f32>> {
         if ships == 0 {
             return Vec::new();
         }
@@ -23,7 +29,7 @@ impl Formation {
         let step_sideways = Quaternion::from_angle_y(Rad(FRAC_PI_2)).rotate_vector(step);
 
         match *self {
-            Formation::Screen => {                
+            Formation::Screen => {
                 let step_up = UP * distance;
 
                 let width = (ships as f32).sqrt().ceil() as usize;
@@ -32,7 +38,7 @@ impl Formation {
 
                 let middle_y = (ships as f32 / width as f32).floor() / 2.0;
 
-                (0 .. ships)
+                (0..ships)
                     .map(|i| {
                         let x = (i % width) as f32 - middle_x;
                         let y = (i / width) as f32 - middle_y;
@@ -40,11 +46,11 @@ impl Formation {
                         target + step_sideways * x + step_up * y
                     })
                     .collect()
-            },
+            }
             Formation::DeltaWing => {
                 let middle_x = (ships - 1) as f32 / 2.0;
 
-                (0 .. ships)
+                (0..ships)
                     .map(|i| {
                         let x = i as f32 - middle_x;
 
@@ -53,24 +59,24 @@ impl Formation {
                         target + step * y + step_sideways * x
                     })
                     .collect()
-            },
-            Formation::GoTo => (0 .. ships).map(|_| target).collect()
+            }
+            Formation::GoTo => (0..ships).map(|_| target).collect(),
         }
     }
 
     pub fn rotate_right(&mut self) {
         match *self {
-            Formation::Screen    => *self = Formation::DeltaWing,
+            Formation::Screen => *self = Formation::DeltaWing,
             Formation::DeltaWing => *self = Formation::GoTo,
-            Formation::GoTo      => *self = Formation::Screen,    
+            Formation::GoTo => *self = Formation::Screen,
         }
     }
 
     pub fn rotate_left(&mut self) {
         match *self {
-            Formation::Screen    => *self = Formation::GoTo,
+            Formation::Screen => *self = Formation::GoTo,
             Formation::DeltaWing => *self = Formation::Screen,
-            Formation::GoTo      => *self = Formation::DeltaWing,    
+            Formation::GoTo => *self = Formation::DeltaWing,
         }
     }
 }

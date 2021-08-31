@@ -1,9 +1,9 @@
-use specs::{prelude::*, saveload::*, error::*};
-use cgmath::*;
-use crate::util::*;
-use rand::rngs::ThreadRng;
 use crate::ships::*;
+use crate::util::*;
+use cgmath::*;
+use rand::rngs::ThreadRng;
 use serde::*;
+use specs::{error::*, prelude::*, saveload::*};
 
 #[derive(Component, NewtypeProxy, Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 #[storage(VecStorage)]
@@ -25,14 +25,14 @@ pub struct Rotation(pub Quaternion<f32>);
 #[derive(Component, ConvertSaveload)]
 pub struct Selectable {
     pub selected: bool,
-    pub camera_following: bool
+    pub camera_following: bool,
 }
 
 impl Selectable {
     pub fn new(selected: bool) -> Self {
         Self {
             selected,
-            camera_following: false
+            camera_following: false,
         }
     }
 }
@@ -57,16 +57,15 @@ pub enum Occupation {
     Pilot,
     Engineer,
     Marine,
-    Government
+    Government,
 }
-
 
 #[derive(ConvertSaveload, Component)]
 pub struct ObjectSpin {
     initial_rotation: Quaternion<f32>,
     rotation_axis: Vector3<f32>,
     rotation: f32,
-    rotation_speed: f32
+    rotation_speed: f32,
 }
 
 impl ObjectSpin {
@@ -78,7 +77,7 @@ impl ObjectSpin {
             initial_rotation: Quaternion::between_vectors(UP, initial),
             rotation_axis: uniform_sphere_distribution(rng),
             rotation: 0.0,
-            rotation_speed: 0.1
+            rotation_speed: 0.1,
         }
     }
 
@@ -95,15 +94,15 @@ impl ObjectSpin {
 pub enum Side {
     Friendly,
     Neutral,
-    Enemy
+    Enemy,
 }
 
 impl Side {
     pub fn colour(&self) -> [f32; 3] {
         match *self {
             Side::Friendly => [0.0, 0.8, 0.0],
-            Side::Neutral  => [1.0, 0.8, 0.2],
-            Side::Enemy    => [0.9, 0.0, 0.0]
+            Side::Neutral => [1.0, 0.8, 0.2],
+            Side::Enemy => [0.9, 0.0, 0.0],
         }
     }
 }
@@ -124,21 +123,23 @@ pub struct MaxSpeed(pub f32);
 pub struct SeekPosition {
     point: Vector3<f32>,
     within_distance: Option<f32>,
-    last_point: bool
+    last_point: bool,
 }
 
 impl SeekPosition {
     pub fn to_point(point: Vector3<f32>, last_point: bool) -> Self {
         Self {
-            point, last_point,
-            within_distance: None
+            point,
+            last_point,
+            within_distance: None,
         }
     }
 
     pub fn within_distance(point: Vector3<f32>, within_distance: f32, last_point: bool) -> Self {
         Self {
-            point, last_point,
-            within_distance: Some(within_distance)
+            point,
+            last_point,
+            within_distance: Some(within_distance),
         }
     }
 
@@ -172,7 +173,6 @@ pub struct AvoidanceForce(pub Vector3<f32>);
 #[derive(Component)]
 pub struct FrictionForce(pub Vector3<f32>);
 
-
 #[derive(Component, NewtypeProxy)]
 pub struct Commands(pub Vec<Command>);
 
@@ -190,12 +190,22 @@ impl<M: Serialize + Marker> ConvertSaveload<M> for Commands {
     type Data = Vec<<Command as ConvertSaveload<M>>::Data>;
     type Error = NoError;
 
-    fn convert_into<F: FnMut(Entity) -> Option<M>>(&self, mut ids: F) -> Result<Self::Data, Self::Error> {
-        self.0.iter().map(|command| command.convert_into(&mut ids)).collect()
+    fn convert_into<F: FnMut(Entity) -> Option<M>>(
+        &self,
+        mut ids: F,
+    ) -> Result<Self::Data, Self::Error> {
+        self.0
+            .iter()
+            .map(|command| command.convert_into(&mut ids))
+            .collect()
     }
 
-    fn convert_from<F: FnMut(M) -> Option<Entity>>(data: Self::Data, mut ids: F) -> Result<Self, Self::Error> {
-        let commands: Result<Vec<Command>, Self::Error> =  data.into_iter()
+    fn convert_from<F: FnMut(M) -> Option<Entity>>(
+        data: Self::Data,
+        mut ids: F,
+    ) -> Result<Self, Self::Error> {
+        let commands: Result<Vec<Command>, Self::Error> = data
+            .into_iter()
             .map(|data| Command::convert_from(data, &mut ids))
             .collect();
 
@@ -207,7 +217,7 @@ impl<M: Serialize + Marker> ConvertSaveload<M> for Commands {
 pub struct CanAttack {
     pub time: f32,
     pub delay: f32,
-    pub range: f32
+    pub range: f32,
 }
 
 #[derive(Component, Serialize, Deserialize, Default)]
@@ -216,7 +226,7 @@ pub struct SpawnSmoke(pub u8);
 #[derive(Component, ConvertSaveload)]
 pub struct AttackTarget {
     pub entity: Entity,
-    pub kamikaze: bool
+    pub kamikaze: bool,
 }
 
 #[derive(Component, ConvertSaveload)]

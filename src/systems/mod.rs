@@ -1,29 +1,29 @@
-use specs::*;
+use crate::camera::*;
 use crate::components::{self, *};
 use crate::context::*;
-use crate::camera::*;
-use crate::ships::*;
-use cgmath::{Vector3, MetricSpace, Zero, Quaternion};
-use crate::util::*;
 use crate::controls::Controls;
 use crate::resources::*;
+use crate::ships::*;
 use crate::star_system::*;
+use crate::util::*;
+use cgmath::{MetricSpace, Quaternion, Vector3, Zero};
+use nalgebra::Unit;
 use ncollide3d::query::RayCast;
 use ncollide3d::shape::Plane;
-use nalgebra::Unit;
+use specs::*;
 
-mod rendering;
-mod storage;
-mod steering;
-mod saving;
 mod combat;
+mod rendering;
+mod saving;
 mod setup;
+mod steering;
+mod storage;
 
-pub use self::rendering::*;
-pub use self::steering::*;
-pub use self::saving::*;
 pub use self::combat::*;
+pub use self::rendering::*;
+pub use self::saving::*;
 pub use self::setup::*;
+pub use self::steering::*;
 use self::storage::*;
 
 pub struct SpinSystem;
@@ -34,7 +34,7 @@ impl<'a> System<'a> for SpinSystem {
         Read<'a, Secs>,
         Read<'a, Paused>,
         WriteStorage<'a, ObjectSpin>,
-        WriteStorage<'a, components::Rotation>
+        WriteStorage<'a, components::Rotation>,
     );
 
     fn run(&mut self, (entities, secs, paused, mut spins, mut rotations): Self::SystemData) {
@@ -45,10 +45,9 @@ impl<'a> System<'a> for SpinSystem {
         for (entity, spin) in (&entities, &mut spins).join() {
             spin.turn(secs.0);
 
-            rotations.insert(
-                entity,
-                components::Rotation(spin.to_quat())
-            ).unwrap();
+            rotations
+                .insert(entity, components::Rotation(spin.to_quat()))
+                .unwrap();
         }
     }
 }
@@ -61,15 +60,16 @@ impl<'a> System<'a> for DragSelectSystem {
         Read<'a, Camera>,
         Read<'a, ScreenDimensions>,
         ReadStorage<'a, Position>,
-        WriteStorage<'a, Selectable>
+        WriteStorage<'a, Selectable>,
     );
 
     fn run(&mut self, (controls, camera, screen_dims, pos, mut selectable): Self::SystemData) {
         if let Some((left, top, right, bottom)) = controls.left_drag_rect() {
             for (pos, selectable) in (&pos, &mut selectable).join() {
                 if let Some(pos) = camera.screen_position(pos.0, screen_dims.0.into(), false) {
-                    let selected = pos.x >= left && pos.x <= right && pos.y >= top && pos.y <= bottom;
-                    
+                    let selected =
+                        pos.x >= left && pos.x <= right && pos.y >= top && pos.y <= bottom;
+
                     if !controls.shift {
                         selectable.selected = selected;
                     } else if selected {
@@ -97,10 +97,25 @@ impl<'a> System<'a> for ShipMovementSystem {
         ReadStorage<'a, Position>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, DrillSpeed>,
-        ReadStorage<'a, CanAttack>
+        ReadStorage<'a, CanAttack>,
     );
 
-    fn run(&mut self, (entities, paused, mut commands, mut materials, mut mineable, mut seek, mut attack_target, pos, size, drill_speed, attack): Self::SystemData) {
+    fn run(
+        &mut self,
+        (
+            entities,
+            paused,
+            mut commands,
+            mut materials,
+            mut mineable,
+            mut seek,
+            mut attack_target,
+            pos,
+            size,
+            drill_speed,
+            attack,
+        ): Self::SystemData,
+    ) {
         if paused.0 {
             return;
         }
@@ -108,10 +123,26 @@ impl<'a> System<'a> for ShipMovementSystem {
         for (entity, commands) in (&entities, &mut commands).join() {
             let last = commands.len() == 1;
 
-            let finished = commands.first()
-                .map(|command| handle_command(command, entity, &mut materials, &mut mineable, &size, &drill_speed, &pos, &mut seek, &mut attack_target, last, &attack).unwrap_or(true))
+            let finished = commands
+                .first()
+                .map(|command| {
+                    handle_command(
+                        command,
+                        entity,
+                        &mut materials,
+                        &mut mineable,
+                        &size,
+                        &drill_speed,
+                        &pos,
+                        &mut seek,
+                        &mut attack_target,
+                        last,
+                        &attack,
+                    )
+                    .unwrap_or(true)
+                })
                 .unwrap_or(false);
-            
+
             if finished {
                 commands.remove(0);
             }
@@ -122,11 +153,16 @@ impl<'a> System<'a> for ShipMovementSystem {
 fn handle_command(
     command: &Command,
     entity: Entity,
-    materials: &mut WriteStorage<Materials>, mineable_materials: &mut WriteStorage<MineableMaterials>,
-    size: &ReadStorage<Size>, drill_speed: &ReadStorage<DrillSpeed>, pos: &ReadStorage<Position>,
-    seek: &mut WriteStorage<SeekPosition>, attack_target: &mut WriteStorage<AttackTarget>, last: bool, attack: &ReadStorage<CanAttack>
+    materials: &mut WriteStorage<Materials>,
+    mineable_materials: &mut WriteStorage<MineableMaterials>,
+    size: &ReadStorage<Size>,
+    drill_speed: &ReadStorage<DrillSpeed>,
+    pos: &ReadStorage<Position>,
+    seek: &mut WriteStorage<SeekPosition>,
+    attack_target: &mut WriteStorage<AttackTarget>,
+    last: bool,
+    attack: &ReadStorage<CanAttack>,
 ) -> Option<bool> {
-    
     let entity_position = pos.get(entity)?.0;
 
     attack_target.remove(entity);
@@ -136,17 +172,26 @@ fn handle_command(
             let reached = close_enough(entity_position, *position);
 
             if !reached {
-                seek.insert(entity, SeekPosition::to_point(*position, last)).unwrap();
+                seek.insert(entity, SeekPosition::to_point(*position, last))
+                    .unwrap();
             }
 
             Some(reached)
-        },
+        }
         Command::GoToAnd(target, interaction) => {
             let target_position = pos.get(*target)?.0;
 
             let distance = if *interaction == Interaction::Attack {
-                attack_target.insert(entity, AttackTarget {entity: *target, kamikaze: false}).unwrap();
-                
+                attack_target
+                    .insert(
+                        entity,
+                        AttackTarget {
+                            entity: *target,
+                            kamikaze: false,
+                        },
+                    )
+                    .unwrap();
+
                 attack.get(entity)?.range - CLOSE_ENOUGH_DISTANCE * 2.0
             } else {
                 size.get(*target)?.0 + size.get(entity)?.0
@@ -155,13 +200,21 @@ fn handle_command(
             if entity_position.distance(target_position) - CLOSE_ENOUGH_DISTANCE < distance {
                 match interaction {
                     Interaction::Follow => Some(false),
-                    Interaction::Mine => {
-                        transfer_between_different(mineable_materials, materials, *target, entity, drill_speed.get(entity).unwrap().0)
-                    },
+                    Interaction::Mine => transfer_between_different(
+                        mineable_materials,
+                        materials,
+                        *target,
+                        entity,
+                        drill_speed.get(entity).unwrap().0,
+                    ),
                     Interaction::Attack => Some(false),
                 }
             } else {
-                seek.insert(entity, SeekPosition::within_distance(target_position, distance, last)).unwrap();
+                seek.insert(
+                    entity,
+                    SeekPosition::within_distance(target_position, distance, last),
+                )
+                .unwrap();
                 Some(false)
             }
         }
@@ -176,7 +229,7 @@ impl<'a> System<'a> for RightClickSystem {
         Read<'a, Controls>,
         Read<'a, Formation>,
         Read<'a, AveragePosition>,
-        WriteStorage<'a, Commands>
+        WriteStorage<'a, Commands>,
     );
 
     fn run(&mut self, (order, controls, formation, avg_pos, mut commands): Self::SystemData) {
@@ -184,16 +237,28 @@ impl<'a> System<'a> for RightClickSystem {
             if let Some(ref command) = order.command {
                 match command {
                     Command::GoToAnd(entity, interaction) => {
-                        order.to_move.iter()
-                            .for_each(|e| commands.get_mut(*e).unwrap().order(controls.shift, Command::GoToAnd(*entity, *interaction)));
-                    },
+                        order.to_move.iter().for_each(|e| {
+                            commands
+                                .get_mut(*e)
+                                .unwrap()
+                                .order(controls.shift, Command::GoToAnd(*entity, *interaction))
+                        });
+                    }
                     Command::MoveTo(target) => {
                         if let Some(avg) = avg_pos.0 {
-                            let positions = formation.arrange(order.to_move.len(), avg, *target, 4.0);
+                            let positions =
+                                formation.arrange(order.to_move.len(), avg, *target, 4.0);
 
-                            order.to_move.iter()
+                            order
+                                .to_move
+                                .iter()
                                 .zip(positions)
-                                .for_each(|(entity, position)| commands.get_mut(*entity).unwrap().order(controls.shift, Command::MoveTo(position)));
+                                .for_each(|(entity, position)| {
+                                    commands
+                                        .get_mut(*entity)
+                                        .unwrap()
+                                        .order(controls.shift, Command::MoveTo(position))
+                                });
                         }
                     }
                 }
@@ -203,7 +268,7 @@ impl<'a> System<'a> for RightClickSystem {
 }
 
 pub struct StepCameraSystem;
-    
+
 impl<'a> System<'a> for StepCameraSystem {
     type SystemData = (
         Write<'a, Camera>,
@@ -214,7 +279,7 @@ impl<'a> System<'a> for StepCameraSystem {
 
     fn run(&mut self, (mut camera, controls, pos, mut selectable): Self::SystemData) {
         let mut clear = false;
-        
+
         if controls.left {
             camera.move_sideways(-0.5);
             clear = true;
@@ -236,13 +301,15 @@ impl<'a> System<'a> for StepCameraSystem {
         }
 
         if clear {
-            (&mut selectable).join()
+            (&mut selectable)
+                .join()
                 .for_each(|selectable| selectable.camera_following = false);
         }
 
         camera.step();
 
-        let iterator = (&pos, &selectable).join()
+        let iterator = (&pos, &selectable)
+            .join()
             .filter(|(_, selectable)| selectable.camera_following)
             .map(|(pos, _)| pos.0);
 
@@ -258,13 +325,15 @@ impl<'a> System<'a> for LeftClickSystem {
     type SystemData = (
         Read<'a, Controls>,
         Read<'a, EntityUnderMouse>,
-        WriteStorage<'a, Selectable>
+        WriteStorage<'a, Selectable>,
     );
 
     fn run(&mut self, (controls, entity, mut selectable): Self::SystemData) {
         if controls.left_clicked() {
             if !controls.shift {
-                (&mut selectable).join().for_each(|selectable| selectable.selected = false);
+                (&mut selectable)
+                    .join()
+                    .for_each(|selectable| selectable.selected = false);
             }
 
             if let Some((entity, _)) = entity.0 {
@@ -289,11 +358,15 @@ impl<'a> System<'a> for RightClickInteractionSystem {
         ReadStorage<'a, Side>,
         ReadStorage<'a, Selectable>,
         ReadStorage<'a, DrillSpeed>,
-        ReadStorage<'a, Commands>
+        ReadStorage<'a, Commands>,
     );
 
-    fn run(&mut self, (entities, mut order, entity, plane, ray, mineable, side, selectable, drill, commands): Self::SystemData) {
-        let ordering = (&entities, &selectable, &side, &commands).join()
+    fn run(
+        &mut self,
+        (entities, mut order, entity, plane, ray, mineable, side, selectable, drill, commands): Self::SystemData,
+    ) {
+        let ordering = (&entities, &selectable, &side, &commands)
+            .join()
             .filter(|(_, selectable, side, _)| selectable.selected && **side == Side::Friendly)
             .map(|(entity, _, _, _)| entity);
 
@@ -302,8 +375,14 @@ impl<'a> System<'a> for RightClickInteractionSystem {
                 order.to_move = ordering.collect();
 
                 Interaction::Attack
-            } else if mineable.get(entity).filter(|mineable| !mineable.is_empty()).is_some() {
-                order.to_move = ordering.filter(|entity| drill.get(*entity).is_some()).collect();
+            } else if mineable
+                .get(entity)
+                .filter(|mineable| !mineable.is_empty())
+                .is_some()
+            {
+                order.to_move = ordering
+                    .filter(|entity| drill.get(*entity).is_some())
+                    .collect();
 
                 Interaction::Mine
             } else {
@@ -333,14 +412,12 @@ impl<'a> System<'a> for RightClickInteractionSystem {
 pub struct MiddleClickSystem;
 
 impl<'a> System<'a> for MiddleClickSystem {
-    type SystemData = (
-        Read<'a, Controls>,
-        WriteStorage<'a, Selectable>
-    );
+    type SystemData = (Read<'a, Controls>, WriteStorage<'a, Selectable>);
 
     fn run(&mut self, (controls, mut selectable): Self::SystemData) {
         if controls.middle_clicked() {
-            (&mut selectable).join()
+            (&mut selectable)
+                .join()
                 .for_each(|selectable| selectable.camera_following = selectable.selected);
         }
     }
@@ -354,7 +431,7 @@ impl<'a> System<'a> for TickTimedEntities {
         Read<'a, Secs>,
         Read<'a, Paused>,
         WriteStorage<'a, TimeLeft>,
-        ReadStorage<'a, Parent>
+        ReadStorage<'a, Parent>,
     );
 
     fn run(&mut self, (entities, secs, paused, mut time, parents): Self::SystemData) {
@@ -374,8 +451,8 @@ impl<'a> System<'a> for TickTimedEntities {
 fn delete_entity(entity: Entity, entities: &Entities, parents: &ReadStorage<Parent>) {
     entities.delete(entity).unwrap();
 
-    (entities, parents).join()
+    (entities, parents)
+        .join()
         .filter(|(_, parent)| parent.0 == entity)
         .for_each(|(entity, _)| delete_entity(entity, entities, parents));
-
 }
